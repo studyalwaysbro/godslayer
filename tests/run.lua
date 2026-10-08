@@ -59,7 +59,8 @@ end
 local function hkCredit() M.hk = M.hk + 1; M.fire("PLAYER_PVP_KILLS_CHANGED", "player"); M.fire("PLAYER_PVP_KILLS_CHANGED", "player") end
 
 -- 3. my killing blow on the original guild -------------------------------------
-local asmon = enemy("target", "Asmongold Asmongler", "OLYMPUS")
+local asmon = enemy("target", "Asmongold Asmongler", "OLYMPUS", { level = 60, race = "Human", sex = 2, rank = "Guild Master",
+                                                                pvpName = "Grand Marshal Asmongold Asmongler" })
 M.fire("PLAYER_TARGET_CHANGED")
 M.fire("PARTY_KILL", ME, asmon.guid)
 eq(c.kills, 1, "kb: kills"); eq(c.points, 5, "kb: 5 points for OLYMPUS"); eq(c.kb, 1, "kb: killing blow")
@@ -182,7 +183,7 @@ for _, m in ipairs(M.sentAddon) do
   check(#m[2] <= 255, "addon message fits")
 end
 check(sawHello, "hello sent after login"); check(sawStats, "stats broadcast after kills")
-check(sawStats and sawStats:match("^S;1;7;15;6;4;2;MAGE;1%.0%.0;2;%x%x%x%x%x%x$"), "stats payload: " .. tostring(sawStats))
+check(sawStats and sawStats:match("^S;1;7;15;6;4;2;MAGE;1%.1%.0;2;%x%x%x%x%x%x$"), "stats payload: " .. tostring(sawStats))
 local myTag = sawStats:match(";(%x+)$")
 M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;400;400;400;0;0;MAGE;1.0.0;0;" .. myTag, "GUILD", "Vesh")  -- own echo under a shorter name
 M.fire("CHAT_MSG_ADDON", "Godslayer", "H;1;" .. myTag, "GUILD", "Vesh")
@@ -240,7 +241,8 @@ local function checkPhrases(label)
   for _ in pairs(seenLines) do count = count + 1 end
   return count
 end
-check(checkPhrases("8 kills") >= 50, "all 50+ lines reachable with kills, original kills and a regicide")
+eq(checkPhrases("8 kills"), #ns.PHRASES, "every line is reachable with kills, original kills, a regicide and dossier data")
+check(#ns.PHRASES >= 65, "at least 65 lines shipped (" .. #ns.PHRASES .. ")")
 check(#ns.PHRASES >= 30, "at least 30 lines shipped (" .. #ns.PHRASES .. ")")
 for _, template in ipairs(ns.PHRASES) do check(#template <= 200, "template short enough: " .. template) end
 
@@ -340,6 +342,228 @@ check(GodslayerFrame.rows[1].cells[3].__text == "Blasphemer", "title column on t
 check(GodslayerFrame.status.__text:find("Title", 1, true) and GodslayerFrame.status.__text:find("Regicides", 1, true), "status line rendered")
 ns.Comm.ForgetRoster()
 
+-- 18c. the dossier: who they were, where, when ---------------------------------
+do
+  local A = c.victims[asmon.guid]
+  eq(A.level, 60, "dossier: level"); eq(A.race, "Human", "dossier: race"); eq(A.sex, 2, "dossier: sex")
+  eq(A.rank, "Guild Master", "dossier: guild rank"); eq(A.title, "Grand Marshal", "dossier: PvP title split from the name")
+  eq(A.up, 30, "dossier: level gap"); eq(#A.hist, A.kills, "dossier: one history entry per kill")
+  eq(A.hist[1][2], "Stranglethorn Vale", "history: zone"); eq(A.hist[1][3], "Nesingwary's Expedition", "history: subzone")
+  eq(A.hist[1][4], 1, "history: killing blow flag"); eq(A.hist[1][5], 60, "history: their level"); eq(A.hist[1][6], 30, "history: our level")
+  eq(A.zones["Stranglethorn Vale"], A.kills, "dossier: zone count"); eq(A.today, A.kills, "dossier: kills today")
+  eq(A.dayBest, A.kills, "dossier: best day")
+  local hourKills = 0
+  for hour, n in pairs(A.hours) do check(hour >= 0 and hour <= 23, "hour in range"); hourKills = hourKills + n end
+  eq(hourKills, A.kills, "dossier: every kill has an hour")
+  -- the cook was an assist first and the killing blow arrived late: the history entry is upgraded too
+  eq(c.victims[cook.guid].hist[1][4], 1, "late killing blow marks the history entry")
+  eq(c.victims[cook.guid].level, nil, "a level the client reports as -1 is not kept")
+
+  -- text helpers
+  eq(ns.clean("  a|cffff0000b|r\n "), "acffff0000br", "clean strips pipes and control characters")
+  eq(ns.clean(("x"):rep(39) .. "\195\177\195\177"), ("x"):rep(39), "clean never cuts a UTF-8 character in half")
+  eq(ns.clean(M.secret()), nil, "clean on a secret"); eq(ns.clean(""), nil, "clean on nothing"); eq(ns.clean(5), nil, "clean on a number")
+
+  -- a fresh victim: zone, day, run and guild changes
+  local k0 = c.kills
+  M.advance(30); clearUnits()
+  M.zone, M.subzone, M.myLevel = "Hillsbrad Foothills", "Tarren Mill", 31
+  local t1 = enemy("target", "Dossier Dummy", "OLYMPUS BETZ", { level = 29, race = "Dwarf", sex = 3, rank = "Captain", class = "PALADIN",
+                                                              pvpName = "Dossier Dummy, Hand of the King" })
+  M.fire("PLAYER_TARGET_CHANGED"); M.fire("PARTY_KILL", mate, t1.guid)
+  local D = c.victims[t1.guid]
+  eq(c.kills, k0 + 1, "dossier dummy scored"); eq(D.title, "Hand of the King", "title behind the name")
+  eq(D.up, -2, "level gap can be negative"); eq(D.hist[1][4], 0, "an assist is recorded as one")
+  eq(D.bestRun, 1, "run starts at one"); eq(D.sex, 3, "sex kept")
+  local facts = table.concat(ns.UI.KillFacts(D, { first = true, zone = "Hillsbrad Foothills" }), " / ")
+  eq(facts, "Level 29 Dwarf Paladin, Captain / Hillsbrad Foothills / First blood on this one", "first-kill facts")
+  M.advance(30); M.zone = "Arathi Highlands"
+  M.fire("PARTY_KILL", ME, t1.guid)
+  eq(D.kills, 2, "second kill"); eq(D.today, 2, "second today"); eq(D.bestRun, 2, "two in one life")
+  eq(D.zones["Arathi Highlands"], 1, "second zone counted"); eq(#D.hist, 2, "two history entries")
+  check(table.concat(ns.UI.KillFacts(D, { zone = "Arathi Highlands" }), " / "):find("Second time today / Returning Customer", 1, true), "repeat facts")
+  M.fire("PLAYER_DEAD"); M.advance(30)
+  t1.guild, t1.rank = "OLYMPUS LXX", nil; t1.secretRank = true
+  M.fire("PLAYER_TARGET_CHANGED"); M.fire("PARTY_KILL", ME, t1.guid)
+  eq(D.kills, 3, "third kill"); eq(D.bestRun, 2, "dying restarts the run, the record stays")
+  eq(D.rank, nil, "a rank from the old guild is dropped when the new one is hidden"); eq(D.guild, "OLYMPUS LXX", "guild follows them")
+  t1.secretRank = nil
+  -- the next day
+  M.advance(30); M.wall = M.wall + 86400
+  M.fire("PLAYER_TARGET_CHANGED"); M.fire("PARTY_KILL", ME, t1.guid)
+  eq(D.today, 1, "a new day starts the daily count again"); eq(D.dayBest, 3, "best day kept")
+  eq(ns.KillsToday(), 1, "kills today counts only today")
+
+  -- every detail hidden by the client: the kill still counts and nothing is stored as garbage
+  M.advance(30); clearUnits(); M.secretZone, M.secretMyLevel = true, true
+  local t2 = enemy("target", "Hidden Details", "OLYMPUS", { level = 40, race = "Gnome", sex = 3, rank = "Lord", pvpName = "Knight Hidden Details",
+    secretLevel = true, secretRace = true, secretSex = true, secretTitle = true, secretRank = true })
+  M.fire("PLAYER_TARGET_CHANGED"); M.fire("PARTY_KILL", ME, t2.guid)
+  local Hd = c.victims[t2.guid]
+  check(Hd and Hd.kills == 1, "kill with every detail secret still counts")
+  check(Hd.level == nil and Hd.race == nil and Hd.sex == nil and Hd.rank == nil and Hd.title == nil and Hd.up == nil, "no secret detail is stored")
+  eq(Hd.zones, nil, "no zone stored when the zone is hidden"); eq(Hd.hist[1][2], "", "history entry has an empty zone")
+  eq(Hd.hist[1][5], 0, "history entry has no level"); eq(ns.errors, nil, "secret details raise no errors")
+  M.secretZone, M.secretMyLevel = nil, nil
+  check(#ns.UI.DossierLines(t2.guid) >= 6, "a dossier with gaps still renders")
+  for _, line in ipairs(ns.UI.DossierLines(t2.guid)) do check(type(line[1]) == "string" and type(line[2]) == "string", "dossier lines are text") end
+
+  -- a victim who was never on screen: race, sex and level come from the client's cache
+  M.advance(30); clearUnits()
+  local t3 = enemy("hidden", "Cache Only", nil, { level = 44, race = "Night Elf", sex = 3 }); M.units.hidden = nil
+  GodslayerDB.known[t3.guid] = { n = "Cache Only", g = "OLYMPUS", c = "DRUID", t = time() } -- as 1.0.0 stored it
+  M.fire("PARTY_KILL", ME, t3.guid)
+  local Cv = c.victims[t3.guid]
+  check(Cv and Cv.race == "Night Elf" and Cv.sex == 3 and Cv.level == 44, "details filled from the GUID cache")
+
+  -- caps: history and zones stay bounded however long the feud runs
+  M.advance(30); M.units.target = t1; M.fire("PLAYER_TARGET_CHANGED")
+  local startKills = D.kills
+  for i = 1, 40 do
+    M.advance(20); M.zone = "Zone Number " .. i
+    M.fire("PARTY_KILL", ME, t1.guid)
+  end
+  eq(D.kills, startKills + 40, "forty more kills"); eq(#D.hist, ns.HIST_CAP, "history capped")
+  local zoneKeys, zoneKills = 0, 0
+  for _, n in pairs(D.zones) do zoneKeys, zoneKills = zoneKeys + 1, zoneKills + n end
+  check(zoneKeys <= ns.ZONE_CAP + 1, "zones capped (" .. zoneKeys .. ")"); eq(zoneKills, D.kills, "no kill lost to the zone cap")
+  check(D.zones[ns.ELSEWHERE] and D.zones[ns.ELSEWHERE] > 0, "overflow zones are lumped together")
+  eq(D.hist[#D.hist][2], "Zone Number 40", "newest kill is last in the history")
+  M.zone = "Stranglethorn Vale"
+
+  -- titles for repeat victims
+  eq((ns.VictimTier(1)), "Fresh Sacrifice", "victim tier 1"); eq((ns.VictimTier(2)), "Returning Customer", "victim tier 2")
+  eq((ns.VictimTier(7)), "Loyalty Card Holder", "victim tier 7"); eq(select(2, ns.VictimTier(7)), 8, "next victim tier")
+  eq((ns.VictimTier(9999)), "Basically My Alt", "top victim tier"); eq(select(2, ns.VictimTier(9999)), nil, "nothing above the top")
+
+  -- nemesis, aggregates, hit list
+  local nem, nemId = ns.Nemesis()
+  check(nem == D and nemId == t1.guid, "nemesis is the most killed")
+  local a = ns.Aggregates()
+  eq(a.kills, c.kills, "aggregate kills match the total")
+  local byClass, byHour, byZone = 0, 0, 0
+  for _, n in pairs(a.class) do byClass = byClass + n end
+  for hour, n in pairs(a.hour) do byHour = byHour + n end
+  for _, n in pairs(a.zone) do byZone = byZone + n end
+  eq(byClass, c.kills, "every kill has a class here"); eq(byHour, a.timed, "hours add up"); eq(byZone, a.zoned, "zones add up")
+  check(a.highest and a.highest.level == 60, "highest level kill"); check(a.upset and a.upset.up == 30, "biggest upset")
+  check(a.rank["Guild Master"] == A.kills, "kills by guild rank")
+  clearUnits()
+  local h1 = enemy("nameplate1", "Still Breathing", "OLYMPUS", { level = 52, rank = "Lord" })
+  local h2 = enemy("nameplate2", "Overflow Guy", "Olympus Kitchen", { level = 12 })
+  M.fire("NAME_PLATE_UNIT_ADDED", "nameplate2"); M.advance(5); M.fire("NAME_PLATE_UNIT_ADDED", "nameplate1")
+  local hit = ns.HitList()
+  eq(hit[1].name, "Still Breathing", "hit list: original guild first"); eq(hit[1].level, 52, "hit list: level"); eq(hit[1].rank, "Lord", "hit list: rank")
+  eq(hit[1].zone, "Stranglethorn Vale", "hit list: where they were seen")
+  local onList = {}
+  for _, k in ipairs(hit) do onList[k.name] = true end
+  check(onList["Overflow Guy"] and not onList["Dossier Dummy"] and not onList["Asmongold Asmongler"], "hit list holds the unkilled only")
+  check(ns.FindVictim("dossier dummy") == D and ns.FindVictim("Doss") == D and ns.FindVictim("") == nil and ns.FindVictim("zzz") == nil, "find a victim by name")
+
+  -- window: click a kill log row, read the dossier, brag, go back
+  GodslayerFrame.tabs[1].__scripts.OnClick()
+  local row1 = GodslayerFrame.rows[1]
+  check(row1.id ~= nil, "kill log rows carry the victim")
+  local clicked = row1.id
+  row1.__scripts.OnMouseUp(row1)
+  check(GodslayerFrame.rows[1].cells[1].__text:find("Target", 1, true), "dossier opens on a click")
+  check(GodslayerFrame.rows[1].cells[2].__text:find(c.victims[clicked].name, 1, true), "dossier is for the clicked player")
+  eq(GodslayerFrame.rows[1].id, nil, "dossier rows are not clickable")
+  GodslayerFrame.list.__scripts.OnMouseWheel(nil, -1); GodslayerFrame.list.__scripts.OnMouseWheel(nil, 1)
+  local text = {}
+  for _, line in ipairs(ns.UI.DossierLines(t1.guid)) do text[#text + 1] = line[1] .. " " .. line[2] end
+  text = table.concat(text, "\n")
+  for _, want in ipairs({ "Level 29 Dwarf Paladin", "Hand of the King", "OLYMPUS LXX", "Claimed As A Dependent", "killing blow", "Killing grounds",
+                          "in one day", "in a row without you dying", "below you at best", "Usually dies around", "Zone Number 40", "your killing blow" }) do
+    check(text:find(want, 1, true), "dossier mentions: " .. want)
+  end
+  M.advance(20); M.sentChat = {}
+  check(ns.UI.ShareVictim(t1.guid), "dossier brag posts")
+  eq(#M.sentChat, 1, "one line"); eq(M.sentChat[1][2], "GUILD", "to guild chat only")
+  check(M.sentChat[1][1]:find("Dossier: Dossier Dummy <OLYMPUS LXX>, Level 29 Dwarf Paladin. Killed 44 times", 1, true), "dossier brag text: " .. M.sentChat[1][1])
+  check(#M.sentChat[1][1] <= 255 and not M.sentChat[1][1]:find("[|{}]"), "dossier brag is chat safe")
+  check(not ns.UI.ShareVictim(t1.guid), "dossier brag is rate limited with the others")
+  check(not ns.UI.ShareVictim("Player-1-FFFFFFFF"), "no brag about a stranger")
+  local back
+  for _, f in ipairs(M.frames) do if f.__text == "Back" then back = f end end
+  back.__scripts.OnClick()
+  check(GodslayerFrame.rows[1].id ~= nil, "back returns to the kill log")
+  check(not ns.UI.OpenDossier("Player-1-FFFFFFFF"), "no dossier for someone never killed")
+  for tab = 4, 5 do GodslayerFrame.tabs[tab].__scripts.OnClick() end
+  GodslayerFrame.tabs[4].__scripts.OnClick()
+  check(GodslayerFrame.rows[1].cells[2].__text:find("Still Breathing", 1, true), "hit list tab rendered")
+  GodslayerFrame.tabs[5].__scripts.OnClick()
+  check(GodslayerFrame.rows[1].cells[1].__text:find("Records", 1, true) and GodslayerFrame.rows[2].cells[2].__text:find("Dossier Dummy", 1, true), "stats tab rendered with the nemesis")
+  for _ = 1, 12 do GodslayerFrame.list.__scripts.OnMouseWheel(nil, -1) end
+  GodslayerFrame.tabs[1].__scripts.OnClick()
+
+  -- tooltip and slash commands with the new data
+  GameTooltip.__unit = "target"; GameTooltip.__lines = {}; M.units.target = t1; M.tooltipHook(GameTooltip)
+  check(GameTooltip.__lines[3] and GameTooltip.__lines[3]:find("Claimed As A Dependent. Last: now ago in Zone Number 40", 1, true), "tooltip title and last kill: " .. tostring(GameTooltip.__lines[3]))
+  GameTooltip.__lines = {}; M.units.target = h1; M.tooltipHook(GameTooltip)
+  check(GameTooltip.__lines[2] and GameTooltip.__lines[2]:find("hit list", 1, true), "tooltip marks the hit list")
+  M.printed = {}
+  for _, cmd in ipairs({ "dossier Dossier Dummy", "dossier doss", "dossier", "dossier nobody at all", "who Asmongold", "nemesis", "hitlist", "help", "demo" }) do slash(cmd) end
+  local printed = table.concat(M.printed, "\n")
+  check(printed:find("Claimed As A Dependent", 1, true) and printed:find("Still Breathing", 1, true) and printed:find("No kill on record", 1, true), "slash output")
+  check(not printed:find("command failed", 1, true), "new slash commands do not fail")
+  eq(ns.errors, nil, "no handler errors after the dossier tests")
+
+  -- promotions: each kill keeps the rank they held when it happened
+  M.advance(30); clearUnits()
+  local climber = enemy("target", "Career Climber", "OLYMPUS", { level = 30, rank = "Recruit" })
+  M.fire("PLAYER_TARGET_CHANGED"); M.fire("PARTY_KILL", ME, climber.guid)
+  M.advance(30); climber.rank = "Officer"
+  M.fire("PLAYER_TARGET_CHANGED"); M.fire("PARTY_KILL", ME, climber.guid)
+  local ranks = ns.Aggregates().rank
+  eq(ranks["Recruit"], 1, "the kill as a recruit stays a recruit kill"); eq(ranks["Officer"], 1, "the kill as an officer is an officer kill")
+  eq(c.victims[climber.guid].rank, "Officer", "the dossier shows the latest rank")
+  local rankLine
+  for _, line in ipairs(ns.UI.DossierLines(climber.guid)) do if line[1]:find("Rank in that guild", 1, true) then rankLine = line[2] end end
+  check(rankLine and rankLine:find("Officer", 1, true) and rankLine:find("also killed as Recruit", 1, true), "dossier lists earlier ranks: " .. tostring(rankLine))
+  for i = 1, 12 do
+    M.advance(20); climber.rank = "Rank " .. i
+    M.fire("PLAYER_TARGET_CHANGED"); M.fire("PARTY_KILL", ME, climber.guid)
+  end
+  local rankKeys, rankKills = 0, 0
+  for _, n in pairs(c.victims[climber.guid].ranks) do rankKeys, rankKills = rankKeys + 1, rankKills + n end
+  check(rankKeys <= ns.RANK_CAP + 1, "ranks per victim capped (" .. rankKeys .. ")"); eq(rankKills, 14, "no kill lost to the rank cap")
+
+  -- a kill scored only after we died belongs to the life it happened in
+  M.advance(30); clearUnits(); M.fire("PLAYER_DEAD")
+  local late = enemy("hidden", "Tagged Late", "OLYMPUS"); M.units.hidden = nil
+  local bestBefore = c.bestStreak
+  M.fire("PARTY_KILL", ME, late.guid)              -- guild unknown: waits
+  M.fire("PLAYER_DEAD")                             -- we die
+  M.units.mouseover = late; M.fire("UPDATE_MOUSEOVER_UNIT") -- the tag shows on the corpse run: scored now
+  eq(c.victims[late.guid].kills, 1, "late kill scored"); eq(ns.session.streak, 0, "it does not start a streak in the new life")
+  M.advance(30); M.units.target = late; M.fire("PLAYER_TARGET_CHANGED"); M.fire("PARTY_KILL", ME, late.guid)
+  eq(c.victims[late.guid].kills, 2, "second kill after resurrecting")
+  eq(c.victims[late.guid].bestRun, 1, "two kills split by our death are not a run of two"); eq(ns.session.streak, 1, "streak counts the new life only")
+  eq(c.bestStreak, bestBefore, "best streak not inflated by the late kill")
+
+  -- the sighting list holds its cap inside one long session
+  M.advance(30); clearUnits()
+  for i = 1, ns.KNOWN_CAP + 450 do
+    M.wall = M.wall + 1
+    M.units.nameplate9 = { name = "Raid Member" .. i, guid = ("Player-9-%08X"):format(i), guild = "OLYMPUS RAID", class = "WARRIOR", faction = "Alliance" }
+    M.fire("NAME_PLATE_UNIT_ADDED", "nameplate9")
+  end
+  local knownNow = 0
+  for _ in pairs(GodslayerDB.known) do knownNow = knownNow + 1 end
+  check(knownNow <= ns.KNOWN_CAP, "sightings capped mid-session (" .. knownNow .. ")")
+  check(GodslayerDB.known[("Player-9-%08X"):format(ns.KNOWN_CAP + 450)] and not GodslayerDB.known[("Player-9-%08X"):format(1)], "the oldest sightings go first")
+  for id in pairs(GodslayerDB.known) do if id:sub(1, 9) == "Player-9-" then GodslayerDB.known[id] = nil end end
+  M.units.nameplate9 = nil
+
+  -- a broken clock costs the time-of-day detail, not the kill
+  M.advance(30); M.dateError = true
+  local before = c.kills
+  M.units.target = t1; M.fire("PLAYER_TARGET_CHANGED"); M.fire("PARTY_KILL", ME, t1.guid)
+  eq(c.kills, before + 1, "kill counts without a working date()")
+  M.dateError = nil
+end
+
 -- 19. zero state and reset ------------------------------------------------------
 slash("reset confirm")
 eq(c.kills, 0, "reset wipes kills"); eq(next(c.victims), nil, "reset wipes victims")
@@ -355,6 +579,69 @@ GodslayerFrame, GodslayerMinimapButton = nil, nil
 local ns2 = M.load("Godslayer", { "Data.lua", "Core.lua", "Comm.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
 check(GodslayerDB == saved and ns2.char.kills == 1, "totals reload from saved variables")
+eq(GodslayerDB.version, 2, "data version")
+
+-- 21. a database written by 1.0.0 loads unchanged and gains details from then on ---
+do
+  GodslayerDB = {
+    version = 1, log = { "10-07 23:33:03 login: Old Timer v1.0.0 build 1.60.1" }, roster = {}, ignore = {}, custom = {},
+    opts = { minimapAngle = -173.67, minimap = true, toast = true, tooltip = true, sound = true, chat = true },
+    known = { ["Player-1-0000F001"] = { c = "SHAMAN", t = time() - 3600, g = "OLYMPUS EVICTION NOTICE", n = "Old Sighting" } },
+    chars = { ["Vesh Torchman"] = { uniques = 1, kb = 1, class = "MAGE", orig = 2, kills = 2, points = 10, kings = 0, bestStreak = 2,
+      guilds = { OLYMPUS = { kills = 2, points = 10, tier = "original" } },
+      victims = { ["Player-1-0000F002"] = { kills = 2, points = 10, kb = 1, ok = 2, first = time() - 9000, last = time() - 600,
+                                            guild = "OLYMPUS", tier = "original", name = "Old Victim", class = "ROGUE" } } } },
+  }
+  M.frames, M.timers = { UIParent, Minimap, GameTooltip }, {}
+  GodslayerFrame, GodslayerWindow, GodslayerMinimapButton, M.failTemplate = nil, nil, nil, nil
+  local ns3 = M.load("Godslayer", { "Data.lua", "Core.lua", "Comm.lua", "UI.lua" })
+  M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
+  local c3 = ns3.char
+  eq(GodslayerDB.version, 2, "old data is marked as migrated"); eq(c3.kills, 2, "old kills kept"); eq(c3.points, 10, "old points kept")
+  local old = c3.victims["Player-1-0000F002"]
+  check(old.kills == 2 and old.name == "Old Victim" and old.hist == nil, "old victim untouched")
+  local lines = ns3.UI.DossierLines("Player-1-0000F002")
+  local joined = ""
+  for _, line in ipairs(lines) do joined = joined .. line[1] .. " " .. line[2] .. "\n" end
+  check(joined:find("from before version 1.1", 1, true) and joined:find("Returning Customer", 1, true), "old victim has a dossier that says what is missing")
+  eq(#ns3.HitList(), 1, "old sightings feed the hit list"); eq(ns3.HitList()[1].level, nil, "with no level yet")
+  ns3.UI.Toggle()
+  for tab = 1, 5 do GodslayerFrame.tabs[tab].__scripts.OnClick() end
+  ns3.UI.OpenDossier("Player-1-0000F002")
+  local a3 = ns3.Aggregates()
+  eq(a3.kills, 2, "aggregates work on old records"); eq(a3.zoned, 0, "old kills have no zone")
+  for i = 1, 60 do ns3.UI.CurrentPhrase(); for _, f in ipairs(M.frames) do if f.__text == "Another line" then f.__scripts.OnClick() end end end
+  M.advance(30)
+  M.addUnit("target", { name = "Old Victim", guid = "Player-1-0000F002", guild = "OLYMPUS", class = "ROGUE", faction = "Alliance", level = 33, race = "Gnome" })
+  M.fire("PLAYER_TARGET_CHANGED"); M.fire("PARTY_KILL", ME, "Player-1-0000F002")
+  eq(old.kills, 3, "an old victim can be killed again"); eq(#old.hist, 1, "and starts a history"); eq(old.level, 33, "and gains a level")
+  eq(old.zones["Stranglethorn Vale"], 1, "and a zone"); eq(c3.points, 15, "points carry on from the old total")
+  eq(ns3.errors, nil, "no errors on migrated data")
+  -- an old client's stats message is still understood, and ours still fits its parser
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;3;7;2;1;1;ROGUE;1.0.0;0;abc123", "GUILD", "Brakka Ashmane")
+  eq(ns3.Comm.Leaderboard()[1].points, 15, "we lead"); eq(ns3.Comm.Leaderboard()[2].name, "Brakka Ashmane", "a 1.0.0 guildmate still shows on the board")
+  M.advance(60)
+  local mine
+  for _, m in ipairs(M.sentAddon) do if m[2]:match("^S;1;") then mine = m[2] end end
+  local fields = { strsplit(";", mine) }
+  eq(#fields, 11, "our stats message keeps the 1.0.0 field count")
+
+  -- thousands of victims: only the newest feuds keep kill-by-kill history, every total stays
+  local victims, extra = c3.victims, ns3.DETAIL_CAP + 120
+  for i = 1, extra do
+    victims["Player-7-" .. i] = { kills = 1, points = 1, kb = 0, first = 1791000000 + i, last = 1791000000 + i, guild = "Olympus Kitchen",
+                                  tier = "network", name = "Crowd " .. i, hist = { { 1791000000 + i, "Zone", "", 0, 0, 0 } }, zones = { Zone = 1 } }
+  end
+  ns3.Recount()
+  local killsBefore = c3.kills
+  M.fire("PLAYER_LOGIN")
+  local withHistory = 0
+  for _, v in pairs(victims) do if v.hist then withHistory = withHistory + 1 end end
+  eq(withHistory, ns3.DETAIL_CAP, "kill-by-kill history kept for the newest feuds only")
+  check(victims["Player-7-1"].hist == nil and victims["Player-7-1"].kills == 1 and victims["Player-7-1"].zones.Zone == 1, "the oldest keep totals and zones")
+  check(victims["Player-7-" .. extra].hist ~= nil and old.hist ~= nil, "the newest keep their history")
+  eq(c3.kills, killsBefore, "no kill lost to compaction")
+end
 -- fallback window when the frame template is missing
 M.failTemplate = true; ns2.UI.Toggle()
 check(GodslayerWindow and GodslayerWindow:IsShown(), "window falls back without the template")

@@ -1,8 +1,8 @@
 ## Interface: 16001
 ## Title: Godslayer
-## Notes: Counts your kills on OLYMPUS and every Olympus-network guild, scores them, hands out titles and keeps a guild leaderboard. Type /godslayer.
+## Notes: Counts your kills on OLYMPUS and every Olympus-network guild, keeps a dossier on everyone you kill, hands out titles and runs a guild leaderboard. Type /godslayer.
 ## Author: The True Torchmen
-## Version: 1.0.0
+## Version: 1.1.0
 ## SavedVariables: GodslayerDB
 ## IconTexture: Interface\Icons\INV_Misc_Bone_HumanSkull_01
 ## AddonCompartmentFunc: Godslayer_OnCompartmentClick

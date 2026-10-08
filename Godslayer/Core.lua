@@ -7,18 +7,28 @@
 --                             at the same moment through UNIT_DIED
 --   the honor chat line       only when it names the victim, which is rare on Forever
 -- Guild names come from units you can see (target, mouseover, focus, nameplates).
+-- So does everything in a victim's dossier: level, race, guild rank, PvP title. The
+-- client may hide any of those, and then the dossier simply has a gap.
 -- Players are keyed by GUID: Forever has first and last names and no realms.
 -- Everything read from the game is checked for secret values before it is compared.
 
 local ADDON, ns = ...
 
-ns.VERSION = "1.0.0"
+ns.VERSION = "1.1.0"
 
 local DEDUPE_SECONDS = 10        -- the signals above can all describe the same death
 local MATCH_WINDOW = 8           -- honorable-kill credit and a seen death must be this close
 local PENDING_SECONDS = 15 * 60  -- how long a kill waits for the victim's guild to be seen
 local KNOWN_MAX_AGE = 7 * 86400  -- how long a remembered guild tag is trusted for scoring
 local KNOWN_CAP, SEEN_CAP, LOG_CAP = 4000, 1500, 150
+local HIST_CAP = 12              -- kills remembered in detail per victim
+local ZONE_CAP = 12              -- zones remembered per victim; the rest go under ELSEWHERE
+local TEXT_MAX = 40              -- longest rank, race, title or zone name kept
+local RANK_CAP = 6               -- guild ranks remembered per victim; the rest go under OTHER_RANKS
+local DETAIL_CAP = 2500          -- victims that keep a kill-by-kill history; older feuds keep their totals
+local ELSEWHERE, OTHER_RANKS = "Elsewhere", "Other ranks"
+ns.HIST_CAP, ns.ZONE_CAP, ns.RANK_CAP, ns.DETAIL_CAP, ns.KNOWN_CAP = HIST_CAP, ZONE_CAP, RANK_CAP, DETAIL_CAP, KNOWN_CAP
+ns.ELSEWHERE, ns.OTHER_RANKS = ELSEWHERE, OTHER_RANKS
 
 local issecret = issecretvalue or function() return false end
 -- the bare global is only a deprecation shim on this client
@@ -34,10 +44,31 @@ ns.plain = plain
 -- Call a game function that may be missing or may reject its arguments.
 local function try(f, ...)
   if type(f) ~= "function" then return nil end
-  local ok, a, b, c, d, e, g, h = pcall(f, ...)
-  if ok then return a, b, c, d, e, g, h end
+  local ok, a, b, c, d, e, g, h, i = pcall(f, ...)
+  if ok then return a, b, c, d, e, g, h, i end
 end
 ns.try = try
+
+-- Text from the game made safe to keep and show: no escape codes, no control
+-- characters, bounded, and never cut in the middle of a UTF-8 character.
+local function clean(s, max)
+  s = plain(s)
+  if type(s) ~= "string" then return nil end
+  s = s:gsub("|", ""):gsub("%c", ""):match("^%s*(.-)%s*$")
+  max = max or TEXT_MAX
+  if #s > max then
+    local cut = max
+    while cut > 0 do
+      local b = s:byte(cut + 1)
+      if not b or b < 128 or b >= 192 then break end
+      cut = cut - 1
+    end
+    s = s:sub(1, cut)
+  end
+  if s == "" then return nil end
+  return s
+end
+ns.clean = clean
 
 function ns.Print(msg)
   print("|cffff7d0aGodslayer:|r " .. tostring(msg))
@@ -47,7 +78,8 @@ function ns.Log(kind, msg)
   local db = GodslayerDB
   if not db then return end
   local log = db.log
-  log[#log + 1] = date("%m-%d %H:%M:%S") .. " " .. kind .. ": " .. tostring(msg)
+  local when = try(date, "%m-%d %H:%M:%S")
+  log[#log + 1] = (type(when) == "string" and when or "?") .. " " .. kind .. ": " .. tostring(msg)
   while #log > LOG_CAP do table.remove(log, 1) end
 end
 
@@ -128,10 +160,13 @@ end
 local function initDB()
   GodslayerDB = type(GodslayerDB) == "table" and GodslayerDB or {}
   local db = GodslayerDB
-  db.version = 1
+  -- version 2 (1.1.0) adds optional detail fields to victims and known players; records
+  -- written by 1.0.0 are valid as they are and simply have less to show
+  db.version = 2
   db.chars = db.chars or {}     -- per character scores
   db.roster = db.roster or {}   -- [guild][member] = scores received over addon chat
-  db.known = db.known or {}     -- network members seen: [id] = { n = name, g = guild, c = class, t = time }
+  db.known = db.known or {}     -- network members seen: [id] = { n = name, g = guild, c = class, t = time,
+                                --   l = level, r = race, s = sex, k = guild rank, p = PvP title, z = zone seen in }
   db.custom = db.custom or {}   -- extra guilds added with /godslayer add
   db.ignore = db.ignore or {}   -- guilds excluded with /godslayer ignore
   db.opts = db.opts or {}
@@ -169,7 +204,18 @@ local function initChar()
   local _, class = try(UnitClass, "player")
   c.class = plain(class) or c.class
   ns.char, ns.myName = c, myName
-  ns.session = { kills = 0, points = 0, streak = 0 }
+  -- life counts our own deaths: a kill belongs to the life it happened in, even when it
+  -- is only scored later, once the victim's guild tag is seen
+  ns.session = { kills = 0, points = 0, streak = 0, runs = {}, life = 1 }
+  -- only so many victims keep their kill-by-kill history; the oldest feuds keep the totals
+  local list = {}
+  for _, v in pairs(c.victims) do
+    if v.hist then list[#list + 1] = v end
+  end
+  if #list > DETAIL_CAP then
+    table.sort(list, function(a, b) return (a.last or 0) < (b.last or 0) end)
+    for i = 1, #list - DETAIL_CAP do list[i].hist = nil end
+  end
 end
 
 -- ---------------------------------------------------------------------------
@@ -181,16 +227,44 @@ local nameId = {}               -- [full name] = id, for the rare signal that on
 local pending = {}              -- kills waiting for a guild: [id] = record
 local recent = {}               -- last kill per victim: [id] = record
 
+local knownCount = 0            -- entries in GodslayerDB.known, kept so the cap holds mid-session
+
 local function pruneKnown()
   local known = GodslayerDB.known
   local list = {}
   for id, e in pairs(known) do list[#list + 1] = { id, e.t or 0 } end
+  knownCount = #list
   if #list <= KNOWN_CAP then return end
   table.sort(list, function(a, b) return a[2] < b[2] end)
-  for i = 1, #list - KNOWN_CAP + 200 do known[list[i][1]] = nil end
+  local drop = #list - KNOWN_CAP + 200
+  for i = 1, drop do known[list[i][1]] = nil end
+  knownCount = #list - drop
 end
 
 local Score, noteDeathRef -- defined below
+
+-- The PvP title in front of (or behind) a name, when the client shows one.
+local function pvpTitle(unit, name)
+  local full = clean((try(UnitPVPName, unit)), 90)
+  if not full or full == name then return nil end
+  local rest, found = full, false
+  for word in name:gmatch("%S+") do
+    local at, to = rest:find(word, 1, true)
+    if at then rest, found = rest:sub(1, at - 1) .. " " .. rest:sub(to + 1), true end
+  end
+  if not found then return nil end
+  return clean((rest:gsub("[%s,]+", " ")))
+end
+
+-- Level, race, sex and title of a visible player. Any of them can be hidden.
+local function observeDetails(unit, e, name)
+  local level = plain(try(UnitLevel, unit))
+  if type(level) == "number" and level >= 1 and level <= 200 then e.level = math.floor(level) end
+  e.race = clean((try(UnitRace, unit))) or e.race
+  local sex = plain(try(UnitSex, unit))
+  if sex == 2 or sex == 3 then e.sex = sex end
+  e.title = pvpTitle(unit, name) or e.title
+end
 
 local function resolvePending(id, guild, tier, class)
   local rec = pending[id]
@@ -215,8 +289,10 @@ local function ObserveUnit(unit)
   if not guid and name == myName then return end
 
   local id = guid or ("name:" .. name)
-  local guild = plain((try(GetGuildInfo, unit)))
+  local guild, rank = try(GetGuildInfo, unit)
+  guild = plain(guild)
   if type(guild) ~= "string" or guild == "" then guild = nil end
+  rank = guild and clean(rank) or nil
   local _, class = try(UnitClass, unit)
   class = plain(class)
   if type(class) ~= "string" then class = nil end
@@ -230,6 +306,7 @@ local function ObserveUnit(unit)
   e.t, e.name = GetTime(), name
   e.class = class or e.class
   nameId[name] = id
+  observeDetails(unit, e, name)
 
   local faction = plain(try(UnitFactionGroup, unit))
   if type(faction) == "string" and myFaction then
@@ -244,14 +321,20 @@ local function ObserveUnit(unit)
   if dead == true or dead == false then e.dead = dead end
 
   if not guild then return id, e.guild end -- guild data may simply not have arrived yet
+  if e.guild ~= guild then e.rank = nil end -- a rank belongs to the guild it was read in
   e.guild = guild
+  e.rank = rank or e.rank
 
   local tier = ns.Classify(guild)
   local known = GodslayerDB.known
   if tier then
-    known[id] = { n = name, g = guild, c = e.class, t = time() }
+    if not known[id] then knownCount = knownCount + 1 end
+    known[id] = { n = name, g = guild, c = e.class, t = time(), l = e.level, r = e.race, s = e.sex,
+                  k = e.rank, p = e.title, z = clean((try(GetRealZoneText))) }
+    if knownCount > KNOWN_CAP then pruneKnown() end -- a thousand-player raid can walk past in one sitting
   elseif known[id] then
     known[id] = nil -- they left the network
+    knownCount = knownCount - 1
   end
   resolvePending(id, guild, tier, e.class)
   return id, guild
@@ -277,6 +360,25 @@ local function lookup(id)
   return nil, class, name
 end
 
+-- Everything else known about a player, from the screen, from memory, or (for race,
+-- sex and level) from the client's own cache when they were never on screen.
+local function details(id)
+  local e, k = seen[id], GodslayerDB.known[id]
+  local d = {
+    level = (e and e.level) or (k and k.l), race = (e and e.race) or (k and k.r),
+    sex = (e and e.sex) or (k and k.s), rank = (e and e.rank) or (k and k.k),
+    title = (e and e.title) or (k and k.p),
+  }
+  if not (d.race and d.sex and d.level) and id:sub(1, 7) == "Player-" then
+    local _, _, race, _, sex, _, _, level = try(GetPlayerInfoByGUID, id)
+    sex, level = plain(sex), plain(level)
+    d.race = d.race or clean(race)
+    if not d.sex and (sex == 2 or sex == 3) then d.sex = sex end
+    if not d.level and type(level) == "number" and level >= 1 and level <= 200 then d.level = math.floor(level) end
+  end
+  return d
+end
+
 -- For the tooltip: tier and guild of a visible unit, if it is in the network.
 function ns.UnitTier(unit)
   local id, guild = ObserveUnit(unit)
@@ -295,6 +397,61 @@ local function addKillingBlow(id)
   if v.tier then c.kb = c.kb + 1 end -- an ignored guild's records stay out of the totals
 end
 
+-- Count one more under a key, folding new keys into the overflow key once the table is full.
+local function bump(counts, key, cap, overflow)
+  if counts[key] == nil and key ~= overflow then
+    local n = 0
+    for _ in pairs(counts) do n = n + 1 end
+    if n >= cap then key = overflow end
+  end
+  counts[key] = (counts[key] or 0) + 1
+end
+
+-- The dossier side of a kill: who they were, where and when it happened.
+local function recordDetails(id, v, rec, guildChanged)
+  local d = details(id)
+  if guildChanged then v.rank = nil end
+  v.level, v.race, v.sex = d.level or v.level, d.race or v.race, d.sex or v.sex
+  v.rank, v.title = d.rank or v.rank, d.title or v.title
+  if v.rank then
+    -- counted per kill: people get promoted, and old kills must keep the rank they had
+    v.ranks = v.ranks or {}
+    bump(v.ranks, v.rank, RANK_CAP, OTHER_RANKS)
+  end
+  if rec.zone then
+    v.zones = v.zones or {}
+    bump(v.zones, rec.zone, ZONE_CAP, ELSEWHERE)
+  end
+  if rec.hour then
+    v.hours = v.hours or {}
+    v.hours[rec.hour] = (v.hours[rec.hour] or 0) + 1
+  end
+  if rec.day then
+    if v.day ~= rec.day then v.day, v.today = rec.day, 0 end
+    v.today = (v.today or 0) + 1
+    if v.today > (v.dayBest or 0) then v.dayBest = v.today end
+  end
+  -- kills on them since we last died; a kill scored after we died since is a run of its own
+  if rec.life == ns.session.life then
+    local runs = ns.session.runs
+    runs[id] = (runs[id] or 0) + 1
+    if runs[id] > (v.bestRun or 0) then v.bestRun = runs[id] end
+  elseif (v.bestRun or 0) < 1 then
+    v.bestRun = 1
+  end
+  -- how far above us they were, at most
+  if d.level and rec.myLevel then
+    local diff = d.level - rec.myLevel
+    if not v.up or diff > v.up then v.up = diff end
+  end
+  -- { when, zone, subzone, killing blow, their level, our level }
+  local entry = { rec.wall or time(), rec.zone or "", rec.sub or "", rec.kb and 1 or 0, d.level or 0, rec.myLevel or 0 }
+  v.hist = v.hist or {}
+  v.hist[#v.hist + 1] = entry
+  while #v.hist > HIST_CAP do table.remove(v.hist, 1) end
+  rec.entry = entry
+end
+
 function Score(id, name, guild, tier, rec, class)
   local c = ns.char
   local pts = ns.PointsFor(tier)
@@ -311,6 +468,7 @@ function Score(id, name, guild, tier, rec, class)
   -- ok = kills made while they wore the original tag; people change guilds
   v.kills, v.points = v.kills + 1, v.points + pts
   if tier == "original" then v.ok = (v.ok or 0) + 1 end
+  local guildChanged = v.guild ~= nil and v.guild ~= guild
   v.guild, v.tier, v.last = guild, tier, now
   v.name = name or v.name or "Unknown"
   v.class = class or v.class
@@ -320,18 +478,22 @@ function Score(id, name, guild, tier, rec, class)
   if not g then g = { kills = 0, points = 0 }; c.guilds[guild] = g end
   g.kills, g.points, g.tier = g.kills + 1, g.points + pts, tier
   rec.scored = true
+  recordDetails(id, v, rec, guildChanged)
   if rec.kb then addKillingBlow(id) end
   if revived then ns.Recount() end
   local s = ns.session
-  s.kills, s.points, s.streak = s.kills + 1, s.points + pts, s.streak + 1
-  if s.streak > (c.bestStreak or 0) then c.bestStreak = s.streak end
+  local sameLife = rec.life == s.life
+  s.kills, s.points = s.kills + 1, s.points + pts
+  if sameLife then s.streak = s.streak + 1 end
+  if math.max(s.streak, 1) > (c.bestStreak or 0) then c.bestStreak = math.max(s.streak, 1) end
   local king = ns.IsKing(v.name, tier)
   if king then c.kings = (c.kings or 0) + 1; v.king = true end
   local rankName, rankAfter = ns.RankFor(c.points)
 
   ns.Log("score", v.name .. " <" .. guild .. "> +" .. pts .. (rec.kb and " kb" or ""))
   if ns.OnScore then
-    ns.OnScore(v, guild, tier, pts, { king = king, streak = s.streak, rankUp = rankAfter > rankBefore and rankName or nil })
+    ns.OnScore(v, guild, tier, pts, { king = king, streak = sameLife and s.streak or 1, rankUp = rankAfter > rankBefore and rankName or nil,
+                                      first = v.kills == 1, zone = rec.zone, sub = rec.sub })
   end
 end
 
@@ -363,6 +525,7 @@ local function RegisterKill(id, name, kb, source)
       rec.kb = true
       if rec.scored then
         addKillingBlow(id)
+        if rec.entry then rec.entry[4] = 1 end
         if ns.Comm then ns.Comm.MarkDirty() end
         if ns.OnChanged then ns.OnChanged() end
       end
@@ -374,7 +537,15 @@ local function RegisterKill(id, name, kb, source)
   sweepUnits()
   local guild, class, seenName = lookup(id)
   name = seenName or name
-  rec = { t = now, kb = kb and true or false, name = name }
+  rec = { t = now, kb = kb and true or false, name = name, life = ns.session.life }
+  -- where and when, taken now: a kill waiting for its guild tag is scored later
+  local wall = time()
+  local hour, myLevel = tonumber((try(date, "%H", wall))), plain(try(UnitLevel, "player"))
+  local day = try(date, "%Y%m%d", wall)
+  rec.wall, rec.day = wall, type(day) == "string" and day or nil
+  rec.hour = hour and hour >= 0 and hour <= 23 and math.floor(hour) or nil
+  rec.zone, rec.sub = clean((try(GetRealZoneText))), clean((try(GetSubZoneText)))
+  rec.myLevel = type(myLevel) == "number" and myLevel >= 1 and math.floor(myLevel) or nil
   recent[id] = rec
   ns.Log("kill", tostring(name or id) .. " via " .. source .. (kb and " kb" or ""))
 
@@ -628,6 +799,7 @@ function handlers.CHAT_MSG_COMBAT_HONOR_GAIN(text)
 end
 
 function handlers.PLAYER_DEAD()
+  ns.session.runs, ns.session.life = {}, ns.session.life + 1
   if ns.session.streak > 0 then
     ns.session.streak = 0
     if ns.OnChanged then ns.OnChanged() end
@@ -705,7 +877,7 @@ function ns.ResetCharacter()
   for k in pairs(c) do c[k] = nil end
   for k, v in pairs(newChar()) do c[k] = v end
   c.class = class
-  ns.session = { kills = 0, points = 0, streak = 0 }
+  ns.session = { kills = 0, points = 0, streak = 0, runs = {}, life = 1 }
   pending, recent = {}, {}
 end
 
@@ -728,4 +900,93 @@ function ns.Recount()
       g.kills, g.points = g.kills + v.kills, g.points + v.points
     end
   end
+end
+
+-- ---------------------------------------------------------------------------
+-- Things worked out from the kill records, for the window and the brag lines
+-- ---------------------------------------------------------------------------
+
+-- What a player is to you after this many kills: label and the count the next one needs.
+function ns.VictimTier(kills)
+  local label, nextAt
+  for _, tier in ipairs(ns.VICTIM_TIERS) do
+    if kills >= tier[1] then label = tier[2] elseif not nextAt then nextAt = tier[1] end
+  end
+  return label, nextAt
+end
+
+function ns.KillsToday()
+  local day, n = try(date, "%Y%m%d", time()), 0
+  if type(day) ~= "string" then return 0 end
+  for _, v in pairs(ns.char.victims) do
+    if v.tier and v.day == day then n = n + (v.today or 0) end
+  end
+  return n
+end
+
+-- The player you have killed most, once it is more than a coincidence.
+function ns.Nemesis()
+  local best, bestId
+  for id, v in pairs(ns.char.victims) do
+    if v.tier and v.kills >= 2 then
+      if not best or v.kills > best.kills or (v.kills == best.kills and (v.last or 0) > (best.last or 0)) then
+        best, bestId = v, id
+      end
+    end
+  end
+  return best, bestId
+end
+
+-- Kills split by class, zone, guild rank and hour, plus a few records. Built from the
+-- victims every time, so it can never drift from the totals.
+function ns.Aggregates()
+  local a = { class = {}, zone = {}, rank = {}, hour = {}, kills = 0, zoned = 0, timed = 0 }
+  for id, v in pairs(ns.char.victims) do
+    if v.tier then
+      a.kills = a.kills + v.kills
+      if v.class then a.class[v.class] = (a.class[v.class] or 0) + v.kills end
+      for rank, n in pairs(v.ranks or {}) do a.rank[rank] = (a.rank[rank] or 0) + n end
+      for zone, n in pairs(v.zones or {}) do a.zone[zone] = (a.zone[zone] or 0) + n; a.zoned = a.zoned + n end
+      for hour, n in pairs(v.hours or {}) do a.hour[hour] = (a.hour[hour] or 0) + n; a.timed = a.timed + n end
+      if v.level and (not a.highest or v.level > a.highest.level) then a.highest = v end
+      if v.up and (not a.upset or v.up > a.upset.up) then a.upset = v end
+      if v.dayBest and (not a.day or v.dayBest > a.day.dayBest) then a.day = v end
+      if v.bestRun and (not a.run or v.bestRun > a.run.bestRun) then a.run = v end
+    end
+  end
+  return a
+end
+
+-- Network members you have seen and not killed yet, the original guild first, then the
+-- most recently seen.
+function ns.HitList()
+  local list, victims = {}, ns.char.victims
+  for id, k in pairs(GodslayerDB.known) do
+    local v = victims[id]
+    if not (v and v.tier) and type(k.n) == "string" then
+      local tier = ns.Classify(k.g)
+      if tier then
+        list[#list + 1] = { id = id, name = k.n, guild = k.g, class = k.c, level = k.l, race = k.r, rank = k.k,
+                            zone = k.z, t = k.t or 0, tier = tier }
+      end
+    end
+  end
+  table.sort(list, function(x, y)
+    if x.tier ~= y.tier then return x.tier == "original" end
+    if x.t ~= y.t then return x.t > y.t end
+    return x.name < y.name
+  end)
+  return list
+end
+
+-- A victim by name: exact first, then the start of a name, any capitalisation.
+function ns.FindVictim(text)
+  if type(text) ~= "string" or text == "" then return nil end
+  local want, partial, partialId = text:lower(), nil, nil
+  for id, v in pairs(ns.char.victims) do
+    local name = type(v.name) == "string" and v.name:lower() or ""
+    if name == want then return v, id end
+    if name:sub(1, #want) == want and (not partial or v.kills > partial.kills) then partial, partialId = v, id end
+  end
+  return partial, partialId
 end

@@ -1,4 +1,5 @@
--- Godslayer window, kill toast, brag lines, minimap button, tooltip line, slash commands.
+-- Godslayer window (kill log, dossiers, guilds, leaderboard, hit list, stats), kill toast,
+-- brag lines, minimap button, tooltip lines, slash commands.
 
 local _, ns = ...
 local plain, try = ns.plain, ns.try
@@ -14,6 +15,7 @@ local SHARE_GAP = 15 -- seconds between guild chat posts
 local opts
 local main, toast, minimapButton
 local currentTab, offset = 1, 0
+local dossierId -- the victim whose dossier is open over the kill log, if any
 local phraseIndex, phraseZero
 local lastShare = -SHARE_GAP
 
@@ -38,15 +40,92 @@ local function ago(t)
   return math.floor(s / 86400) .. "d"
 end
 
+local function className(token)
+  if type(token) ~= "string" or token == "" then return nil end
+  local localized = LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[token]
+  if type(localized) == "string" then return localized end
+  return token:sub(1, 1) .. token:sub(2):lower()
+end
+
+-- Nothing that could be read as an escape code or a phrase token goes to chat.
+local function chatSafe(text)
+  return (tostring(text):gsub("[|{}%c]", ""))
+end
+
+local function hourLabel(hour)
+  local h = hour % 12
+  if h == 0 then h = 12 end
+  return h .. (hour < 12 and " AM" or " PM")
+end
+
+local function stamp(t)
+  local text = t and try(date, "%b %d, %H:%M", t)
+  return type(text) == "string" and text or ""
+end
+
+local function plural(n, one, many)
+  return n .. " " .. (n == 1 and one or many)
+end
+
+-- "Level 34 Dwarf Paladin", from whatever parts are known.
+local function describe(v)
+  local parts = {}
+  if v.level then parts[#parts + 1] = "Level " .. v.level end
+  if v.race then parts[#parts + 1] = v.race end
+  local class = className(v.class)
+  if class then parts[#parts + 1] = class end
+  return table.concat(parts, " ")
+end
+
+-- The key with the biggest count, and that count. Ties go to the alphabet so the
+-- answer does not flicker between refreshes.
+local function topKey(counts, skip)
+  local best, bestN
+  for key, n in pairs(counts) do
+    if key ~= skip and (not bestN or n > bestN or (n == bestN and tostring(key) < tostring(best))) then
+      best, bestN = key, n
+    end
+  end
+  return best, bestN
+end
+
+local function sortedCounts(counts)
+  local list = {}
+  for key, n in pairs(counts) do list[#list + 1] = { key, n } end
+  table.sort(list, function(a, b)
+    if a[2] ~= b[2] then return a[2] > b[2] end
+    return tostring(a[1]) < tostring(b[1])
+  end)
+  return list
+end
+
 local function guildLabel(guild, tier)
   if tier == "original" then return GOLD .. guild .. " (x" .. ns.ORIGINAL_POINTS .. ")|r" end
   return guild
 end
 
-local function renderPhrase(template)
+-- The facts the newer brag lines need. Each is nil until the kill records can back it.
+local function phraseFacts()
+  local a, facts = ns.Aggregates(), {}
+  local nemesis = ns.Nemesis()
+  if nemesis then facts.nemesis = chatSafe(nemesis.name or "Unknown") .. " (" .. nemesis.kills .. " times)" end
+  local zone = topKey(a.zone, ns.ELSEWHERE)
+  if zone then facts.zone = chatSafe(zone) end
+  local prey = topKey(a.class)
+  if prey then facts.prey = prey:sub(1, 1) .. prey:sub(2):lower() .. "s" end
+  local today = ns.KillsToday()
+  if today >= 2 then facts.today = today .. " Olympus kills today" end
+  if a.upset and a.upset.up >= 2 then facts.up = tostring(a.upset.up) end
+  return facts
+end
+local FACT_TOKENS = { "nemesis", "zone", "prey", "today", "up" }
+
+local function renderPhrase(template, facts)
   local c = ns.char
   local n, p, u, o = c.kills, c.points, c.uniques, c.orig
+  facts = facts or phraseFacts()
   local words = {
+    nemesis = facts.nemesis, zone = facts.zone, prey = facts.prey, today = facts.today, up = facts.up,
     n = n, p = p, u = u, o = o,
     kills = n .. " Olympus " .. (n == 1 and "kill" or "kills"),
     points = p .. " " .. (p == 1 and "point" or "points"),
@@ -59,8 +138,11 @@ local function renderPhrase(template)
 end
 UI.RenderPhrase = renderPhrase
 
-local function phraseAllowed(template)
+local function phraseAllowed(template, facts)
   local c = ns.char
+  for _, token in ipairs(FACT_TOKENS) do
+    if not facts[token] and template:find("{" .. token .. "}", 1, true) then return false end
+  end
   if c.kills < 2 and template:find("{n}", 1, true) then return false end
   if c.orig < 1 and (template:find("{orig}", 1, true) or template:find("{o}", 1, true)) then return false end
   if (c.kings or 0) < 1 and template:find("{king}", 1, true) then return false end
@@ -74,9 +156,9 @@ local function rollPhrase()
     phraseIndex = nil
     return
   end
-  local pool = {}
+  local pool, facts = {}, phraseFacts()
   for i, template in ipairs(ns.PHRASES) do
-    if i ~= phraseIndex and phraseAllowed(template) then pool[#pool + 1] = i end
+    if i ~= phraseIndex and phraseAllowed(template, facts) then pool[#pool + 1] = i end
   end
   phraseIndex = pool[math.random(#pool)] or 1
 end
@@ -87,8 +169,9 @@ local function currentPhrase()
     if not phraseZero then rollPhrase() end
     return ns.PHRASES_ZERO[phraseZero]
   end
-  if not phraseIndex or not phraseAllowed(ns.PHRASES[phraseIndex]) then rollPhrase() end
-  return renderPhrase(ns.PHRASES[phraseIndex])
+  local facts = phraseFacts()
+  if not phraseIndex or not phraseAllowed(ns.PHRASES[phraseIndex], facts) then rollPhrase() end
+  return renderPhrase(ns.PHRASES[phraseIndex], facts)
 end
 UI.CurrentPhrase = currentPhrase
 
@@ -112,7 +195,7 @@ local function sayGuild(text)
   end
   local sendChat = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
   if type(sendChat) ~= "function" then return false end
-  local ok, err = pcall(sendChat, text:sub(1, 255), "GUILD")
+  local ok, err = pcall(sendChat, chatSafe(text):sub(1, 255), "GUILD")
   if not ok then
     ns.Log("chat", err)
     ns.Print("The game refused that message.")
@@ -151,18 +234,129 @@ end
 
 local function victimRows()
   local list = {}
-  for _, v in pairs(ns.char.victims) do
-    if v.tier then list[#list + 1] = v end
+  for id, v in pairs(ns.char.victims) do
+    if v.tier then list[#list + 1] = { v, id } end
   end
   table.sort(list, function(a, b)
+    a, b = a[1], b[1]
     if a.points ~= b.points then return a.points > b.points end
     if a.kills ~= b.kills then return a.kills > b.kills end
     return (a.last or 0) > (b.last or 0)
   end)
   local rows = {}
-  for i, v in ipairs(list) do
-    rows[i] = { i, classColored(v.name or "Unknown", v.class), guildLabel(v.guild or "", v.tier),
-                v.kills, v.kb or 0, v.points, ago(v.last) }
+  for i, pair in ipairs(list) do
+    local v = pair[1]
+    rows[i] = { i, classColored(v.name or "Unknown", v.class), v.level or "", guildLabel(v.guild or "", v.tier),
+                v.kills, v.kb or 0, v.points, ago(v.last), id = pair[2] }
+  end
+  return rows
+end
+
+-- Everything known about one victim, as label and value lines.
+local function dossierLines(id)
+  local v = ns.char.victims[id]
+  if not v then return {} end
+  local L = {}
+  local function add(label, value) L[#L + 1] = { GOLD .. label .. "|r", value } end
+  local name = classColored(v.name or "Unknown", v.class)
+  if v.king then name = name .. GOLD .. "  the King of Olympus|r" end
+  add("Target", name)
+  local who = describe(v)
+  if who ~= "" and v.sex then who = who .. ", " .. (v.sex == 3 and "female" or "male") end
+  if who ~= "" then add("Known as", who) end
+  if v.title then add("PvP title", v.title) end
+  add("Guild", guildLabel(v.guild or "?", v.tier) .. (v.tier and "" or GREY .. "  (not counted right now)|r"))
+  if v.rank then
+    local others = {}
+    for _, pair in ipairs(sortedCounts(v.ranks or {})) do
+      if pair[1] ~= v.rank then others[#others + 1] = pair[1] end
+    end
+    add("Rank in that guild", v.rank .. (#others > 0 and (GREY .. "  (also killed as " .. table.concat(others, ", ") .. ")|r") or ""))
+  end
+  local label, nextAt = ns.VictimTier(v.kills)
+  add("What they are to you", ORANGE .. (label or "") .. "|r" ..
+    (nextAt and (GREY .. "  (" .. (nextAt - v.kills) .. " more for the next title)|r") or ""))
+  add("Kills", ("%s, %s, %s"):format(plural(v.kills, "kill", "kills"),
+    plural(v.kb or 0, "killing blow", "killing blows"), plural(v.points, "point", "points")))
+  if v.first then add("First kill", stamp(v.first) .. GREY .. "  " .. ago(v.first) .. " ago|r") end
+  if v.last then add("Last kill", stamp(v.last) .. GREY .. "  " .. ago(v.last) .. " ago|r") end
+  local records = {}
+  if (v.dayBest or 0) > 1 then records[#records + 1] = v.dayBest .. " in one day" end
+  if (v.bestRun or 0) > 1 then records[#records + 1] = v.bestRun .. " in a row without you dying" end
+  if #records > 0 then add("Your best on them", table.concat(records, ", ")) end
+  if v.up then
+    add("Level gap", v.up > 0 and (v.up .. " above you at most") or (v.up == 0 and "your level" or ((-v.up) .. " below you at best")))
+  end
+  local hour, hourKills = topKey(v.hours or {})
+  if hour and hourKills >= 2 then add("Usually dies around", hourLabel(hour)) end
+  local zones = sortedCounts(v.zones or {})
+  if #zones > 0 then
+    local parts = {}
+    for i = 1, math.min(3, #zones) do parts[i] = zones[i][1] .. " " .. zones[i][2] end
+    if #zones > 3 then parts[#parts + 1] = "and " .. (#zones - 3) .. " more" end
+    add("Killing grounds", table.concat(parts, ", "))
+  end
+  local hist = v.hist or {}
+  if #hist == 0 then
+    add("Kill history", GREY .. "No kill-by-kill details on file: these kills are from before version 1.1, or the feud is very old.|r")
+  else
+    add("Kill history", GREY .. "the last " .. #hist .. (v.kills > #hist and (" of " .. v.kills) or "") .. ", newest first|r")
+    for i = #hist, 1, -1 do
+      local h = hist[i]
+      local where = h[2] ~= "" and h[2] or "somewhere"
+      if h[3] ~= "" and h[3] ~= h[2] then where = where .. ", " .. h[3] end
+      local extra = {}
+      if h[5] > 0 then extra[#extra + 1] = "level " .. h[5] .. (h[6] > 0 and (" (you " .. h[6] .. ")") or "") end
+      if h[4] == 1 then extra[#extra + 1] = "your killing blow" end
+      L[#L + 1] = { WHITE .. stamp(h[1]) .. "|r", where .. (#extra > 0 and (GREY .. "   " .. table.concat(extra, ", ") .. "|r") or "") }
+    end
+  end
+  return L
+end
+UI.DossierLines = dossierLines
+
+local function hitRows()
+  local rows = {}
+  for i, k in ipairs(ns.HitList()) do
+    rows[i] = { i, classColored(k.name, k.class), k.level or "", guildLabel(k.guild, k.tier), k.rank or "", k.zone or "", ago(k.t) }
+  end
+  return rows
+end
+
+local function statsRows()
+  local a, rows = ns.Aggregates(), {}
+  local function header(text) rows[#rows + 1] = { ORANGE .. text .. "|r", "", "", "" } end
+  local function share(n, total) return total > 0 and (math.floor(n * 100 / total + 0.5) .. "%") or "" end
+  local function who(v) return classColored(v.name or "Unknown", v.class) end
+  header("Records")
+  local nemesis = ns.Nemesis()
+  rows[#rows + 1] = { "Nemesis", nemesis and who(nemesis) or GREY .. "nobody twice yet|r", nemesis and nemesis.kills or "", "" }
+  rows[#rows + 1] = { "Kills today", "", ns.KillsToday(), "" }
+  if a.day and a.day.dayBest > 1 then rows[#rows + 1] = { "Most on one player in a day", who(a.day), a.day.dayBest, "" } end
+  if a.run and a.run.bestRun > 1 then rows[#rows + 1] = { "Most on one player in one life", who(a.run), a.run.bestRun, "" } end
+  if a.highest then rows[#rows + 1] = { "Highest level killed", who(a.highest) .. GREY .. "  level " .. a.highest.level .. "|r", "", "" } end
+  if a.upset and a.upset.up > 0 then rows[#rows + 1] = { "Biggest upset", who(a.upset) .. GREY .. "  " .. a.upset.up .. " levels above you|r", "", "" } end
+  local sections = {
+    { "By class", a.class, a.kills, function(key) return classColored(className(key) or key, key) end },
+    { "By zone", a.zone, a.zoned },
+    { "By rank inside their guild", a.rank, a.kills },
+  }
+  for _, section in ipairs(sections) do
+    local list = sortedCounts(section[2])
+    if #list > 0 then
+      header(section[1])
+      for i = 1, math.min(12, #list) do
+        local key, n = list[i][1], list[i][2]
+        rows[#rows + 1] = { "", section[4] and section[4](key) or key, n, share(n, section[3]) }
+      end
+    end
+  end
+  if a.timed > 0 then
+    header("By hour of the day")
+    for hour = 0, 23 do
+      local n = a.hour[hour]
+      if n then rows[#rows + 1] = { "", hourLabel(hour), n, share(n, a.timed) } end
+    end
   end
   return rows
 end
@@ -202,7 +396,7 @@ end
 
 local TABS = {
   { label = "Kill Log", rows = victimRows, empty = "No Olympus kills yet. Go find one.",
-    cols = { { "#", 26, "RIGHT" }, { "Player", 168, "LEFT" }, { "Guild", 196, "LEFT" },
+    cols = { { "#", 26, "RIGHT" }, { "Player", 168, "LEFT" }, { "Lvl", 30, "RIGHT" }, { "Guild", 170, "LEFT" },
              { "Kills", 46, "RIGHT" }, { "KB", 36, "RIGHT" }, { "Points", 54, "RIGHT" }, { "Last", 50, "RIGHT" } } },
   { label = "Guilds", rows = guildRows, empty = "No Olympus guild has paid tribute yet.",
     cols = { { "#", 26, "RIGHT" }, { "Guild", 280, "LEFT" }, { "Members killed", 110, "RIGHT" },
@@ -210,6 +404,16 @@ local TABS = {
   { label = "Leaderboard", rows = boardRows, empty = "",
     cols = { { "#", 26, "RIGHT" }, { "Hunter", 190, "LEFT" }, { "Title", 140, "LEFT" }, { "Kills", 40, "RIGHT" },
              { "Unique", 46, "RIGHT" }, { "KB", 32, "RIGHT" }, { "OLYMPUS", 62, "RIGHT" }, { "Points", 46, "RIGHT" } } },
+  { label = "Hit List", rows = hitRows, empty = "No Olympian seen and still breathing. Turn on enemy nameplates.",
+    cols = { { "#", 26, "RIGHT" }, { "Player", 140, "LEFT" }, { "Lvl", 30, "RIGHT" }, { "Guild", 150, "LEFT" },
+             { "Rank", 90, "LEFT" }, { "Seen in", 100, "LEFT" }, { "Seen", 40, "RIGHT" } } },
+  { label = "Stats", rows = statsRows, empty = "",
+    cols = { { "", 190, "LEFT" }, { "", 290, "LEFT" }, { "Kills", 60, "RIGHT" }, { "Share", 60, "RIGHT" } } },
+}
+local DOSSIER_COLS = { { "Dossier", 150, "LEFT" }, { "", 490, "LEFT" } }
+local TAB_NOTES = {
+  [1] = "Click a player for their dossier",
+  [4] = "Olympians you have seen and not killed yet",
 }
 local MAX_COLS = 8
 
@@ -285,17 +489,14 @@ local function buildMain()
 
   f.tabs = {}
   for i, tab in ipairs(TABS) do
-    local b = makeButton(f, tab.label, 120)
-    b:SetPoint("TOPLEFT", 14 + (i - 1) * 124, -74)
+    local b = makeButton(f, tab.label, 104)
+    b:SetPoint("TOPLEFT", 14 + (i - 1) * 108, -74)
     b:SetScript("OnClick", function()
-      currentTab, offset = i, 0
+      currentTab, offset, dossierId = i, 0, nil
       UI.Refresh()
     end)
     f.tabs[i] = b
   end
-
-  f.guildNote = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  f.guildNote:SetPoint("TOPRIGHT", -18, -79)
 
   local list = CreateFrame("Frame", nil, f)
   list:SetPoint("TOPLEFT", 16, -104)
@@ -307,6 +508,15 @@ local function buildMain()
     UI.Refresh()
   end)
   f.list = list
+
+  -- under the list, on the left: what the open tab is showing
+  f.guildNote = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  f.guildNote:SetPoint("TOPLEFT", list, "BOTTOMLEFT", 0, -2)
+
+  local function wheel(_, delta)
+    offset = offset - delta * 3
+    UI.Refresh()
+  end
 
   local header = CreateFrame("Frame", nil, list)
   header:SetPoint("TOPLEFT")
@@ -335,6 +545,19 @@ local function buildMain()
       cell:SetWordWrap(false)
       row.cells[i] = cell
     end
+    -- a kill log row opens that player's dossier
+    local glow = row:CreateTexture(nil, "BACKGROUND")
+    glow:SetAllPoints()
+    glow:SetColorTexture(1, 0.49, 0.04, 0.18)
+    glow:Hide()
+    row:EnableMouse(true)
+    row:EnableMouseWheel(true)
+    row:SetScript("OnMouseWheel", wheel)
+    row:SetScript("OnEnter", function(self) if self.id then glow:Show() end end)
+    row:SetScript("OnLeave", function() glow:Hide() end)
+    row:SetScript("OnMouseUp", function(self)
+      if self.id then UI.OpenDossier(self.id) end
+    end)
     f.rows[r] = row
   end
 
@@ -371,6 +594,15 @@ local function buildMain()
   local hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   hint:SetPoint("BOTTOMRIGHT", -16, 20)
   hint:SetText("/godslayer help")
+  f.hint = hint
+
+  -- only while a dossier is open
+  f.back = makeButton(f, "Back", 56)
+  f.back:SetPoint("LEFT", top, "RIGHT", 6, 0)
+  f.back:SetScript("OnClick", function() dossierId, offset = nil, 0; UI.Refresh() end)
+  f.bragVictim = makeButton(f, "Brag about them", 140)
+  f.bragVictim:SetPoint("LEFT", f.back, "RIGHT", 6, 0)
+  f.bragVictim:SetScript("OnClick", function() if dossierId then UI.ShareVictim(dossierId) end end)
 
   f:SetScript("OnShow", UI.Refresh)
   return f
@@ -406,22 +638,33 @@ function UI.Refresh()
   for i, b in ipairs(main.tabs) do
     if i == currentTab then b:LockHighlight() else b:UnlockHighlight() end
   end
-  for i = 1, MAX_COLS do
-    main.header.cells[i]:SetText(tab.cols[i] and tab.cols[i][1] or "")
+  -- a dossier covers the kill log until Back, another tab, or the victim's record going away
+  if dossierId and not (currentTab == 1 and c.victims[dossierId]) then dossierId = nil end
+  local cols, rows = tab.cols, nil
+  if dossierId then
+    cols, rows = DOSSIER_COLS, dossierLines(dossierId)
+    main.back:Show(); main.bragVictim:Show(); main.hint:Hide()
+  else
+    rows = tab.rows()
+    main.back:Hide(); main.bragVictim:Hide(); main.hint:Show()
   end
-  layoutColumns(main.header.cells, tab.cols)
+  for i = 1, MAX_COLS do
+    main.header.cells[i]:SetText(cols[i] and cols[i][1] or "")
+  end
+  layoutColumns(main.header.cells, cols)
 
-  local rows = tab.rows()
   offset = math.max(0, math.min(offset, math.max(0, #rows - ROWS)))
   for r = 1, ROWS do
     local row, data = main.rows[r], rows[r + offset]
     if data then
-      layoutColumns(row.cells, tab.cols)
+      layoutColumns(row.cells, cols)
       for i = 1, MAX_COLS do
         row.cells[i]:SetText(data[i] ~= nil and tostring(data[i]) or "")
       end
+      row.id = data.id
       row:Show()
     else
+      row.id = nil
       row:Hide()
     end
   end
@@ -432,13 +675,35 @@ function UI.Refresh()
     main.count:SetText("")
   end
 
-  if currentTab == 3 then
+  if dossierId then
+    main.guildNote:SetText("")
+  elseif currentTab == 3 then
     local guild = ns.MyGuild()
     main.guildNote:SetText(guild and ("<" .. guild .. "> members running Godslayer") or "Join a guild to see a leaderboard")
   else
-    main.guildNote:SetText("")
+    main.guildNote:SetText(#rows > 0 and TAB_NOTES[currentTab] or "")
   end
   main.phrase:SetText(currentPhrase())
+end
+
+function UI.OpenDossier(id)
+  if not ns.char.victims[id] then return false end
+  if not main then UI.Toggle() elseif not main:IsShown() then main:Show() end
+  if not main then return false end
+  currentTab, offset, dossierId = 1, 0, id
+  UI.Refresh()
+  return true
+end
+
+-- One victim's record as a guild chat line. Click or typed command only, like every brag.
+function UI.ShareVictim(id)
+  local v = ns.char.victims[id]
+  if not v or not v.tier then return false end
+  local who = describe(v)
+  local text = ("Dossier: %s <%s>%s. Killed %s%s. Status: %s."):format(v.name or "Unknown", v.guild or "?",
+    who ~= "" and (", " .. who) or "", plural(v.kills, "time", "times"),
+    (v.kb or 0) > 0 and (", " .. v.kb .. " by my own hand") or "", (ns.VictimTier(v.kills)) or "Unknown")
+  return sayGuild(text)
 end
 
 function UI.Toggle()
@@ -458,18 +723,20 @@ end
 -- Kill toast
 -- ---------------------------------------------------------------------------
 
-local function showToast(headline, detail, extra)
+local function showToast(headline, detail, extra, facts)
   if not toast then
     toast = CreateFrame("Frame", nil, UIParent)
-    toast:SetSize(600, 80)
+    toast:SetSize(700, 100)
     toast:SetPoint("TOP", 0, -170)
     toast:SetFrameStrata("HIGH")
     toast.head = toast:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     toast.head:SetPoint("TOP")
     toast.detail = toast:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     toast.detail:SetPoint("TOP", toast.head, "BOTTOM", 0, -4)
+    toast.facts = toast:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    toast.facts:SetPoint("TOP", toast.detail, "BOTTOM", 0, -3)
     toast.extra = toast:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    toast.extra:SetPoint("TOP", toast.detail, "BOTTOM", 0, -4)
+    toast.extra:SetPoint("TOP", toast.facts, "BOTTOM", 0, -4)
     toast:SetScript("OnUpdate", function(self, elapsed)
       self.age = self.age + elapsed
       if self.age > 3.5 then
@@ -481,6 +748,7 @@ local function showToast(headline, detail, extra)
   end
   toast.head:SetText(headline)
   toast.detail:SetText(detail)
+  toast.facts:SetText(facts or "")
   toast.extra:SetText(extra or "")
   toast.age = 0
   toast:SetAlpha(1)
@@ -495,11 +763,35 @@ local function streakName(streak)
   return best and ns.STREAKS[best]
 end
 
-local function killFeedback(name, class, guild, tier, pts, info)
+-- The best facts about a fresh kill, most interesting first.
+local function killFacts(v, info)
+  local facts = {}
+  local who = describe(v)
+  if v.rank then who = (who ~= "" and (who .. ", ") or "") .. v.rank end
+  if who ~= "" then facts[#facts + 1] = who end
+  if info.zone then facts[#facts + 1] = info.zone end
+  if info.first then
+    facts[#facts + 1] = "First blood on this one"
+  else
+    local today = v.today or 0
+    if today == 2 then facts[#facts + 1] = "Second time today"
+    elseif today == 3 then facts[#facts + 1] = "Third time today"
+    elseif today > 3 then facts[#facts + 1] = today .. " times today"
+    else facts[#facts + 1] = "Kill number " .. v.kills .. " on them" end
+    local label = ns.VictimTier(v.kills)
+    if label then facts[#facts + 1] = label end
+  end
+  return facts
+end
+UI.KillFacts = killFacts
+
+local function killFeedback(name, class, guild, tier, pts, info, v)
   local c = ns.char
   local who = classColored(name, class)
+  local facts = v and killFacts(v, info) or {}
   if opts.chat then
     ns.Print(("%s <%s> down. +%d  (%d kills, %d points)"):format(who, guild, pts, c.kills, c.points))
+    if #facts > 0 then print("  " .. GREY .. table.concat(facts, ". ") .. ".|r") end
     if info.king then ns.Print(GOLD .. "REGICIDE.|r You killed the King of Olympus. Tell everyone.") end
     if info.rankUp then ns.Print("New title: " .. ORANGE .. info.rankUp .. "|r") end
   end
@@ -514,17 +806,18 @@ local function killFeedback(name, class, guild, tier, pts, info)
     local streak = info.streak and info.streak > 1 and streakName(info.streak)
     if streak then extras[#extras + 1] = streak .. " (x" .. info.streak .. ")" end
     if info.rankUp then extras[#extras + 1] = "New title: " .. info.rankUp end
-    showToast(headline, ("%s  <%s>  %s+%d|r"):format(who, guild, GOLD, pts), table.concat(extras, "   "))
+    showToast(headline, ("%s  <%s>  %s+%d|r"):format(who, guild, GOLD, pts), table.concat(extras, "   "),
+      table.concat(facts, "    "))
   end
   if opts.sound and SOUNDKIT then
     local loud = tier == "original" or info.rankUp
     local id = loud and SOUNDKIT.RAID_WARNING or (SOUNDKIT.UI_PVP_HONOR_PRESTIGE_RANK_UP or SOUNDKIT.RAID_WARNING)
-    if id then pcall(PlaySound, id, "Master") end
+    if id then pcall(PlaySound, id) end -- this client's second argument is not the old channel name
   end
 end
 
 ns.OnScore = function(v, guild, tier, pts, info)
-  killFeedback(v.name or "Unknown", v.class, guild, tier, pts, info or {})
+  killFeedback(v.name or "Unknown", v.class, guild, tier, pts, info or {}, v)
   ns.Comm.MarkDirty()
   UI.Refresh()
 end
@@ -619,6 +912,11 @@ local function onUnitTooltip(tt)
   local v = ns.char.victims[id]
   if v and v.tier then
     tt:AddLine(("You have killed them %d %s"):format(v.kills, v.kills == 1 and "time" or "times"), 1, 0.82, 0)
+    local label = ns.VictimTier(v.kills)
+    local zone = v.hist and v.hist[#v.hist] and v.hist[#v.hist][2]
+    tt:AddLine((label or "") .. ". Last: " .. ago(v.last) .. " ago" .. ((zone and zone ~= "") and (" in " .. zone) or ""), 0.8, 0.8, 0.8)
+  else
+    tt:AddLine("On your hit list. Not killed yet.", 0.8, 0.8, 0.8)
   end
 end
 
@@ -649,6 +947,8 @@ local function printHelp()
   ns.Print("commands (also /slay):")
   print("  /godslayer            open or close the window")
   print("  /godslayer stats      your totals in chat (only you see it)")
+  print("  /godslayer dossier <name>   everything on someone you killed (only you see it)")
+  print("  /godslayer nemesis    who you have killed most   /godslayer hitlist   Olympians seen, not killed yet")
   print("  /godslayer share      post a brag line to guild chat")
   print("  /godslayer top        post the top 3 to guild chat")
   print("  /godslayer add <guild name>       count a guild that has no 'olympus' in its name")
@@ -670,6 +970,24 @@ local function slash(input)
     printHelp()
   elseif cmd == "stats" then
     printStats()
+  elseif cmd == "dossier" or cmd == "who" or cmd == "nemesis" then
+    local v, id
+    if cmd == "nemesis" then v, id = ns.Nemesis() else v, id = ns.FindVictim(rest) end
+    if not v then
+      ns.Print(cmd == "nemesis" and "Nobody has died to you twice yet." or
+        (rest == "" and "Give a name, for example: /godslayer dossier Bob" or ("No kill on record for '" .. rest .. "'.")))
+      return
+    end
+    ns.Print("dossier:")
+    for _, line in ipairs(dossierLines(id)) do print("  " .. line[1] .. "  " .. line[2]) end
+  elseif cmd == "hitlist" then
+    local list = ns.HitList()
+    ns.Print(#list == 0 and "No Olympian seen and still unkilled." or (#list .. " seen and not killed yet. The most recent:"))
+    for i = 1, math.min(10, #list) do
+      local k = list[i]
+      print(("  %s <%s>%s  %s ago"):format(classColored(k.name, k.class), k.guild,
+        k.level and (" level " .. k.level) or "", ago(k.t)))
+    end
   elseif cmd == "share" then
     UI.Share()
   elseif cmd == "top" then
@@ -711,7 +1029,7 @@ local function slash(input)
     print("  ignored: " .. (#ignored > 0 and table.concat(ignored, ", ") or "none"))
   elseif cmd == "demo" then
     showToast(GOLD .. "REGICIDE: THE KING IS DEAD|r", ("%s  <OLYMPUS>  %s+%d|r"):format(ns.KING, GOLD, ns.ORIGINAL_POINTS),
-      "Triple Heresy (x3)   New title: Thief of Fire")
+      "Triple Heresy (x3)   New title: Thief of Fire", "Level 60 Human Warrior, Guild Master    Stranglethorn Vale    Third time today")
     ns.Print("That was a preview. Nothing was recorded.")
   elseif cmd == "log" then
     local log = GodslayerDB.log

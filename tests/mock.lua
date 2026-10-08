@@ -1,7 +1,8 @@
 -- Minimal stand-in for the WoW client API, enough to load and drive Godslayer offline.
 local M = { now = 1000, wall = 1791400000, timers = {}, units = {}, guids = {}, group = {},
             sentAddon = {}, sentChat = {}, printed = {}, events = {}, frames = {}, lockdown = false,
-            inGuild = true, myGuild = "The True Torchmen", hk = 0, addonResult = 0 }
+            inGuild = true, myGuild = "The True Torchmen", hk = 0, addonResult = 0,
+            zone = "Stranglethorn Vale", subzone = "Nesingwary's Expedition", myLevel = 30 }
 
 -- secret values: any use other than passing them around blows up
 local secretMT = {
@@ -16,7 +17,11 @@ function issecretvalue(v) return getmetatable(v) == secretMT end
 
 function GetTime() return M.now end
 function time() return M.wall end
-function date() return "10-07 12:00:00" end
+-- like the client's date(): a format and an optional time; UTC here so runs are repeatable
+function date(fmt, t)
+  if M.dateError then error("date blew up") end
+  return os.date("!" .. (fmt or "%c"), t or M.wall)
+end
 local realPrint = print
 function print(...) local t = {} for i = 1, select("#", ...) do t[#t + 1] = tostring((select(i, ...))) end M.printed[#M.printed + 1] = table.concat(t, " ") end
 M.realPrint = realPrint
@@ -63,7 +68,24 @@ function UnitIsPlayer(t) return U(t) and U(t).player ~= false end
 function UnitName(t) local u = U(t) if not u then return nil end local first, last = u.name:match("^(%S+)%s*(.*)$") return first, last end
 function GetUnitName(t, full) local u = U(t) if not u then return nil end if u.secretName then return M.secret() end return u.name end
 function UnitGUID(t) local u = U(t) if not u then return nil end if u.secretGUID then return M.secret() end return u.guid end
-function GetGuildInfo(t) local u = U(t) if not u then return nil end if u.secretGuild then return M.secret() end return u.guild, "Member", 3 end
+function GetGuildInfo(t)
+  local u = U(t)
+  if not u then return nil end
+  if u.secretGuild then return M.secret(), M.secret(), M.secret() end
+  if not u.guild then return nil end
+  return u.guild, u.secretRank and M.secret() or u.rank or "Member", 3
+end
+function UnitLevel(t)
+  if t == "player" then return M.secretMyLevel and M.secret() or M.myLevel end
+  local u = U(t) if not u then return 0 end
+  if u.secretLevel then return M.secret() end
+  return u.level or -1 -- the client says -1 for a player too far above you
+end
+function UnitRace(t) local u = U(t) if not u or not u.race then return nil end if u.secretRace then return M.secret(), M.secret(), M.secret() end return u.race, u.race, 1 end
+function UnitSex(t) local u = U(t) if not u then return nil end if u.secretSex then return M.secret() end return u.sex end
+function UnitPVPName(t) local u = U(t) if not u then return nil end if u.secretTitle then return M.secret() end return u.pvpName or u.name end
+function GetRealZoneText() if M.secretZone then return M.secret() end return M.zone end
+function GetSubZoneText() if M.secretZone then return M.secret() end return M.subzone end
 function UnitClass(t) local u = U(t) if not u then return nil end return "Class", u.class or "WARRIOR" end
 function UnitFactionGroup(t) local u = U(t) if not u then return nil end return u.faction or "Alliance" end
 function UnitCanAttack(a, t) local u = U(t) return u and (u.faction or "Alliance") ~= "Horde" end
@@ -71,7 +93,12 @@ C_PartyInfo = { IsGUIDInGroup = function(g) return M.group[g] == true end }
 function UnitIsDeadOrGhost(t) local u = U(t) return u and u.dead == true or false end
 function UnitIsFeignDeath(t) local u = U(t) return u and u.feign == true or false end
 function UnitTokenFromGUID(g) for token, u in pairs(M.units) do if u.guid == g then return token end end end
-function GetPlayerInfoByGUID(g) local u = M.guids[g] if not u then return nil end return "Class", u.class or "WARRIOR", "Race", "Race", 2, (u.name:match("^(%S+)")), "" end
+function GetPlayerInfoByGUID(g)
+  local u = M.guids[g]
+  if not u then return nil end
+  if u.secretRace then return M.secret(), M.secret(), M.secret(), M.secret(), M.secret(), M.secret(), M.secret(), M.secret() end
+  return "Class", u.class or "WARRIOR", u.race or "Human", u.race or "Human", u.sex or 2, (u.name:match("^(%S+)")), "", u.level
+end
 function GetPVPSessionStats() return M.hk, 0 end
 function IsInGuild() return M.inGuild end
 function M.addUnit(token, u) M.units[token] = u if u.guid then M.guids[u.guid] = u end return u end
@@ -79,7 +106,7 @@ function M.addUnit(token, u) M.units[token] = u if u.guid then M.guids[u.guid] =
 C_ChatInfo = {
   RegisterAddonMessagePrefix = function(p) M.prefix = p return 0 end,
   InChatMessagingLockdown = function() return M.lockdown end,
-  SendAddonMessage = function(prefix, msg, channel) if M.lockdown then return 11 end if M.addonResult ~= 0 then return M.addonResult end M.sentAddon[#M.sentAddon + 1] = { prefix, msg, channel } return 0 end,
+  SendAddonMessage = function(prefix, msg, channel) if M.lockdown then return 11 end if M.addonResult ~= 0 then return M.addonResult end M.sentAddon[#M.sentAddon + 1] = { prefix, msg, channel, M.now } return 0 end,
   SendChatMessage = function(msg, channel) M.sentChat[#M.sentChat + 1] = { msg, channel } end,
 }
 

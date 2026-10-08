@@ -50,11 +50,28 @@ ns.STREAKS = {
   [7] = "Twilight of the Gods", [10] = "Olympus Is A Hill Now", [15] = "Zeus Has Left The Chat",
 }
 
+-- What one player becomes to you, by how many times you have killed them.
+ns.VICTIM_TIERS = {
+  { 1, "Fresh Sacrifice" },
+  { 2, "Returning Customer" },
+  { 3, "Regular" },
+  { 5, "Loyalty Card Holder" },
+  { 8, "Frequent Flyer, Graveyard Air" },
+  { 12, "Emotional Support Olympian" },
+  { 20, "Personal Tithe" },
+  { 35, "Claimed As A Dependent" },
+  { 50, "Basically My Alt" },
+}
+
 -- Tokens: {kills} "7 Olympus kills"   {points} "19 points"   {uniques} "5 different Olympians"
 --         {orig} "3 from the original OLYMPUS"   {n} {p} {u} {o} are the bare numbers.
 --         {rank} your title   {king} "the King himself 2 times"
+--         {nemesis} "Bob Smith (7 times)"   {zone} the zone you kill in most
+--         {prey} the class you kill most   {today} "4 Olympus kills today"   {up} levels above you
 -- Lines with {n} are only picked at 2+ kills, lines with {orig} or {o} only when you have one,
--- lines with {king} only after a regicide.
+-- lines with {king} only after a regicide, {nemesis} once somebody has died to you twice,
+-- {today} at 2+ kills today, {up} when you have killed somebody at least 2 levels above you,
+-- {zone} and {prey} once the addon has seen where and what you kill.
 -- Keep every line plain ASCII and under about 200 characters; chat cuts off at 255.
 ns.PHRASES = {
   "Mount Olympus update: {kills}, {points}. The gods bleed, and they drop nothing.",
@@ -107,6 +124,18 @@ ns.PHRASES = {
   "The torch is not for warmth. It's for finding them in the dark. {kills}.",
   "Azeroth cleansing report: {kills} scrubbed, {uniques} rinsed, zero remorse.",
   "They pass around invites. We pass the torch. {kills}, {points}.",
+  "My nemesis, {nemesis}, should probably just change layers at this point.",
+  "{nemesis}. At what point do I have to claim them as a dependent?",
+  "Shoutout to {nemesis}, my most loyal customer. The punch card is almost full.",
+  "I know {nemesis} better than their own guild does. We meet at the graveyard.",
+  "{zone} is my office. Olympus keeps walking into it. {kills}.",
+  "Tourism board update: {zone} remains closed to Olympians. {kills}.",
+  "Olympus travel advisory: avoid {zone}. Signed, the reason for the advisory.",
+  "Favorite prey this season: {prey}. They die like everyone else, just louder.",
+  "The ledger says I mostly kill {prey}. Nothing personal. Okay, a little personal.",
+  "{today}. It's not even dinner.",
+  "Daily report: {today}. The spirit healer knows them by name now.",
+  "Biggest upset on the books: an Olympian {up} levels above me. Turns out the gear is cosmetic.",
   "REGICIDE. I have slain {king}. He said 'dude' on the way down.",
   "Killed {king}. The King is dead. Long live whoever is next in the 30-guild line of succession.",
   "Slew {king}. Somewhere, 30,000 guildmates felt a disturbance in the layer.",
