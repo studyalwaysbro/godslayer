@@ -182,7 +182,8 @@ local function buildBanner()
   f:SetFrameStrata("HIGH")
   local font = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
   f.title = f:CreateFontString(nil, "OVERLAY")
-  f.title:SetFont(font, 44, "THICKOUTLINE")
+  -- the game says whether it took the font; if the heavy outline is refused, the plain one is not
+  if f.title:SetFont(font, 44, "THICKOUTLINE") == false then f.title:SetFont(font, 44, "OUTLINE") end
   f.title:SetPoint("TOP", 0, 0)
   f.line = f:CreateFontString(nil, "OVERLAY")
   f.line:SetFont(font, 17, "OUTLINE")
@@ -344,8 +345,10 @@ local function startMusic()
   if not path and opts().theme and ns.MUSIC and ns.MUSIC.hunt then path, theme = SOUNDS .. "music\\hunt.ogg", true end
   if not path then return nil end
   -- as game music it loops, replaces the zone music and fades out by itself when stopped
-  if plain(try(GetCVar, "Sound_EnableMusic")) ~= "0" and type(PlayMusic) == "function" and pcall(PlayMusic, path) then
-    return "music", theme
+  if plain(try(GetCVar, "Sound_EnableMusic")) ~= "0" and type(PlayMusic) == "function" then
+    -- a client that says no plays it as a sound instead, below
+    local ok, will = pcall(PlayMusic, path)
+    if ok and plain(will) ~= false then return "music", theme end
   end
   -- music is switched off in the options: play it as an ordinary sound instead
   local willPlay, handle = try(PlaySoundFile, path, "Master")

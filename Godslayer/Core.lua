@@ -14,7 +14,7 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "1.4.0"
+ns.VERSION = "1.4.1"
 
 local DEDUPE_SECONDS = 10        -- the signals above can all describe the same death
 local MATCH_WINDOW = 8           -- honorable-kill credit and a seen death must be this close
@@ -770,7 +770,10 @@ function handlers.UNIT_HEALTH(unit)
   ObserveUnit(unit)
 end
 
-function handlers.PLAYER_PVP_KILLS_CHANGED()
+function handlers.PLAYER_PVP_KILLS_CHANGED(unit)
+  -- the event names whose count changed; only your own is a credit
+  unit = plain(unit)
+  if unit ~= nil and unit ~= "player" then return end
   local now = GetTime()
   local hk = plain(try(GetPVPSessionStats))
   local gained
