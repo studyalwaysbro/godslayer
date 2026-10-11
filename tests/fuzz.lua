@@ -4,7 +4,7 @@
 package.path = "tests/?.lua;" .. package.path
 local M = require("mock")
 local RUNS, EVENTS = tonumber(arg[1]) or 1000, tonumber(arg[2]) or 250
-local FILES = { "Data.lua", "Core.lua", "Hype.lua", "Comm.lua", "UI.lua" }
+local FILES = { "Data.lua", "Core.lua", "Voice.lua", "Hype.lua", "Comm.lua", "UI.lua" }
 local ME, MATE, STRANGER = "Player-1-0000AAAA", "Player-1-0000BBBB", "Player-1-0000CCCC"
 local GUILDS = { "OLYMPUS", "OLYMPUS", "Olympus Kitchen", "OLYMPUS BETZ", "OLYMPUS XIlI", "HOELYMPUS", "The Enclave",
                  "0lympus", "Method", "The True Torchmen", "Olympic Swim Team", "", "x|cffff0000y|r", "Olympus;S;1", false }
@@ -16,7 +16,8 @@ local ZONES = { "Stranglethorn Vale", "Hillsbrad Foothills", "Ashenvale", "", "Z
                 "Sen\195\177ora's Rest", "A\nB", "Elsewhere" }
 local RACES = { "Human", "Dwarf", "Night Elf", "Gnome", "", "R|ace", ("Race"):rep(30) }
 local RANKS = { "Guild Master", "Lord", "Captain", "Member", "", "Rank|cff", ("Rank "):rep(20), "Sen\195\177or" }
-local SLASHES = { "", "stats", "share", "top", "guilds", "log", "demo", "help", "sound", "toast", "chat", "tooltip", "minimap",
+local SLASHES = { "hype", "hype test", "hype test olympus", "hype test king", "hype stop", "hype pack herald", "hype pack titan", "hype pack zz", "hype voice off", "hype voice on",
+                  "hype guild off", "hype guild on", "hype window 20", "hype blows", "hype all", "hype off", "hype on", "", "stats", "share", "top", "guilds", "log", "demo", "help", "sound", "toast", "chat", "tooltip", "minimap",
                   "add Method", "ignore OLYMPUS BETZ", "unignore OLYMPUS BETZ", "remove Method", "ignore Olympus", "unignore Olympus",
                   "add", "ignore   ", "reset", "reset roster", "bogus |cff", "add %s%d", "ignore ;;;",
                   "dossier Enemy", "dossier Enemy3 Last3", "dossier", "dossier %s|cff", "who asmon", "nemesis", "hitlist" }
@@ -69,6 +70,12 @@ for seed = 1, RUNS do
   M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", faction = "Horde" })
   local ns = M.load("Godslayer", FILES)
   M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
+  -- every announcer line exists on disk, so the voice really queues and plays in this soak
+  M.audio.files, M.audio.played, M.audio.music = {}, {}, nil
+  for id, pack in pairs(ns.VOICE) do
+    for clip in pairs(pack.clips) do M.audio.files["Interface\\AddOns\\Godslayer\\Sounds\\" .. id .. "\\" .. clip .. ".ogg"] = true end
+  end
+  if R(2) == 1 then M.audio.files["Interface\\AddOns\\GodslayerMusic\\kill.mp3"] = true end
   local c = ns.char
   local players, opportunities = {}, inherited
   for i = 1, 12 do
@@ -170,6 +177,16 @@ for seed = 1, RUNS do
 
   -- the books must balance
   if ns.errors then fail(seed, "handler errors: " .. tostring(ns.errors)) end
+  if #ns.Hype.Queued() > 7 then fail(seed, "the announcer queue grew past its cap: " .. #ns.Hype.Queued()) end
+  -- no two lines start closer together than the first one's length allows
+  local prev
+  for _, p in ipairs(M.audio.played) do
+    local pack, clip = p.path:match("Sounds\\(%a+)\\([%w_]+)%.ogg$")
+    if clip then
+      if prev and p.at - prev.at < prev.length - 0.5 - 0.02 then fail(seed, "two announcer lines overlapped: " .. prev.clip .. " then " .. clip) end
+      prev = { at = p.at, clip = clip, length = ns.VOICE[pack].clips[clip] }
+    end
+  end
   for _, line in ipairs(GodslayerDB.log) do if line:find(" error: ", 1, true) then fail(seed, line) end end
   for _, line in ipairs(M.printed) do if line:find("command failed", 1, true) or line:find("Could not build", 1, true) then fail(seed, line) end end
   local kills, points, uniques, kb, orig = 0, 0, 0, 0, 0

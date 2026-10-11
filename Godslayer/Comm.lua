@@ -126,6 +126,16 @@ function Comm.handlers.CHAT_MSG_ADDON(prefix, text, channel, sender)
     if not guild then return end
     local db = GodslayerDB
     db.roster[guild] = db.roster[guild] or {}
+    -- their score went up since we last heard from them: that is a kill worth knowing about.
+    -- A first sighting or a stale record is not, or logging in would announce everyone.
+    local before = db.roster[guild][who]
+    local gained = before and time() - (before.t or 0) < 6 * 3600 and points - (before.points or 0) or 0
+    local newKills = before and kills - (before.kills or 0) or 0
+    -- points with no kills behind them, or more than a handful at once, are a recount or a lie, not a kill
+    if gained >= 1 and newKills >= 1 and newKills <= 5 and gained <= newKills * ns.ORIGINAL_POINTS and ns.Hype then
+      local ok, err = pcall(ns.Hype.Ally, who, gained)
+      if not ok then ns.errors = (ns.errors or 0) + 1 ns.Log("error", "hype ally: " .. tostring(err)) end
+    end
     db.roster[guild][who] = {
       kills = kills, points = points, uniques = uniques, kb = kb, orig = orig,
       class = (type(class) == "string" and class:match("^%u+$")) and class or nil,

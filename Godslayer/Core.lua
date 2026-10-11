@@ -14,7 +14,7 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "1.2.1"
+ns.VERSION = "1.3.0"
 
 local DEDUPE_SECONDS = 10        -- the signals above can all describe the same death
 local MATCH_WINDOW = 8           -- honorable-kill credit and a seen death must be this close
@@ -86,6 +86,14 @@ end
 -- ---------------------------------------------------------------------------
 -- Guild matching
 -- ---------------------------------------------------------------------------
+
+-- The announcer is decoration: a fault in it is logged and counted, and never costs a kill its score.
+local function hype(what, ...)
+  local ok, result = pcall(ns.Hype[what], ...)
+  if ok then return result end
+  ns.errors = (ns.errors or 0) + 1
+  if ns.errors <= 25 then ns.Log("error", "hype " .. what .. ": " .. tostring(result)) end
+end
 
 function ns.NormGuild(guild)
   return (guild:lower():gsub("[^%w]", ""))
@@ -491,10 +499,11 @@ function Score(id, name, guild, tier, rec, class)
   local rankName, rankAfter = ns.RankFor(c.points)
 
   ns.Log("score", v.name .. " <" .. guild .. "> +" .. pts .. (rec.kb and " kb" or ""))
-  if ns.OnScore then
-    ns.OnScore(v, guild, tier, pts, { king = king, streak = sameLife and s.streak or 1, rankUp = rankAfter > rankBefore and rankName or nil,
-                                      first = v.kills == 1, zone = rec.zone, sub = rec.sub })
-  end
+  local info = { king = king, streak = sameLife and s.streak or 1, rankUp = rankAfter > rankBefore and rankName or nil,
+                 first = v.kills == 1, zone = rec.zone, sub = rec.sub, kb = rec.kb and true or false }
+  -- true when the announcer is calling this one, so the plain chime stays out of its way
+  if ns.Hype then info.announced = hype("Olympus", id, v, tier, pts, info, rankAfter) and true or false end
+  if ns.OnScore then ns.OnScore(v, guild, tier, pts, info) end
 end
 
 local function prune()
@@ -524,7 +533,7 @@ local function RegisterKill(id, name, kb, source)
     if kb and not rec.kb then
       rec.kb = true
       -- counted late for someone who only wants their own killing blows
-      if ns.Hype and not rec.hyped then rec.hyped = true pcall(ns.Hype.Kill, rec.name or name, true) end
+      if ns.Hype and not rec.hyped then rec.hyped = true hype("Kill", rec.name or name, true, id) end
       if rec.scored then
         addKillingBlow(id)
         if rec.entry then rec.entry[4] = 1 end
@@ -553,7 +562,7 @@ local function RegisterKill(id, name, kb, source)
   if ns.Hype then
     local mode = GodslayerDB.opts.hype and GodslayerDB.opts.hype.mode
     if kb or mode ~= "blows" then rec.hyped = true end
-    pcall(ns.Hype.Kill, name, kb and true or false)
+    hype("Kill", name, kb and true or false, id)
   end
 
   if guild then
@@ -806,7 +815,7 @@ function handlers.CHAT_MSG_COMBAT_HONOR_GAIN(text)
 end
 
 function handlers.PLAYER_DEAD()
-  if ns.Hype then pcall(ns.Hype.Died) end
+  if ns.Hype then hype("Died") end
   ns.session.runs, ns.session.life = {}, ns.session.life + 1
   if ns.session.streak > 0 then
     ns.session.streak = 0

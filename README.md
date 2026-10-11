@@ -24,7 +24,10 @@ Made by **The True Torchmen**. For the Horde.
 - **Stats.** Kills by class, by zone, by guild rank and by hour of the day, plus your nemesis, your biggest upset and the highest level you have dropped.
 - **A louder kill banner.** "Level 34 Dwarf Paladin, Captain. Stranglethorn Vale. Third time today."
 - **Tooltip tags.** Mouse over an Olympian and see what they're worth, how often you've already collected, and whether they are still on the hit list.
-- **Your kill song, and an announcer.** The first player you kill starts a hunt: your own song begins and FIRST BLOOD goes up on screen. Every kill that follows while the hunt is on climbs a rung, shouted over the music: MEGA KILL, ULTRA KILL, GODLIKE, UNSTOPPABLE, BEYOND GODLIKE, GODSLAYER. Each kill keeps the hunt going another 90 seconds. Die, or go 90 seconds with nobody dead, and the music fades out and the zone's music comes back. This counts every player you kill, not only Olympus. Only you hear it.
+- **Your kill song, and an announcer who takes Olympus personally.** The first player you kill starts a hunt: your own song begins and FIRST BLOOD is called. Every kill that follows climbs a rung over the music: MEGA KILL, ULTRA KILL, GODLIKE, UNSTOPPABLE, BEYOND GODLIKE, GODSLAYER. Each kill keeps the hunt going another 90 seconds. Die and you get SHUT DOWN.
+- **Olympus kills get their own script.** A GOD BLEEDS. DOUBLE SACRILEGE. TITANOMACHY. Then the points, out loud: one for the network, five for the King's own guild. Then, now and then, a dry remark ("Zeus felt that one."). Earn a new title and the announcer says it. Kill the King and everybody within earshot of your speakers will know.
+- **Two announcers.** Titan, deep and huge, and Herald, fierce and sharp. `/godslayer hype pack` switches. Common lines have several takes and the same take never plays twice running.
+- **The guild feed.** When a guildmate's score goes up, you get a line in chat and, now and then, the announcer mentions it.
 
 ## Install
 
@@ -43,15 +46,26 @@ Godslayer ships the announcer and no music. To add your song:
 
 1. Make a folder called `GodslayerMusic` next to the `Godslayer` folder, in `Interface/AddOns/`.
 2. Put your song in it, named `kill.mp3` or `kill.ogg`.
-3. Fully restart the game. `/godslayer hype test` plays it; press it again to climb the rungs.
+3. Fully restart the game.
 
 Updates never touch that folder. The song plays as game music, so it replaces the zone music, follows your music volume slider and fades the way the game's own tracks do.
 
-To pitch the announcer into your song's key, run `python3 tools/tune_announcer.py /path/to/GodslayerMusic/kill.mp3` (needs ffmpeg, numpy and scipy). It writes re-pitched lines into `GodslayerMusic/voice`, which the addon uses first.
+Try it without killing anyone:
 
-`/godslayer hype` shows the settings: `on`, `off`, `music on|off`, `voice on|off`, `window <seconds>`, `blows` (only your own killing blows count) or `all`.
+| Command | What it plays |
+|---|---|
+| `/godslayer hype test` | An ordinary kill. Again inside 90 seconds to climb the rungs |
+| `/godslayer hype test olympus` | An Olympus kill, with the points |
+| `/godslayer hype test king` | Regicide |
+| `/godslayer hype stop` | Ends the hunt and fades the music |
 
-The announcer lines are original recordings made for this addon with a synthetic voice.
+`/godslayer hype` shows the settings: `on`, `off`, `pack`, `music on|off`, `voice on|off`, `guild on|off`, `window <seconds>`, `blows` (only your own killing blows count) or `all`. Pretend kills score nothing.
+
+## How the voice was made
+
+Every line is in `tools/voice_script.json`. `tools/build_voice.py` asks a voice service for a take of each line, has the take transcribed back and keeps it only if the words match, then gives it the arena treatment with ffmpeg: pitched down, compressed, a hall behind it, and an impact under each kill call. The voices are synthetic and the recordings were made for this addon. To change a line or add an announcer, edit the script and run the tool.
+
+`tools/tune_announcer.py /path/to/GodslayerMusic/kill.mp3` re-pitches every line toward the key of your song and writes the result to `GodslayerMusic/voice`, which the addon uses first. It is optional.
 
 ## Commands
 

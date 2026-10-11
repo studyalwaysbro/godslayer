@@ -809,7 +809,8 @@ local function killFeedback(name, class, guild, tier, pts, info, v)
     showToast(headline, ("%s  <%s>  %s+%d|r"):format(who, guild, GOLD, pts), table.concat(extras, "   "),
       table.concat(facts, "    "))
   end
-  if opts.sound and SOUNDKIT then
+  -- the announcer has this one: a system chime under a shouted line is only noise
+  if opts.sound and SOUNDKIT and not info.announced then
     local loud = tier == "original" or info.rankUp
     local id = loud and SOUNDKIT.RAID_WARNING or (SOUNDKIT.UI_PVP_HONOR_PRESTIGE_RANK_UP or SOUNDKIT.RAID_WARNING)
     if id then pcall(PlaySound, id) end -- this client's second argument is not the old channel name

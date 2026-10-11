@@ -10,7 +10,7 @@ local function eq(a, b, label) check(a == b, label .. " (got " .. tostring(a) ..
 local ME = "Player-1-0000AAAA"
 M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", faction = "Horde" })
 
-local ns = M.load("Godslayer", { "Data.lua", "Core.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+local ns = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Hype.lua", "Comm.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "SomethingElse")
 check(GodslayerDB == nil, "ignores other addons loading")
 M.fire("PARTY_KILL", ME, "Player-1-00000001") -- before init: must not error
@@ -576,7 +576,7 @@ checkPhrases("1 kill")
 local saved = GodslayerDB
 M.frames, M.timers = { UIParent, Minimap, GameTooltip }, {}
 GodslayerFrame, GodslayerMinimapButton = nil, nil
-local ns2 = M.load("Godslayer", { "Data.lua", "Core.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+local ns2 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Hype.lua", "Comm.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
 check(GodslayerDB == saved and ns2.char.kills == 1, "totals reload from saved variables")
 eq(GodslayerDB.version, 2, "data version")
@@ -594,7 +594,7 @@ do
   }
   M.frames, M.timers = { UIParent, Minimap, GameTooltip }, {}
   GodslayerFrame, GodslayerWindow, GodslayerMinimapButton, M.failTemplate = nil, nil, nil, nil
-  local ns3 = M.load("Godslayer", { "Data.lua", "Core.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+  local ns3 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Hype.lua", "Comm.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
   local c3 = ns3.char
   eq(GodslayerDB.version, 2, "old data is marked as migrated"); eq(c3.kills, 2, "old kills kept"); eq(c3.points, 10, "old points kept")
@@ -662,140 +662,378 @@ do
   check(table.concat(M.printed, "\n"):find("github.com/studyalwaysbro/godslayer/releases", 1, true), "and says where to get it")
 end
 
--- 1.2: the kill song and the announcer ------------------------------------------------------------
+-- 1.3: the kill song and the announcer ------------------------------------------------------------
 do
-  local H, A = ns2.Hype, M.audio
+  local A = M.audio
   local S = "Interface\\AddOns\\Godslayer\\Sounds\\"
-  local SONG = "Interface\\AddOns\\GodslayerMusic\\kill.mp3"
-  for _, r in ipairs(H.LADDER) do if r[3] then A.files[S .. r[3] .. ".ogg"] = true end end
-  A.files[S .. "shut_down.ogg"] = true
-  for _, r in ipairs(H.LADDER) do
-    if r[3] then
-      local f = io.open("Godslayer/Sounds/" .. r[3] .. ".ogg", "rb")
-      check(f ~= nil, "the announcer file for " .. r[2] .. " ships with the addon")
-      if f then check(f:read(4) == "OggS", r[3] .. ".ogg is an Ogg file") f:close() end
-    end
-  end
-  local function calls() local t = {} for _, p in ipairs(A.played) do if p.path:find("Sounds", 1, true) or p.path:find("voice", 1, true) then t[#t + 1] = p.path:match("([%w_]+)%.ogg$") end end return table.concat(t, ",") end
-  local function reset() H.End("test") A.played, A.stopped, A.music, A.musicStops = {}, {}, nil, 0 end
-  local banner
-  local function title() banner = banner or GodslayerHypeBanner return banner and banner.title.__text end
-
-  -- no song on disk: the announcer and the banner still work
-  reset()
-  H.Kill("Zeus Olympian", true)
-  check(H.Active() and H.Kills() == 1, "the first kill starts a hunt")
-  eq(title(), "FIRST BLOOD", "banner for the first kill")
-  eq(A.music, nil, "no song file, no music") eq(calls(), "", "and the first kill has no call")
-  H.Kill("Hera Olympian", true) M.advance(1)
-  eq(title(), "MEGA KILL", "second kill") eq(calls(), "mega_kill", "is called out")
-  check(GodslayerHypeBanner.line.__text:find("Hera Olympian is dead", 1, true) and GodslayerHypeBanner.line.__text:find("x2", 1, true), "the banner names the victim and the count")
-  H.Kill("Ares", false) M.advance(1) H.Kill("Apollo", true) M.advance(1)
-  eq(calls(), "mega_kill,ultra_kill,godlike", "then ULTRA KILL, then GODLIKE")
-  for _ = 5, 9 do H.Kill("Someone", true) M.advance(1) end
-  eq(calls(), "mega_kill,ultra_kill,godlike,unstoppable,beyond_godlike,godslayer,godslayer,godslayer", "the top rung repeats")
-  eq(title(), "GODSLAYER", "and the banner stays on it") eq(H.Kills(), 9, "nine kills in the hunt")
-
-  -- the hunt lasts 90 seconds past the last kill
-  M.advance(80)
-  check(H.Active(), "still hunting 80 seconds after the last kill")
-  H.Kill("Late One", true) M.advance(85)
-  check(H.Active(), "a kill resets the clock")
-  M.advance(10)
-  check(not H.Active(), "90 seconds with nobody dead ends the hunt")
-  eq(GodslayerDB.opts.hype.best, 10, "the best hunt is remembered")
-  A.played = {}
-  H.Kill("New Hunt", true) M.advance(1)
-  eq(H.Kills(), 1, "the next kill starts a new hunt from one") eq(calls(), "", "with no call")
-
-  -- several deaths at once: one call, for the highest rung
-  reset()
-  H.Kill("A", true) H.Kill("B", true) H.Kill("C", true) H.Kill("D", true) M.advance(1)
-  eq(calls(), "godlike", "four at once is one GODLIKE, not four calls over each other")
-
-  -- with your own song: it plays as game music and fades when the hunt ends
-  reset()
-  A.files[SONG] = true
-  local ns4 = M.load("Godslayer", { "Data.lua", "Core.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+  local OWN = "Interface\\AddOns\\GodslayerMusic\\"
+  local SONG = OWN .. "kill.mp3"
+  M.frames = {} -- one client, one copy of the addon: the copies loaded earlier in this file stop listening
+  local ns4 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Hype.lua", "Comm.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer") M.fire("PLAYER_LOGIN")
-  H = ns4.Hype
+  local H = ns4.Hype
+  local realToday, realPoints = ns4.KillsToday, ns4.char.points
+  ns4.KillsToday = function() return 5 end -- not the first Olympian of the day, unless a test says so
+  ns4.char.points = 10
+  local say = SlashCmdList["GODSLAYER"]
+
+  -- every line the script can ask for exists, in every pack, as a real file
+  local NEEDED = { "first_blood_1", "first_blood_2", "mega_kill_1", "ultra_kill_1", "godlike", "unstoppable", "beyond_godlike", "godslayer", "shut_down",
+                   "god_down_1", "god_down_2", "olympus_1", "olympus_2", "double_sacrilege", "triple_heresy", "quad_blasphemy", "titanomachy", "twilight", "hill", "zeus_left",
+                   "regicide", "plus_one_1", "plus_one_2", "plus_five_1", "plus_five_2", "plus_many", "first_today", "tail_1", "tail_2", "tail_3", "repeat_1", "repeat_2",
+                   "new_title", "ally_1", "ally_2" }
+  for i = 2, #ns4.RANKS do NEEDED[#NEEDED + 1] = "title_" .. i end
+  local packs = 0
+  for id, pack in pairs(ns4.VOICE) do
+    packs = packs + 1
+    check(type(pack.label) == "string" and type(pack.about) == "string", "pack " .. id .. " is described")
+    for _, clip in ipairs(NEEDED) do check(pack.clips[clip], id .. " has the line " .. clip) end
+    local n = 0
+    for clip, length in pairs(pack.clips) do
+      n = n + 1
+      A.files[S .. id .. "\\" .. clip .. ".ogg"] = true
+      local f = io.open("Godslayer/Sounds/" .. id .. "/" .. clip .. ".ogg", "rb")
+      if not f then check(false, id .. "/" .. clip .. ".ogg is missing from the addon")
+      else
+        if f:read(4) ~= "OggS" then check(false, id .. "/" .. clip .. ".ogg is not an Ogg file") end
+        f:close()
+      end
+      if not (length > 0.5 and length < 9) then check(false, id .. "/" .. clip .. " has an odd length: " .. tostring(length)) end
+      if not ns4.VOICE_TEXT[clip] then check(false, "no text recorded for " .. clip) end
+    end
+    check(n >= 55, id .. " has the whole script (" .. n .. " lines)")
+  end
+  check(packs >= 2, "at least two announcers to choose from")
+  eq(GodslayerDB.opts.hype and GodslayerDB.opts.hype.pack or H.Opts().pack, "titan", "the default announcer")
+
+  -- what was spoken, in order, with when; the song and the search for it are not speech
+  local function spoken()
+    local names, times = {}, {}
+    for _, p in ipairs(A.played) do
+      local clip = p.path:match("\\([%w_]+)%.ogg$")
+      if clip and (p.path:find("Sounds", 1, true) or p.path:find("voice", 1, true)) then names[#names + 1] = clip times[#times + 1] = p.at end
+    end
+    return names, times
+  end
+  local function said() return table.concat((spoken()), ",") end
+  local function group(clip) return (clip:gsub("_%d+$", "")) end
+  local function groups() local t = {} for i, clip in ipairs((spoken())) do t[i] = group(clip) end return table.concat(t, ",") end
+  local function reset() H.End("test") M.advance(20) A.played, A.stopped, A.music, A.musicStops = {}, {}, nil, 0 end
+  local function title() return GodslayerHypeBanner and GodslayerHypeBanner.title.__text end
+  local function line() return GodslayerHypeBanner and GodslayerHypeBanner.line.__text or "" end
+  local kid = 0
+  local function kill(name) kid = kid + 1 H.Kill(name or ("Victim " .. kid), true, "k" .. kid) return "k" .. kid end
+  local function god(tier, streak, extra)
+    local id = kill("Zeus Olympian")
+    local info = { streak = streak or 1 }
+    for k, v in pairs(extra or {}) do info[k] = v end
+    H.Olympus(id, { name = "Zeus Olympian", kills = info.victimKills or 1 }, tier, tier == "original" and 5 or 1, info, info.rankIndex)
+    return id
+  end
+  local realRandom = math.random
+  local function noAsides() math.random = function(n) if n then return 1 end return 0.99 end end
+  local function allAsides() math.random = function(n) if n then return 1 end return 0 end end
+
+  -- the generic ladder, first kill included
+  noAsides()
+  reset()
+  kill("Zeus") M.advance(6)
+  check(H.Active() and H.Kills() == 1, "the first kill starts a hunt")
+  eq(title(), "FIRST BLOOD", "banner for the first kill") eq(groups(), "first_blood", "and FIRST BLOOD is called out loud")
+  kill("Hera") M.advance(6)
+  eq(title(), "MEGA KILL", "second kill") eq(groups(), "first_blood,mega_kill", "is called")
+  check(line():find("Hera is dead", 1, true) and line():find("x2", 1, true), "the banner names the victim and the count")
+  for _ = 3, 9 do kill() M.advance(6) end
+  eq(groups(), "first_blood,mega_kill,ultra_kill,godlike,unstoppable,beyond_godlike,godslayer,godslayer,godslayer", "the ladder, and the top rung repeats")
+  eq(title(), "GODSLAYER", "banner on the top rung") eq(H.Kills(), 9, "nine kills in the hunt")
+  M.advance(80) check(H.Active(), "still hunting 80 seconds after the last kill")
+  kill() M.advance(85) check(H.Active(), "a kill resets the clock")
+  M.advance(10) check(not H.Active(), "90 seconds with nobody dead ends the hunt")
+  eq(GodslayerDB.opts.hype.best, 10, "the best hunt is remembered")
+  reset()
+  kill() kill() kill() kill() M.advance(6)
+  eq(groups(), "godlike", "four at once is one GODLIKE, not four calls over each other")
+
+  -- the same take is never played twice running
+  math.random = realRandom
+  local last, repeats = nil, 0
+  for _ = 1, 60 do local clip = H.Pick("first_blood") if clip == last then repeats = repeats + 1 end last = clip end
+  eq(repeats, 0, "sixty FIRST BLOODs, never the same take twice in a row")
+  eq(H.Pick("godlike"), "godlike", "a line with one take is just that take")
+  eq(H.Pick("no_such_line"), nil, "a line that does not exist is nothing")
+  noAsides()
+
+  -- Olympus: its own call, then the points
+  reset()
+  god("network", 1) M.advance(10)
+  eq(groups(), "god_down,plus_one", "a network kill: the call, then one point") eq(title(), "OLYMPIAN DOWN", "its banner")
+  check(line():find("Zeus Olympian", 1, true) and line():find("+1", 1, true), "the banner has the name and the point: " .. line())
+  check(line():find(" to ", 1, true), "and how far the next title is: " .. line())
+  reset()
+  god("original", 1) M.advance(10)
+  eq(groups(), "olympus,plus_five", "the King's own guild: its own call and five points") eq(title(), "OLYMPUS BLEEDS", "and its own banner")
+  reset()
+  god("network", 2) M.advance(10) eq(groups(), "double_sacrilege,plus_one", "two in a row") eq(title(), "DOUBLE SACRILEGE", "banner")
+  reset() god("original", 3) M.advance(10) eq(groups(), "triple_heresy,plus_five", "three")
+  reset() god("network", 6) M.advance(10) eq(groups(), "titanomachy,plus_one", "six is still TITANOMACHY")
+  reset() god("network", 7) M.advance(10) eq(groups(), "twilight,plus_one", "seven")
+  reset() god("network", 16) M.advance(10) eq(groups(), "zeus_left,plus_one", "past fifteen")
+  reset()
+  god("original", 4, { king = true }) M.advance(12)
+  eq(groups(), "regicide,plus_five", "the King: REGICIDE, whatever the streak") eq(title(), "REGICIDE", "banner")
+  reset()
+  god("network", 1, { rankUp = "Temple Robber", rankIndex = 5 }) M.advance(15)
+  eq(said():gsub("_%d+,", ",", 2), "god_down,plus_one,new_title,title_5", "a new title is announced by name: " .. said())
+  check(line():find("New title: Temple Robber", 1, true), "and shown")
+  reset()
+  god("network", 1, { rankUp = "Nonsense", rankIndex = 99 }) M.advance(12)
+  eq(groups(), "god_down,plus_one", "a title with no recording is skipped, not guessed")
+
+  ns4.KillsToday = function() return 1 end
+  reset()
+  god("network", 1) M.advance(12)
+  eq(groups(), "god_down,plus_one,first_today", "the first Olympian of the day is remarked on")
+  ns4.KillsToday = function() return 5 end
+  ns4.char.points = 5000
+  reset() god("network", 1) M.advance(10)
+  check(not line():find(" to ", 1, true), "at the top title there is no next one to count toward")
+  ns4.char.points = 10
+
+  -- lines are spoken one after another, never on top of each other
+  reset()
+  god("network", 1, { rankUp = "Heretic", rankIndex = 3 }) M.advance(20)
+  local names, times = spoken()
+  eq(#names, 4, "four lines for a kill with a new title")
+  local overlap = false
+  for i = 2, #names do
+    local length = H.ClipLength(names[i - 1])
+    if times[i] - times[i - 1] < length - 0.5 - 0.02 then overlap = true end
+  end
+  check(not overlap, "each line waits for the one before it")
+  check(times[1] - 0 > 0, "and the first comes a moment after the kill, not on top of it")
+
+  -- asides: dry remarks after the points, dropped when the next kill call arrives
+  allAsides()
+  reset()
+  god("network", 1) M.advance(12)
+  eq(groups(), "god_down,plus_one,tail", "a remark follows the points")
+  reset()
+  god("network", 1, { victimKills = 4 }) M.advance(12)
+  eq(groups(), "god_down,plus_one,repeat", "a regular victim gets the regulars' remark")
+  reset()
+  god("network", 1) M.advance(1.2)          -- the call is playing, points and a remark are waiting
+  kill("Someone Else") M.advance(12)
+  eq(groups(), "god_down,plus_one,mega_kill", "a new kill drops the remark still waiting and makes its own call")
+  noAsides()
+
+  -- many Olympians at once: one call, and the points pour in
+  reset()
+  god("network", 1) god("network", 2) god("original", 3) M.advance(12)
+  eq(groups(), "triple_heresy,plus_many", "three at once: the highest call, and the points are pouring in")
+  check(line():find("and 2 more", 1, true) and line():find("+7", 1, true), "the banner adds them up: " .. line())
+
+  -- an Olympian and a nobody die in the same moment: the Olympian gets the call
+  reset()
+  kill("Some Bystander") god("network", 1) M.advance(12)
+  eq(groups(), "god_down,plus_one", "the Olympus call is not spoken over by the ordinary one")
+
+  -- the guild tag arrives late: the generic call has gone out, the Olympus lines follow
+  reset()
+  local late = kill("Slow Tag") M.advance(3)
+  eq(groups(), "first_blood", "the kill is called as soon as it happens")
+  H.Olympus(late, { name = "Slow Tag", kills = 1 }, "network", 1, { streak = 1 }) M.advance(10)
+  eq(groups(), "first_blood,god_down,plus_one", "and the Olympus lines follow when the game says who it was")
+
+  -- a late guild tag never takes over the kill that is waiting now
+  reset()
+  local first = kill("Slow Tag") M.advance(3)        -- called as FIRST BLOOD already
+  kill("Unrelated Second")                            -- waiting for its MEGA KILL
+  H.Olympus(first, { name = "Slow Tag", kills = 1 }, "network", 1, { streak = 1 })
+  check(not line():find("x2", 1, true), "the late Olympian's banner does not borrow the new kill's count: " .. line())
+  M.advance(15)
+  check(groups():find("mega_kill", 1, true), "the second kill still gets its own call: " .. groups())
+  check(groups():find("god_down,plus_one", 1, true), "and the late Olympian gets theirs: " .. groups())
+
+  -- the King or a new title is never lost in a crowd
+  reset()
+  local k1, k2 = kill("The King"), kill("Some Olympian")
+  H.Olympus(k1, { name = "The King", kills = 1 }, "original", 5, { streak = 1, king = true })
+  H.Olympus(k2, { name = "Some Olympian", kills = 1 }, "network", 1, { streak = 6 })
+  M.advance(15)
+  check(groups():find("^regicide"), "the King dying beside a longer streak is still REGICIDE: " .. groups()) eq(title(), "REGICIDE", "on the banner too")
+  reset()
+  k1, k2 = kill("Promoter"), kill("Streaker")
+  H.Olympus(k1, { name = "Promoter", kills = 1 }, "network", 1, { streak = 1, rankUp = "Heretic" }, 3)
+  H.Olympus(k2, { name = "Streaker", kills = 1 }, "network", 1, { streak = 2 })
+  M.advance(20)
+  check(said():find("new_title,title_3", 1, true), "a title earned in the same moment is still announced: " .. said())
+  check(line():find("New title: Heretic", 1, true), "and shown")
+
+  -- a full queue still makes room for a kill call
+  reset()
+  for i = 1, 6 do god("network", 1, { rankUp = "Heretic", rankIndex = 3 }) M.advance(0.5) end
+  eq(#H.Queued(), 7, "the queue is full of points and titles")
+  kill("One More") M.advance(0.5)
+  local hasCall = false
+  for _, clip in ipairs(H.Queued()) do if clip:find("^godslayer") or clip:find("^beyond_godlike") or clip:find("^unstoppable") then hasCall = true end end
+  check(hasCall, "a new kill's call gets in ahead of older points: " .. table.concat(H.Queued(), ","))
+  check(#H.Queued() <= 7, "without growing the queue")
+
+  -- switching it off while a kill is waiting to be called
+  reset()
+  kill("Too Late")
+  say("hype off") M.advance(10)
+  eq(groups(), "", "off in the half second before the call: no call")
+  say("hype on")
+
+  -- the voice never runs away: a flood of kills cannot queue more than a handful of lines
+  reset()
+  for i = 1, 40 do god("network", i, { rankUp = "Heretic", rankIndex = 3 }) M.advance(0.5) end
+  check(#H.Queued() <= 7, "forty kills in twenty seconds leave at most seven lines waiting (" .. #H.Queued() .. ")")
+  M.advance(60)
+  eq(#H.Queued(), 0, "and it drains")
+
+  -- dying
+  reset()
+  kill() kill() kill() M.advance(1) A.played = {}
+  M.fire("PLAYER_DEAD") M.advance(6)
+  check(not H.Active(), "your death ends the hunt") eq(groups(), "shut_down", "SHUT DOWN, and nothing else") eq(title(), "SHUT DOWN", "on the banner too")
+  reset()
+  kill() god("network", 2, { rankUp = "Heretic", rankIndex = 3 }) M.advance(1.2) -- a call playing, points and a title still to come
+  A.played = {}
+  M.fire("PLAYER_DEAD") M.advance(20)
+  eq(groups(), "shut_down", "dying cuts off what was still waiting to be said")
+  A.played = {}
+  kill() M.advance(0.1) M.fire("PLAYER_DEAD") M.advance(6)
+  eq(groups(), "", "dying on your first kill is not announced, and neither is the kill")
+
+  -- your own song
+  reset()
+  ns4.KillsToday, ns4.char.points = realToday, realPoints
+  A.files[SONG] = true
+  M.frames = {}
+  local ns5 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+  M.fire("ADDON_LOADED", "Godslayer") M.fire("PLAYER_LOGIN")
+  H = ns5.Hype
   A.played, A.stopped, A.music, A.musicStops = {}, {}, nil, 0
-  H.Kill("Zeus", true)
+  kill("Zeus") M.advance(5)
   eq(A.music, SONG, "the first kill starts your song as game music")
-  eq(#A.played, 1, "found by one silent try") check(A.stopped[A.played[1].handle] == 0, "which is cut at once")
-  H.Kill("Hera", true) M.advance(1)
-  eq(A.music, SONG, "a second kill does not restart the song") eq(calls(), "mega_kill", "it calls MEGA KILL over it")
-  eq(#A.played, 2, "and the song is not searched for again")
+  check(A.played[1].path == SONG and A.stopped[A.played[1].handle] == 0, "found by one silent try that is cut at once")
+  kill("Hera") M.advance(5)
+  eq(A.music, SONG, "a second kill does not restart the song")
   M.advance(95)
   check(not H.Active() and A.music == nil and A.musicStops == 1, "the song is stopped when the hunt runs out")
-
-  -- dying ends it
-  H.Kill("Zeus", true) H.Kill("Hera", true) H.Kill("Ares", true) M.advance(1)
-  A.played = {}
-  M.fire("PLAYER_DEAD")
-  check(not H.Active() and A.music == nil, "your death ends the hunt and the music")
-  eq(calls(), "shut_down", "with SHUT DOWN") eq(GodslayerHypeBanner.title.__text, "SHUT DOWN", "on the banner too")
-  A.played = {}
-  H.Kill("Zeus", true) M.fire("PLAYER_DEAD")
-  eq(calls(), "", "dying after a single kill is not announced")
-
-  -- music switched off in the game options: the song plays as an ordinary sound and fades on stop
   A.cvars.Sound_EnableMusic = "0"
   A.played, A.stopped = {}, {}
-  H.Kill("Zeus", true)
-  check(A.music == nil and #A.played == 1 and A.played[1].path == SONG, "with game music off the song plays as a sound")
+  kill("Zeus")
+  check(A.music == nil and A.played[1].path == SONG, "with game music off the song plays as a sound")
   H.End("stop")
   eq(A.stopped[A.played[1].handle], 2500, "and is faded out when the hunt ends")
   A.cvars.Sound_EnableMusic = "1"
   A.cvars.Sound_EnableAllSound = "0"
   A.played = {}
-  H.Kill("Zeus", true) H.Kill("Hera", true) M.advance(1)
-  check(#A.played == 0 and A.music == nil, "with all sound off nothing is played") eq(GodslayerHypeBanner.title.__text, "MEGA KILL", "but the banner still shows")
+  kill() kill() M.advance(6)
+  check(#A.played == 0 and A.music == nil, "with all sound off nothing is played") eq(title(), "MEGA KILL", "but the banner still shows")
   A.cvars.Sound_EnableAllSound = "1"
-  H.End("stop")
+  H.End("stop") M.advance(20)
 
-  -- lines tuned to your own song win over the built-in ones
-  A.files["Interface\\AddOns\\GodslayerMusic\\voice\\mega_kill.ogg"] = true
+  -- announcers to choose from, and lines tuned to your own song
   A.played = {}
-  H.Kill("Zeus", true) H.Kill("Hera", true) M.advance(1)
-  check(A.played[#A.played].path:find("GodslayerMusic\\voice\\mega_kill.ogg", 1, true), "a tuned line in your music folder is used first")
-  H.End("stop")
+  say("hype pack herald") M.advance(10)
+  eq(GodslayerDB.opts.hype.pack, "herald", "pack chosen")
+  check(A.played[1] and A.played[1].path:find("Sounds\\herald\\first_blood", 1, true), "and it introduces itself in its own voice")
+  say("hype pack nonsense") eq(GodslayerDB.opts.hype.pack, "herald", "an unknown announcer changes nothing")
+  say("hype pack titan") M.advance(10)
+  A.files[OWN .. "voice\\titan\\godlike.ogg"] = true
+  A.played = {}
+  kill() kill() kill() kill() M.advance(6)
+  check(A.played[#A.played].path == OWN .. "voice\\titan\\godlike.ogg", "a line tuned to your song is used before the built-in one")
+  H.End("stop") M.advance(20)
 
-  -- options
-  local say = SlashCmdList["GODSLAYER"]
-  for _, cmd in ipairs({ "hype", "hype voice off", "hype window 30", "hype window 5", "hype blows", "hype test", "hype test", "hype stop", "hype zz", "help" }) do
+  -- the guild: a guildmate's score going up is news, a first sighting is not
+  M.printed, A.played = {}, {}
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;10;22;8;4;3;WARRIOR;1.3.0", "GUILD", "Feed Tester")
+  check(not table.concat(M.printed, "\n"):find("Feed Tester", 1, true), "the first time we hear from someone is not a kill")
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;11;27;8;4;4;WARRIOR;1.3.0", "GUILD", "Feed Tester") M.advance(6)
+  check(table.concat(M.printed, "\n"):find("Feed Tester|r just took |cffffd100+5|r off Olympus", 1, true), "five more points is announced in chat")
+  eq(groups(), "ally", "and spoken")
+  A.played = {}
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;12;28;8;4;4;WARRIOR;1.3.0", "GUILD", "Feed Tester") M.advance(6)
+  eq(groups(), "", "the next one inside 45 seconds is chat only")
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;12;28;8;4;4;WARRIOR;1.3.0", "GUILD", "Feed Tester")
+  M.advance(7 * 3600)
+  M.printed = {}
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;30;90;20;9;9;WARRIOR;1.3.0", "GUILD", "Feed Tester")
+  check(not table.concat(M.printed, "\n"):find("just took", 1, true), "a record hours old is not compared against")
+  -- made-up scores cannot make your client talk all evening
+  M.printed = {}
+  local function took(text) return select(2, table.concat(M.printed, "\n"):gsub(text .. "|r just took", "")) end
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;1;1;1;0;0;MAGE;1.3.0", "GUILD", "Spam Mer")
+  for i = 2, 40 do M.advance(1) M.fire("CHAT_MSG_ADDON", "Godslayer", ("S;1;%d;%d;1;0;0;MAGE;1.3.0"):format(i, i), "GUILD", "Spam Mer") end
+  check(took("Spam Mer") <= 2, "forty score bumps in forty seconds from one player: two lines at most (" .. took("Spam Mer") .. ")")
+  for i = 41, 140 do M.advance(25) M.fire("CHAT_MSG_ADDON", "Godslayer", ("S;1;%d;%d;1;0;0;MAGE;1.3.0"):format(i, i), "GUILD", "Spam Mer") end
+  check(took("Spam Mer") <= 22, "and no more than twenty an hour, however long they keep at it (" .. took("Spam Mer") .. ")")
+  M.printed = {}
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;5;5;5;0;0;MAGE;1.3.0", "GUILD", "Re Count")
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;5;25;5;0;5;MAGE;1.3.0", "GUILD", "Re Count")
+  eq(took("Re Count"), 0, "points that went up with no new kill behind them are a recount, not a kill")
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;40;60;30;0;5;MAGE;1.3.0", "GUILD", "Re Count")
+  eq(took("Re Count"), 0, "and thirty-five kills at once is not news either")
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;39;59;30;0;5;MAGE;1.3.0", "GUILD", "Re Count")
+  eq(took("Re Count"), 0, "a score going down announces nothing")
+  M.printed = {}
+  say("hype guild off")
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;31;95;20;9;10;WARRIOR;1.3.0", "GUILD", "Feed Tester")
+  check(not table.concat(M.printed, "\n"):find("just took", 1, true), "guild calls off: silence")
+  say("hype guild on")
+
+  -- options and the pretend kills
+  local pointsBefore, killsBefore = ns5.char.points, ns5.char.kills
+  for _, cmd in ipairs({ "hype", "hype voice off", "hype voice on", "hype window 30", "hype window 5", "hype blows", "hype test", "hype test olympus", "hype test king",
+                         "hype stop", "hype zz", "hype pack", "help" }) do
     check(pcall(say, cmd), "/godslayer " .. cmd)
+    M.advance(8)
   end
+  check(ns5.char.points == pointsBefore and ns5.char.kills == killsBefore, "pretend kills score nothing")
+  GodslayerDB.opts.hype.best = 0
+  for _ = 1, 4 do say("hype test") M.advance(1) end
+  say("hype stop")
+  eq(GodslayerDB.opts.hype.best, 0, "and a pretend hunt is not a record")
   local o = GodslayerDB.opts.hype
-  check(o.voice == false and o.window == 30 and o.mode == "blows", "options are kept")
+  check(o.window == 30 and o.mode == "blows", "options are kept")
+  H.Kill("Assist Only", false, "assist") check(not H.Active(), "in blows mode a kill that was not your blow does not count")
   A.played = {}
-  H.Kill("Assist Only", false)
-  check(not H.Active(), "in blows mode a kill that was not your blow does not count")
-  H.Kill("My Blow", true)
-  check(H.Active() and H.Kills() == 1, "your own killing blow does")
-  H.Kill("Second", true) M.advance(1)
-  eq(calls(), "", "announcer off: no calls") eq(GodslayerHypeBanner.title.__text, "MEGA KILL", "banner still shows")
-  M.advance(31)
-  check(not H.Active(), "the hunt length follows the option")
-  say("hype off")
-  H.Kill("Nobody", true)
-  check(not H.Active(), "off means off")
-  say("hype on") say("hype all") say("hype voice on") say("hype window 90")
+  check(H.Olympus("assist", { name = "Assist Only" }, "network", 1, { streak = 1, kb = false }) == false, "nor does its Olympus announcement")
+  M.advance(8) eq(groups(), "", "nothing is said for it")
+  H.Kill("My Blow", true, "blow") check(H.Active() and H.Kills() == 1, "your own killing blow does")
+  check(H.Olympus("blow", { name = "My Blow" }, "network", 1, { streak = 1, kb = true }) == true, "and its Olympus announcement goes out")
+  M.advance(31) check(not H.Active(), "the hunt length follows the option")
+  M.advance(20) A.played = {}
+  say("hype off") H.Kill("Nobody", true, "x") check(not H.Active(), "off means off")
+  H.Olympus("x", { name = "Nobody" }, "network", 1, { streak = 1 }) M.advance(6)
+  eq(groups(), "", "and an Olympus kill is not announced either")
+  say("hype on") say("hype all") say("hype window 90")
 
-  -- through the real kill path: one hype kill per victim, whatever order the game reports things in
-  A.played = {}
+  -- through the real kill path, with the real scoring
+  M.advance(30) A.played, M.printed = {}, {}
   M.addUnit("target", { name = "Fresh Victim", guid = "Player-1-0000F001", guild = "OLYMPUS", class = "WARRIOR", faction = "Alliance" })
   M.fire("PLAYER_TARGET_CHANGED")
   M.fire("PARTY_KILL", ME, "Player-1-0000F001")
   M.fire("PARTY_KILL", ME, "Player-1-0000F001")
+  M.advance(12)
   eq(H.Kills(), 1, "a kill reported twice is one kill")
-  check(GodslayerHypeBanner.line.__text:find("Fresh Victim", 1, true), "the banner has the victim's name")
+  check(groups():find("^olympus,plus_five"), "a real kill on OLYMPUS gets the Olympus call and five points, not FIRST BLOOD: " .. groups())
+  check(not groups():find("first_blood", 1, true), "and FIRST BLOOD is not said over it")
+  eq(title(), "OLYMPUS BLEEDS", "and the Olympus banner")
   M.fire("PARTY_KILL", ME, "Creature-0-0000-0000-00000001")
   eq(H.Kills(), 1, "killing a creature is not a kill")
-  M.fire("PARTY_KILL", ME, "Player-1-0000F002") M.advance(1)
-  eq(H.Kills(), 2, "a second player is") check(calls():find("^mega_kill"), "and is called") -- earlier copies of the addon in this file hear the event too
+  A.played = {}
+  M.fire("PARTY_KILL", ME, "Player-1-0000FFA7") M.advance(8)
+  eq(H.Kills(), 2, "a player with no Olympus tag counts toward the hunt") check(groups():find("^mega_kill"), "and gets the ordinary call: " .. groups())
   H.End("stop")
-  eq(ns4.errors, nil, "no errors in the hype section")
+  math.random = realRandom
+  eq(ns5.errors, nil, "no errors in the hype section") eq(ns4.errors, nil, "nor in the first copy")
+  ns2 = ns5
 end
 
 for _, line in ipairs(GodslayerDB.log) do if line:find(" error: ", 1, true) then check(false, "logged error: " .. line) end end

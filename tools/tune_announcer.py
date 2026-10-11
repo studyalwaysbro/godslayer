@@ -3,7 +3,7 @@
 
     python3 tools/tune_announcer.py /path/to/Interface/AddOns/GodslayerMusic/kill.mp3
 
-It works out the song's key, measures the pitch each announcer line is shouted at, and moves
+It works out the song's key, measures the pitch each announcer line is shouted at, in every announcer pack, and moves
 each line by the smallest step that puts it on a note of the key's home chord (root, third or
 fifth), so no line moves far enough to change the character of the voice. The results go in a "voice" folder next to the song, where the addon
 looks first. Needs ffmpeg, numpy and scipy. Delete the voice folder to go back to the built-in lines.
@@ -81,7 +81,7 @@ def repitch(src, dst, semitones):
     ratio = 2 ** (semitones / 12.0)
     tempo = 1 / ratio
     chain = "asetrate=44100*%.6f,aresample=44100,atempo=%.6f" % (ratio, tempo)
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-af", chain, "-ac", "1", "-ar", "44100",
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-af", chain, "-ar", "44100",
                     "-c:a", "libvorbis", "-q:a", "5", dst], check=True)
 
 
@@ -96,19 +96,23 @@ def main():
     print("Song key: %s %s (match %.2f)" % (NOTES[tonic], mode, score))
     if score < 0.5:
         print("That match is weak, so the key may be wrong. The lines are still moved, by small steps only.")
-    os.makedirs(out, exist_ok=True)
-    for name in sorted(os.listdir(lines)):
-        if not name.endswith(".ogg"):
+    moved, total = 0.0, 0
+    for pack in sorted(os.listdir(lines)):
+        folder = os.path.join(lines, pack)
+        if not os.path.isdir(folder):
             continue
-        src = os.path.join(lines, name)
-        pitch = voice_pitch(decode(src))
-        if not pitch:
-            print("  %-20s no steady pitch found, copied as it is" % name)
-            repitch(src, os.path.join(out, name), 0.0)
-            continue
-        step = shift_for(pitch, tonic, mode)
-        repitch(src, os.path.join(out, name), step)
-        print("  %-20s shouted near %.0f Hz, moved %+.1f semitones" % (name, pitch, step))
+        os.makedirs(os.path.join(out, pack), exist_ok=True)
+        for name in sorted(os.listdir(folder)):
+            if not name.endswith(".ogg"):
+                continue
+            src, dst = os.path.join(folder, name), os.path.join(out, pack, name)
+            pitch = voice_pitch(decode(src))
+            step = shift_for(pitch, tonic, mode) if pitch else 0.0
+            repitch(src, dst, step)
+            moved, total = moved + abs(step), total + 1
+        print("  %-8s done" % pack)
+    if total:
+        print("%d lines, moved %.1f semitones on average." % (total, moved / total))
     print("Written to " + out + ". Restart the game to hear them.")
 
 

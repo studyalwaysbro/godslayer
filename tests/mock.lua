@@ -37,7 +37,7 @@ function PlaySoundFile(path, channel)
   assert(type(path) == "string" and channel == "Master", "PlaySoundFile(path, \"Master\")")
   if not M.audio.files[path] then return false end
   M.audio.next = M.audio.next + 1
-  M.audio.played[#M.audio.played + 1] = { path = path, handle = M.audio.next }
+  M.audio.played[#M.audio.played + 1] = { path = path, handle = M.audio.next, at = M.now }
   return true, M.audio.next
 end
 function StopSound(handle, fade) assert(type(handle) == "number") M.audio.stopped[handle] = fade or 0 end
