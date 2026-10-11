@@ -32,6 +32,7 @@ local CALL_DELAY = 0.45    -- kills landing together get one call, for where the
 local OVERLAP = 0.5        -- the next line starts this long before the last one's hall has died away
 local BANNER_SECONDS = 3.6
 local ASIDE_CHANCE = 0.4   -- how often a dry remark follows the points
+local RARE_CHANCE = 0.05   -- and how often, instead, one of the lines you will hear a handful of times ever
 local ALLY_GAP = 45        -- seconds between spoken guild kills; the chat line is never held back
 local QUEUE_MAX = 7
 
@@ -321,11 +322,14 @@ local function olympusLines(o)
   elseif ladder then lines[1] = { ladder[2], 3 }
   else lines[1] = { pick(o.tier == "original" and "olympus" or "god_down"), 3 } end
   lines[2] = { pick(o.pts >= 5 and "plus_five" or "plus_one"), 2 }
+  local roll = math.random()
   if o.firstToday then
     lines[#lines + 1] = { "first_today", 1 }
-  elseif (v.kills or 0) >= 3 and math.random() < 0.6 then
+  elseif roll < RARE_CHANCE then
+    lines[#lines + 1] = { pick("rare"), 1 }
+  elseif (v.kills or 0) >= 3 and roll < 0.6 then
     lines[#lines + 1] = { pick("repeat"), 1 }
-  elseif math.random() < ASIDE_CHANCE then
+  elseif roll < RARE_CHANCE + ASIDE_CHANCE then
     lines[#lines + 1] = { pick("tail"), 1 }
   end
   if info.rankUp and o.rankIndex and clipLength("title_" .. o.rankIndex) then

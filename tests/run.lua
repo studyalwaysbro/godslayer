@@ -732,7 +732,7 @@ do
   end
   local realRandom = math.random
   local function noAsides() math.random = function(n) if n then return 1 end return 0.99 end end
-  local function allAsides() math.random = function(n) if n then return 1 end return 0 end end
+  local function allAsides() math.random = function(n) if n then return 1 end return 0.2 end end -- past the rare lines, inside the remarks
 
   -- the generic ladder, first kill included
   noAsides()
@@ -824,6 +824,17 @@ do
   god("network", 1) M.advance(1.2)          -- the call is playing, points and a remark are waiting
   kill("Someone Else") M.advance(12)
   eq(groups(), "god_down,plus_one,mega_kill", "a new kill drops the remark still waiting and makes its own call")
+  -- the rare lines: about one Olympus kill in twenty
+  math.random = realRandom
+  math.randomseed(11)
+  local rare, tails, n = 0, 0, 2000
+  for _ = 1, n do
+    for _, l in ipairs((H.OlympusLines({ tier = "network", pts = 1, info = { streak = 1 }, v = { kills = 1 } }))) do
+      if l[1] and l[1]:find("^rare_") then rare = rare + 1 elseif l[1] and l[1]:find("^tail_") then tails = tails + 1 end
+    end
+  end
+  check(rare > n * 0.02 and rare < n * 0.09, "a rare line on roughly one kill in twenty (" .. rare .. " in " .. n .. ")")
+  check(tails > n * 0.25 and tails < n * 0.5, "an ordinary remark on roughly four in ten (" .. tails .. ")")
   noAsides()
 
   -- many Olympians at once: one call, and the points pour in
