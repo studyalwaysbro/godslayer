@@ -4,8 +4,8 @@
     python3 tools/tune_announcer.py /path/to/Interface/AddOns/GodslayerMusic/kill.mp3
 
 It works out the song's key, measures the pitch each announcer line is shouted at, and moves
-each line by the smallest step (never more than three and a half semitones) that puts it on the
-key note or its fifth. The results go in a "voice" folder next to the song, where the addon
+each line by the smallest step that puts it on a note of the key's home chord (root, third or
+fifth), so no line moves far enough to change the character of the voice. The results go in a "voice" folder next to the song, where the addon
 looks first. Needs ffmpeg, numpy and scipy. Delete the voice folder to go back to the built-in lines.
 """
 import os
@@ -19,7 +19,7 @@ NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 MAJOR = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
 MINOR = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
 RATE = 22050
-MAX_SHIFT = 3.5
+MAX_SHIFT = 2.5
 
 
 def decode(path, seconds=None):
@@ -66,11 +66,11 @@ def voice_pitch(samples):
     return float(np.median(found)) if found else None
 
 
-def shift_for(pitch_hz, tonic):
-    """Semitones to the nearest key note or fifth, whichever is closer."""
+def shift_for(pitch_hz, tonic, mode):
+    """Semitones to the nearest note of the key's home chord: root, third or fifth."""
     midi = 69 + 12 * np.log2(pitch_hz / 440.0)
     best = None
-    for target_class in (tonic, (tonic + 7) % 12):
+    for target_class in (tonic, (tonic + (3 if mode == "minor" else 4)) % 12, (tonic + 7) % 12):
         delta = ((target_class - midi + 6) % 12) - 6
         if best is None or abs(delta) < abs(best):
             best = delta
@@ -106,7 +106,7 @@ def main():
             print("  %-20s no steady pitch found, copied as it is" % name)
             repitch(src, os.path.join(out, name), 0.0)
             continue
-        step = shift_for(pitch, tonic)
+        step = shift_for(pitch, tonic, mode)
         repitch(src, os.path.join(out, name), step)
         print("  %-20s shouted near %.0f Hz, moved %+.1f semitones" % (name, pitch, step))
     print("Written to " + out + ". Restart the game to hear them.")
