@@ -949,6 +949,7 @@ local function printHelp()
   print("  /godslayer stats      your totals in chat (only you see it)")
   print("  /godslayer dossier <name>   everything on someone you killed (only you see it)")
   print("  /godslayer nemesis    who you have killed most   /godslayer hitlist   Olympians seen, not killed yet")
+  print("  /godslayer hype       your kill song and the announcer: test, on, off, window <seconds>")
   print("  /godslayer share      post a brag line to guild chat")
   print("  /godslayer top        post the top 3 to guild chat")
   print("  /godslayer add <guild name>       count a guild that has no 'olympus' in its name")
@@ -980,6 +981,8 @@ local function slash(input)
     end
     ns.Print("dossier:")
     for _, line in ipairs(dossierLines(id)) do print("  " .. line[1] .. "  " .. line[2]) end
+  elseif cmd == "hype" then
+    if ns.Hype then ns.Hype.Command(rest) else ns.Print("The hype part of the addon did not load. Quit the game fully and start it again.") end
   elseif cmd == "hitlist" then
     local list = ns.HitList()
     ns.Print(#list == 0 and "No Olympian seen and still unkilled." or (#list .. " seen and not killed yet. The most recent:"))

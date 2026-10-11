@@ -523,6 +523,8 @@ local function RegisterKill(id, name, kb, source)
   if rec and now - rec.t < DEDUPE_SECONDS then
     if kb and not rec.kb then
       rec.kb = true
+      -- counted late for someone who only wants their own killing blows
+      if ns.Hype and not rec.hyped then rec.hyped = true pcall(ns.Hype.Kill, rec.name or name, true) end
       if rec.scored then
         addKillingBlow(id)
         if rec.entry then rec.entry[4] = 1 end
@@ -548,6 +550,11 @@ local function RegisterKill(id, name, kb, source)
   rec.myLevel = type(myLevel) == "number" and myLevel >= 1 and math.floor(myLevel) or nil
   recent[id] = rec
   ns.Log("kill", tostring(name or id) .. " via " .. source .. (kb and " kb" or ""))
+  if ns.Hype then
+    local mode = GodslayerDB.opts.hype and GodslayerDB.opts.hype.mode
+    if kb or mode ~= "blows" then rec.hyped = true end
+    pcall(ns.Hype.Kill, name, kb and true or false)
+  end
 
   if guild then
     local tier = ns.Classify(guild)
@@ -799,6 +806,7 @@ function handlers.CHAT_MSG_COMBAT_HONOR_GAIN(text)
 end
 
 function handlers.PLAYER_DEAD()
+  if ns.Hype then pcall(ns.Hype.Died) end
   ns.session.runs, ns.session.life = {}, ns.session.life + 1
   if ns.session.streak > 0 then
     ns.session.streak = 0

@@ -24,6 +24,7 @@ Made by **The True Torchmen**. For the Horde.
 - **Stats.** Kills by class, by zone, by guild rank and by hour of the day, plus your nemesis, your biggest upset and the highest level you have dropped.
 - **A louder kill banner.** "Level 34 Dwarf Paladin, Captain. Stranglethorn Vale. Third time today."
 - **Tooltip tags.** Mouse over an Olympian and see what they're worth, how often you've already collected, and whether they are still on the hit list.
+- **Your kill song, and an announcer.** The first player you kill starts a hunt: your own song begins and FIRST BLOOD goes up on screen. Every kill that follows while the hunt is on climbs a rung, shouted over the music: MEGA KILL, ULTRA KILL, GODLIKE, UNSTOPPABLE, BEYOND GODLIKE, GODSLAYER. Each kill keeps the hunt going another 90 seconds. Die, or go 90 seconds with nobody dead, and the music fades out and the zone's music comes back. This counts every player you kill, not only Olympus. Only you hear it.
 
 ## Install
 
@@ -35,6 +36,22 @@ Made by **The True Torchmen**. For the Horde.
 5. In game, type `/godslayer`.
 
 Turn on **enemy nameplates** (default key: V). The addon learns who is in which guild from nameplates, your target and your mouseover.
+
+## Your kill song
+
+Godslayer ships the announcer and no music. To add your song:
+
+1. Make a folder called `GodslayerMusic` next to the `Godslayer` folder, in `Interface/AddOns/`.
+2. Put your song in it, named `kill.mp3` or `kill.ogg`.
+3. Fully restart the game. `/godslayer hype test` plays it; press it again to climb the rungs.
+
+Updates never touch that folder. The song plays as game music, so it replaces the zone music, follows your music volume slider and fades the way the game's own tracks do.
+
+To pitch the announcer into your song's key, run `python3 tools/tune_announcer.py /path/to/GodslayerMusic/kill.mp3` (needs ffmpeg, numpy and scipy). It writes re-pitched lines into `GodslayerMusic/voice`, which the addon uses first.
+
+`/godslayer hype` shows the settings: `on`, `off`, `music on|off`, `voice on|off`, `window <seconds>`, `blows` (only your own killing blows count) or `all`.
+
+The announcer lines are original recordings made for this addon with a synthetic voice.
 
 ## Commands
 

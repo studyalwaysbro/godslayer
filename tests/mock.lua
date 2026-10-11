@@ -31,6 +31,21 @@ UNKNOWNOBJECT = "Unknown"
 RAID_CLASS_COLORS = { WARRIOR = { r = 0.78, g = 0.61, b = 0.43 }, MAGE = { r = 0.25, g = 0.78, b = 0.92 } }
 SOUNDKIT = { RAID_WARNING = 8959 }
 function PlaySound() end
+-- sound files and music: M.audio.files names the files that exist on disk
+M.audio = { files = {}, played = {}, stopped = {}, music = nil, musicStops = 0, cvars = { Sound_EnableAllSound = "1", Sound_EnableMusic = "1" }, next = 0 }
+function PlaySoundFile(path, channel)
+  assert(type(path) == "string" and channel == "Master", "PlaySoundFile(path, \"Master\")")
+  if not M.audio.files[path] then return false end
+  M.audio.next = M.audio.next + 1
+  M.audio.played[#M.audio.played + 1] = { path = path, handle = M.audio.next }
+  return true, M.audio.next
+end
+function StopSound(handle, fade) assert(type(handle) == "number") M.audio.stopped[handle] = fade or 0 end
+function PlayMusic(path) assert(M.audio.files[path], "PlayMusic on a missing file") M.audio.music = path end
+function StopMusic() if M.audio.music then M.audio.musicStops = M.audio.musicStops + 1 end M.audio.music = nil end
+function GetCVar(name) return M.audio.cvars[name] end
+function UIFrameFadeOut(frame, seconds, from, to) frame.__fading = true end
+function UIFrameFadeRemoveFrame(frame) frame.__fading = nil end
 UISpecialFrames = {}
 SlashCmdList = {}
 function GetBuildInfo() return "1.60.1", "70245", "Oct 6 2026", 16001 end
