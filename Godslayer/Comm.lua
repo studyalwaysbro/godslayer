@@ -84,6 +84,23 @@ local function count(v)
   return v
 end
 
+local RELEASES = "github.com/studyalwaysbro/godslayer/releases"
+-- A guildmate running a newer version means there is one to get. Said once per session.
+local function versionNumber(v)
+  local a, b, c = tostring(v):match("^(%d+)%.(%d+)%.?(%d*)")
+  if not a then return nil end
+  return tonumber(a) * 1000000 + tonumber(b) * 1000 + (tonumber(c) or 0)
+end
+local toldNewer = false
+local function noteVersion(theirs)
+  if toldNewer or type(theirs) ~= "string" or #theirs > 12 then return end
+  local mine, other = versionNumber(ns.VERSION), versionNumber(theirs)
+  if not (mine and other) or other <= mine then return end
+  toldNewer = true
+  ns.Print(("version %s is out and you have %s. With Yeeterson Forge it arrives by itself. Otherwise download it from %s"):format(theirs, ns.VERSION, RELEASES))
+end
+Comm.NoteVersion = noteVersion
+
 function Comm.handlers.CHAT_MSG_ADDON(prefix, text, channel, sender)
   prefix, text, channel, sender = plain(prefix), plain(text), plain(channel), plain(sender)
   if prefix ~= PREFIX or channel ~= "GUILD" then return end
@@ -116,6 +133,7 @@ function Comm.handlers.CHAT_MSG_ADDON(prefix, text, channel, sender)
       kings = math.min(count(kings) or 0, orig),
       t = time(),
     }
+    noteVersion(db.roster[guild][who].ver)
     if ns.OnChanged then ns.OnChanged() end
   end
 end

@@ -183,7 +183,7 @@ for _, m in ipairs(M.sentAddon) do
   check(#m[2] <= 255, "addon message fits")
 end
 check(sawHello, "hello sent after login"); check(sawStats, "stats broadcast after kills")
-check(sawStats and sawStats:match("^S;1;7;15;6;4;2;MAGE;1%.1%.0;2;%x%x%x%x%x%x$"), "stats payload: " .. tostring(sawStats))
+check(sawStats and sawStats:match("^S;1;7;15;6;4;2;MAGE;" .. ns.VERSION:gsub("%.", "%%.") .. ";2;%x%x%x%x%x%x$"), "stats payload: " .. tostring(sawStats))
 local myTag = sawStats:match(";(%x+)$")
 M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;400;400;400;0;0;MAGE;1.0.0;0;" .. myTag, "GUILD", "Vesh")  -- own echo under a shorter name
 M.fire("CHAT_MSG_ADDON", "Godslayer", "H;1;" .. myTag, "GUILD", "Vesh")
@@ -647,6 +647,21 @@ M.failTemplate = true; ns2.UI.Toggle()
 check(GodslayerWindow and GodslayerWindow:IsShown(), "window falls back without the template")
 eq(ns2.errors, nil, "no errors after reload")
 
+-- a guildmate on a newer version: one line, once
+do
+  M.printed = {}
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;3;3;2;1;0;MAGE;" .. ns2.VERSION, "GUILD", "Same Version")
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;3;3;2;1;0;MAGE;1.0.0", "GUILD", "Old Version")
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;3;3;2;1;0;MAGE;junk", "GUILD", "Junk Version")
+  check(not table.concat(M.printed, "\n"):find("is out", 1, true), "the same, an older or an unreadable version says nothing")
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;3;3;2;1;0;MAGE;9.4.2", "GUILD", "Newer Version")
+  M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;3;3;2;1;0;MAGE;9.5.0", "GUILD", "Newest Version")
+  local n = 0
+  for _, line in ipairs(M.printed) do if line:find("version 9.4.2 is out and you have " .. ns2.VERSION, 1, true) then n = n + 1 end if line:find("9.5.0", 1, true) then n = n + 10 end end
+  check(n >= 1 and n < 10, "a newer version is announced once per session, with yours next to it")
+  check(table.concat(M.printed, "\n"):find("github.com/studyalwaysbro/godslayer/releases", 1, true), "and says where to get it")
+end
+
 -- 1.2: the kill song and the announcer ------------------------------------------------------------
 do
   local H, A = ns2.Hype, M.audio
@@ -784,5 +799,14 @@ do
 end
 
 for _, line in ipairs(GodslayerDB.log) do if line:find(" error: ", 1, true) then check(false, "logged error: " .. line) end end
+-- the version the addon reports is the version on the box
+do
+  local f = assert(io.open("Godslayer/Godslayer.toc"))
+  local toc = f:read("*a") f:close()
+  local probe = {}
+  assert(loadfile("Godslayer/Data.lua"))("Godslayer", probe)
+  assert(loadfile("Godslayer/Core.lua"))("Godslayer", probe)
+  eq(toc:match("## Version: ([%d%.]+)"), probe.VERSION, "the toc and the code agree on the version")
+end
 M.realPrint(("%d passed, %d failed"):format(passed, failed))
 os.exit(failed == 0 and 0 or 1)
