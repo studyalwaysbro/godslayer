@@ -14,7 +14,7 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "1.3.1"
+ns.VERSION = "1.4.0"
 
 local DEDUPE_SECONDS = 10        -- the signals above can all describe the same death
 local MATCH_WINDOW = 8           -- honorable-kill credit and a seen death must be this close
@@ -340,6 +340,8 @@ local function ObserveUnit(unit)
     known[id] = { n = name, g = guild, c = e.class, t = time(), l = e.level, r = e.race, s = e.sex,
                   k = e.rank, p = e.title, z = clean((try(GetRealZoneText))) }
     if knownCount > KNOWN_CAP then pruneKnown() end -- a thousand-player raid can walk past in one sitting
+    -- alive, hostile and in view: the announcer says so
+    if dead == false and e.hostile and ns.Hype and ns.Hype.Spot then pcall(ns.Hype.Spot, id, name, guild, tier, ns.IsKing(name, tier)) end
   elseif known[id] then
     known[id] = nil -- they left the network
     knownCount = knownCount - 1
@@ -350,11 +352,13 @@ end
 ns.ObserveUnit = ObserveUnit
 
 local function sweepUnits()
+  ns.sweeping = true -- a look around to put a name to a kill is not a sighting
   ObserveUnit("target")
   ObserveUnit("mouseover")
   ObserveUnit("focus")
   ObserveUnit("softenemy")
   for i = 1, 40 do ObserveUnit("nameplate" .. i) end
+  ns.sweeping = false
 end
 
 -- Guild, class and name for a player, from what is on screen or was seen earlier.

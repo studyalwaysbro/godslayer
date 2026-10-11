@@ -26,7 +26,11 @@ Made by **The True Torchmen**. For the Horde.
 - **Tooltip tags.** Mouse over an Olympian and see what they're worth, how often you've already collected, and whether they are still on the hit list.
 - **Your kill song, and an announcer who takes Olympus personally.** The first player you kill starts a hunt: your own song begins and FIRST BLOOD is called. Every kill that follows climbs a rung over the music: MEGA KILL, ULTRA KILL, GODLIKE, UNSTOPPABLE, BEYOND GODLIKE, GODSLAYER. Each kill keeps the hunt going another 90 seconds. Die and you get SHUT DOWN.
 - **Olympus kills get their own script.** A GOD BLEEDS. DOUBLE SACRILEGE. TITANOMACHY. Then the points, out loud: one for the network, five for the King's own guild. Then, now and then, a dry remark ("Zeus felt that one."). Earn a new title and the announcer says it. Kill the King and everybody within earshot of your speakers will know.
-- **Two announcers.** Titan, deep and huge, and Herald, fierce and sharp. `/godslayer hype pack` switches. Common lines have several takes and the same take never plays twice running.
+- **Kills in a row.** Two kills within twelve seconds is a DOUBLE KILL. Then TRIPLE KILL, QUAD KILL and RAMPAGE, called before the rung, with a crowd under the big ones.
+- **Six announcers, each a character with a script of their own.** Titan, deep and huge. Herald, fierce and sharp. Valkyrie, a shield-maiden who chooses the slain and keeps choosing yours. Frostbite, an ice witch having a lovely time ("Olympus is a hill now! Great for sledding!"). The Naturalist, calm and British, filming a documentary about you ("A rampage. The camera crew has asked to leave."). Sable, who is only here because the stream was boring. By default a different one takes each hunt. `/godslayer hype pack` pins one, `/godslayer hype audition frost` plays every line of one.
+- **The spotter.** A living Olympian comes into view: a horn, their name and guild on screen, and the announcer says so. The King gets his own call.
+- **The end of a hunt.** A heartbeat and a word with ten seconds left, so you can do something about it. Then the sum of it in chat: kills, points, best run. Beat your best hunt and you hear about it at the kill that does it.
+- **A hunt theme.** No song of your own? The addon comes with one, so the first kill starts music for everybody.
 - **The guild feed.** When a guildmate's score goes up, you get a line in chat and, now and then, the announcer mentions it.
 
 ## Install
@@ -42,7 +46,7 @@ Turn on **enemy nameplates** (default key: V). The addon learns who is in which 
 
 ## Your kill song
 
-Godslayer ships the announcer and no music. To add your song:
+Godslayer comes with a hunt theme. To hunt to your own song instead:
 
 1. Make a folder called `GodslayerMusic` next to the `Godslayer` folder, in `Interface/AddOns/`.
 2. Put your song in it, named `kill.mp3` or `kill.ogg`.
@@ -54,16 +58,21 @@ Try it without killing anyone:
 
 | Command | What it plays |
 |---|---|
-| `/godslayer hype test` | An ordinary kill. Again inside 90 seconds to climb the rungs |
+| `/godslayer hype test` | An ordinary kill. Again inside 12 seconds for a double kill, inside 90 to climb the rungs |
 | `/godslayer hype test olympus` | An Olympus kill, with the points |
 | `/godslayer hype test king` | Regicide |
+| `/godslayer hype test spot` | An Olympian coming into view. `test king spot` for the King |
+| `/godslayer hype audition <name>` | Every line of one announcer, with the words in chat |
+| `/godslayer hype say <line>` | One line, by name |
 | `/godslayer hype stop` | Ends the hunt and fades the music |
 
-`/godslayer hype` shows the settings: `on`, `off`, `pack`, `music on|off`, `voice on|off`, `guild on|off`, `window <seconds>`, `blows` (only your own killing blows count) or `all`. Pretend kills score nothing.
+`/godslayer hype` shows the settings. `pack <name>` pins an announcer and `pack mix` goes back to a different one each hunt; `mix <name> off` leaves one out of the mix. On or off: `music`, `voice`, `guild`, `sfx` (crowd, horn, heartbeat), `spot`, `multi` (double kill and up), `asides` (the remarks), `theme`. `window <seconds>` sets how long a hunt lasts, `blows` counts only your own killing blows, `all` counts every kill you get credit for. Pretend kills score nothing.
 
 ## How the voice was made
 
-Every line is in `tools/voice_script.json`. `tools/build_voice.py` asks a voice service for a take of each line, has the take transcribed back and keeps it only if the words match, then gives it the arena treatment with ffmpeg: pitched down, compressed, a hall behind it, and an impact under each kill call. The voices are synthetic and the recordings were made for this addon. To change a line or add an announcer, edit the script and run the tool.
+Every line is in `tools/voice_script.json`: six packs, five scripts. `tools/build_voice.py` asks a voice service for a take of each line, has the take transcribed back and throws it away if the words are wrong or it runs long. A kill call gets three good takes and the fiercest is kept (the most even one, for the Naturalist). The kept take gets the arena treatment with ffmpeg, with the pack's own impact under it: a boom for Titan, a war drum and a sword for Valkyrie, breaking ice for Frostbite. The same script builds the sound effects and the hunt theme.
+
+`tools/voice_report.md` lists every clip, the take that was kept and what the transcription heard. `tools/audition.html` is a page with a button for every clip; open it in a browser to listen through a pack in a minute.
 
 `tools/tune_announcer.py /path/to/GodslayerMusic/kill.mp3` re-pitches every line toward the key of your song and writes the result to `GodslayerMusic/voice`, which the addon uses first. It is optional.
 

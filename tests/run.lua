@@ -681,7 +681,8 @@ do
   local NEEDED = { "first_blood_1", "first_blood_2", "mega_kill_1", "ultra_kill_1", "godlike", "unstoppable", "beyond_godlike", "godslayer", "shut_down",
                    "god_down_1", "god_down_2", "olympus_1", "olympus_2", "double_sacrilege", "triple_heresy", "quad_blasphemy", "titanomachy", "twilight", "hill", "zeus_left",
                    "regicide", "plus_one_1", "plus_one_2", "plus_five_1", "plus_five_2", "plus_many", "first_today", "tail_1", "tail_2", "tail_3", "repeat_1", "repeat_2",
-                   "new_title", "ally_1", "ally_2" }
+                   "new_title", "ally_1", "ally_2", "double_kill_1", "double_kill_2", "triple_kill", "quad_kill", "rampage", "spot_1", "spot_2", "king_spot",
+                   "record", "hunt_over_1", "hunt_over_2", "fading" }
   for i = 2, #ns4.RANKS do NEEDED[#NEEDED + 1] = "title_" .. i end
   local packs = 0
   for id, pack in pairs(ns4.VOICE) do
@@ -699,19 +700,45 @@ do
         f:close()
       end
       if not (length > 0.5 and length < 9) then check(false, id .. "/" .. clip .. " has an odd length: " .. tostring(length)) end
-      if not ns4.VOICE_TEXT[clip] then check(false, "no text recorded for " .. clip) end
+      local text = pack.text and pack.text[clip]
+      if type(text) ~= "string" or text == "" then check(false, "no text recorded for " .. id .. "/" .. clip)
+      elseif text:find("[", 1, true) or text:find("\226\128\148", 1, true) then check(false, id .. "/" .. clip .. " shows a delivery note or a long dash: " .. text) end
     end
-    check(n >= 55, id .. " has the whole script (" .. n .. " lines)")
+    check(n >= 70, id .. " has the whole script (" .. n .. " lines)")
+    check(type(pack.weight) == "number" and pack.weight > 0, id .. " has a place in the mix")
   end
-  check(packs >= 2, "at least two announcers to choose from")
-  eq(GodslayerDB.opts.hype and GodslayerDB.opts.hype.pack or H.Opts().pack, "titan", "the default announcer")
+  check(packs >= 6, "six announcers to choose from")
+  eq(#ns4.VOICE_ORDER, packs, "and they are listed in a fixed order")
+  for _, name in ipairs({ "crowd", "horn", "fanfare", "heartbeat", "gong", "powerdown" }) do
+    local f = io.open("Godslayer/Sounds/sfx/" .. name .. ".ogg", "rb")
+    check(f and f:read(4) == "OggS" and ns4.SFX[name] and ns4.SFX[name] > 0.3, "the sound " .. name .. " is in the addon")
+    if f then f:close() end
+  end
+  do
+    local f = io.open("Godslayer/Sounds/music/hunt.ogg", "rb")
+    check(f and f:read(4) == "OggS" and ns4.MUSIC.hunt > 30, "the hunt theme is in the addon")
+    if f then f:close() end
+  end
+  eq(H.Opts().pack, "mix", "the default announcer is the mix")
+  do -- coming from 1.3: a chosen announcer is kept, the old default moves to the mix
+    local real = GodslayerDB.opts.hype
+    GodslayerDB.opts.hype = { on = true, voice = false, music = true, guild = false, mode = "blows", pack = "herald", window = 120, best = 7 }
+    local o = H.Opts()
+    check(o.pack == "herald" and o.voice == false and o.guild == false and o.mode == "blows" and o.window == 120 and o.best == 7, "a 1.3 choice of Herald and every other setting survives")
+    GodslayerDB.opts.hype = { on = true, pack = "titan" }
+    eq(H.Opts().pack, "mix", "the 1.3 default moves to the mix")
+    GodslayerDB.opts.hype = real
+  end
+  -- the older tests below were written for one announcer and one call per kill
+  H.Opts().pack, H.Opts().multi = "titan", false
+  eq(H.Pack(), "titan", "a chosen announcer is the one who speaks")
 
   -- what was spoken, in order, with when; the song and the search for it are not speech
   local function spoken()
     local names, times = {}, {}
     for _, p in ipairs(A.played) do
       local clip = p.path:match("\\([%w_]+)%.ogg$")
-      if clip and (p.path:find("Sounds", 1, true) or p.path:find("voice", 1, true)) then names[#names + 1] = clip times[#times + 1] = p.at end
+      if clip and not p.path:find("\\sfx\\", 1, true) and (p.path:find("Sounds", 1, true) or p.path:find("voice", 1, true)) then names[#names + 1] = clip times[#times + 1] = p.at end
     end
     return names, times
   end
@@ -918,6 +945,234 @@ do
   kill() M.advance(0.1) M.fire("PLAYER_DEAD") M.advance(6)
   eq(groups(), "", "dying on your first kill is not announced, and neither is the kill")
 
+
+  -- kills in quick succession: DOUBLE KILL, TRIPLE KILL, QUAD KILL, RAMPAGE, said before the rung
+  local function effects()
+    local names = {}
+    for _, p in ipairs(A.played) do
+      local name = p.path:match("\\sfx\\([%w_]+)%.ogg$")
+      if name then names[#names + 1] = name end
+    end
+    return table.concat(names, ",")
+  end
+  for name in pairs(ns4.SFX) do A.files[S .. "sfx\\" .. name .. ".ogg"] = true end
+  H.Opts().multi = true
+  noAsides()
+  reset()
+  kill("Zeus") M.advance(8) kill("Hera") M.advance(8)
+  eq(groups(), "first_blood,double_kill,mega_kill", "two inside twelve seconds: DOUBLE KILL, then the rung")
+  check(line():find("DOUBLE KILL", 1, true) and line():find("x2", 1, true), "and the banner says so: " .. line())
+  eq(title(), "MEGA KILL", "the rung keeps the banner for a double")
+  reset()
+  kill() M.advance(13) kill() M.advance(8)
+  eq(groups(), "first_blood,mega_kill", "thirteen seconds apart is not a double kill")
+  reset()
+  kill() M.advance(1) kill() M.advance(1) kill() M.advance(12)
+  eq(groups(), "first_blood,double_kill,triple_kill,ultra_kill", "a kill arriving before the rung is said takes its place: " .. groups())
+  check(effects():find("crowd", 1, true), "a triple kill gets the crowd")
+  reset()
+  kill() M.advance(3) kill() M.advance(3) kill() M.advance(3) kill() M.advance(0.1)
+  eq(title(), "QUAD KILL", "four in a run: the banner is the run") check(line():find("GODLIKE", 1, true), "with the rung beside it: " .. line())
+  M.advance(3) kill() M.advance(0.1) eq(title(), "RAMPAGE", "five is a RAMPAGE")
+  kill() M.advance(10) eq(title(), "RAMPAGE", "and so is six")
+  check(groups():find("rampage,", 1, true), "called out loud: " .. groups())
+  eq(H.MultiFor(1), nil, "one kill is not a run") eq(H.MultiFor(40)[2], "RAMPAGE", "forty is still a RAMPAGE")
+  reset()
+  kill() kill() kill() M.advance(8)
+  eq(groups(), "triple_kill,ultra_kill", "three in the same moment: one TRIPLE KILL, one rung")
+  -- on Olympus the god's own call stands for a double; from three the run is said first
+  reset()
+  god("network", 1) M.advance(3) god("network", 2) M.advance(12)
+  eq(groups(), "god_down,plus_one,double_sacrilege,plus_one", "two gods in a run keep the Olympus script: " .. groups())
+  reset()
+  allAsides()
+  god("network", 1) M.advance(2) god("network", 2) M.advance(2) god("network", 3) M.advance(14)
+  check(groups():find("triple_kill,triple_heresy,plus_one$"), "three gods in a run: TRIPLE KILL, the heresy, the point, and no remark after: " .. groups())
+  noAsides()
+  say("hype multi off")
+  reset() kill() M.advance(2) kill() M.advance(8)
+  eq(groups(), "first_blood,mega_kill", "with the run calls off there is one call per kill")
+  say("hype multi on")
+
+  -- the end of a hunt: a warning with ten seconds left, then a quiet word and the sum of it
+  reset()
+  M.printed = {}
+  kill() M.advance(20) kill() M.advance(20) A.played = {}
+  M.advance(55) eq(groups(), "", "nothing until the last ten seconds")
+  M.advance(6) eq(groups(), "fading", "ten seconds left: a warning") eq(effects(), "heartbeat", "over a heartbeat")
+  M.advance(10)
+  check(not H.Active(), "and then it is over") eq(groups(), "fading,hunt_over", "said quietly") check(effects():find("gong", 1, true), "with a gong")
+  local recap = false
+  for _, text in ipairs(M.printed) do if text:find("Hunt over: 2 kills", 1, true) then recap = true end end
+  check(recap, "the hunt is summed up in chat")
+  reset() A.played = {}
+  kill() M.advance(95)
+  eq(groups(), "first_blood", "a hunt of one kill ends without a word")
+  reset()
+  kill() M.advance(20) kill() M.advance(75) A.played = {}
+  kill() M.advance(15)
+  eq(groups(), "ultra_kill", "a kill after the warning carries on as if nothing was said")
+  check(H.Active(), "and the hunt is alive again")
+  reset()
+  kill() kill() M.advance(1) A.played = {}
+  M.fire("PLAYER_DEAD") M.advance(6)
+  eq(effects(), "powerdown", "SHUT DOWN comes with the lights going out")
+
+  -- a new best hunt is called once, at the kill that does it
+  reset()
+  GodslayerDB.opts.hype.best = 3
+  for _ = 1, 3 do kill() M.advance(13) end
+  check(not groups():find("record", 1, true), "matching your best is not a record")
+  kill() M.advance(13)
+  check(groups():find("godlike,record$"), "the kill that passes it is: " .. groups())
+  kill() M.advance(13)
+  eq(select(2, groups():gsub("record", "")), 1, "and it is said once in a hunt")
+  H.End("test") eq(GodslayerDB.opts.hype.best, 5, "the new best is kept")
+  GodslayerDB.opts.hype.best = 2
+  reset() for _ = 1, 4 do kill() M.advance(13) end
+  check(not groups():find("record", 1, true), "a best of two is not worth calling a record")
+  GodslayerDB.opts.hype.best = 10
+
+  -- the spotter
+  reset() M.advance(1000)
+  check(H.Spot("Player-1", "Zeus Olympian", "OLYMPUS", "original", false), "a living Olympian in view is called")
+  M.advance(6)
+  eq(groups(), "spot", "by the announcer") eq(effects(), "horn", "over a horn") eq(title(), "OLYMPIAN SIGHTED", "on the banner")
+  check(line():find("Zeus Olympian", 1, true) and line():find("<OLYMPUS>", 1, true), "with the name and the guild: " .. line())
+  check(not H.Spot("Player-1", "Zeus Olympian", "OLYMPUS", "original", false), "the same one is not called again")
+  check(not H.Spot("Player-2", "Hera Olympian", "OLYMPUS", "original", false), "nor another, so soon")
+  M.advance(40)
+  check(H.Spot("Player-9", "Asmongold Asmongler", "OLYMPUS", "original", true), "the King is called even inside that gap")
+  M.advance(8) eq(title(), "THE KING IS HERE", "on the banner") check(groups():find("king_spot$"), "and out loud: " .. groups())
+  M.advance(130)
+  check(not H.Spot("Player-1", "Zeus Olympian", "OLYMPUS", "original", false), "somebody called a few minutes ago is left alone")
+  check(H.Spot("Player-2", "Hera Olympian", "OLYMPUS", "original", false), "a new face after two minutes is called")
+  M.advance(130)
+  kill()
+  check(not H.Spot("Player-3", "Ares Olympian", "OLYMPUS", "original", false), "never over a kill that is about to be called")
+  M.advance(5)
+  check(not H.Spot("Player-3", "Ares Olympian", "OLYMPUS", "original", false), "nor in the seconds after one")
+  M.advance(20)
+  say("hype spot off")
+  check(not H.Spot("Player-3", "Ares Olympian", "OLYMPUS", "original", false), "and not at all when it is switched off")
+  say("hype spot on")
+  check(not H.Spot(nil, "Nobody"), "a spot without a player is nothing")
+  say("hype sfx off") reset() M.advance(1000)
+  H.Spot("Player-4", "Apollo Olympian", "OLYMPUS", "original", false) M.advance(6)
+  eq(effects(), "", "with sound effects off there is no horn") eq(groups(), "spot", "but the announcer still says it")
+  say("hype sfx on")
+
+  -- a preview of the spotter leaves the real one alone
+  reset() M.advance(1000)
+  say("hype test spot") M.advance(8)
+  check(H.Spot("Player-5", "Hermes Olympian", "OLYMPUS", "original", false), "a real Olympian right after a test spot is still called")
+  -- a look around at kill time is not a sighting
+  ns4.sweeping = true
+  M.advance(1000)
+  check(not H.Spot("Player-6", "Hades Olympian", "OLYMPUS", "original", false), "nobody is sighted by the sweep that names a kill")
+  ns4.sweeping = false
+  -- points belong to the hunt the kill was made in
+  reset() M.printed = {}
+  local old = kill("Slow Tag") M.advance(95)
+  kill() M.advance(13) kill() M.advance(1)
+  H.Olympus(old, { name = "Slow Tag", kills = 1 }, "original", 5, { streak = 1 }) M.advance(100)
+  local leaked = false
+  for _, text in ipairs(M.printed) do if text:find("Hunt over", 1, true) and text:find("off Olympus", 1, true) then leaked = true end end
+  check(not leaked, "a tag arriving late does not add its points to a later hunt")
+
+  -- remarks can be switched off
+  allAsides()
+  say("hype asides off")
+  reset() god("network", 1) M.advance(12)
+  eq(groups(), "god_down,plus_one", "no remark after the points when remarks are off")
+  say("hype asides on")
+  noAsides()
+
+  -- the mix: a different announcer each hunt, the same one all through a hunt
+  math.random = realRandom
+  math.randomseed(7)
+  say("hype pack mix")
+  eq(GodslayerDB.opts.hype.pack, "mix", "the mix can be chosen")
+  local seen, same, lastPack, mixed = {}, 0, nil, false
+  for _ = 1, 300 do
+    reset()
+    kill() M.advance(3) kill() M.advance(8)
+    local pack = H.Pack()
+    seen[pack] = (seen[pack] or 0) + 1
+    if pack == lastPack then same = same + 1 end
+    lastPack = pack
+    for _, p in ipairs(A.played) do
+      if p.path:find("Sounds", 1, true) and not p.path:find("\\sfx\\", 1, true) and not p.path:find("\\" .. pack .. "\\", 1, true) then mixed = true end
+    end
+  end
+  for id in pairs(ns4.VOICE) do check((seen[id] or 0) >= 5, id .. " takes its turn in the mix (" .. (seen[id] or 0) .. " hunts of 300)") end
+  eq(same, 0, "the same announcer never takes two hunts running")
+  check(not mixed, "and one hunt is one voice from first blood to the last line")
+  check(seen.titan > seen.sable, "the weights are respected: titan " .. seen.titan .. ", sable " .. seen.sable)
+  say("hype mix sable off")
+  seen = {}
+  for _ = 1, 150 do reset() kill() M.advance(1) seen[H.Pack()] = true end
+  check(not seen.sable and seen.frost, "an announcer left out of the mix stays out")
+  say("hype mix sable on")
+  do -- leaving the active announcer out of the mix does not change the voice mid-hunt
+    reset() kill() M.advance(13)
+    local during = H.Pack()
+    say("hype mix " .. during .. " off")
+    kill() M.advance(13)
+    eq(H.Pack(), during, "the hunt keeps its voice")
+    reset() kill() M.advance(1)
+    check(H.Pack() ~= during, "and the next hunt draws another")
+    say("hype mix " .. during .. " on")
+  end
+  for id in pairs(ns4.VOICE) do if id ~= "frost" then say("hype mix " .. id .. " off") end end
+  seen = {}
+  for _ = 1, 10 do reset() kill() M.advance(1) seen[H.Pack()] = true end
+  check(seen.frost and not seen.titan, "with one announcer left in the mix, that one takes every hunt")
+  say("hype mix frost off")
+  reset() kill() M.advance(6)
+  check(H.Pack() ~= nil and groups() == "first_blood", "with every announcer left out there is still a voice")
+  for id in pairs(ns4.VOICE) do say("hype mix " .. id .. " on") end
+  -- a line already waiting keeps the voice it was written for
+  reset()
+  say("hype pack herald") M.advance(10) A.played = {}
+  god("network", 1, { rankUp = "Heretic", rankIndex = 3 }) M.advance(1)
+  say("hype pack frost") M.advance(0.01)
+  -- choosing an announcer hushes what was waiting and introduces the new one
+  M.advance(12)
+  local last = A.played[#A.played]
+  check(last and last.path:find("\\frost\\", 1, true), "a newly chosen announcer speaks in its own voice: " .. tostring(last and last.path))
+
+  -- every line of an announcer, on request
+  reset() M.advance(30) A.played, M.printed = {}, {}
+  say("hype audition frost") M.advance(600)
+  local heard, total = {}, 0
+  for _, p in ipairs(A.played) do local clip = p.path:match("\\frost\\([%w_]+)%.ogg$") if clip then heard[clip] = (heard[clip] or 0) + 1 end end
+  for clip in pairs(ns4.VOICE.frost.clips) do total = total + 1 if heard[clip] ~= 1 then check(false, "the audition plays " .. clip .. " once, not " .. tostring(heard[clip])) end end
+  check(total >= 70, "the audition went through the whole script")
+  A.played = {}
+  say("hype audition titan") M.advance(5) say("hype stop") local soFar = #A.played M.advance(600)
+  eq(#A.played, soFar, "and stops when told to")
+  A.played = {}
+  say("hype say rampage") M.advance(5)
+  check(A.played[1] and A.played[1].path:find("rampage", 1, true), "one line can be asked for by name")
+  say("hype say no_such_line") say("hype test spot") say("hype test king spot") say("hype") say("hype pack") say("hype mix")
+  M.advance(30)
+
+  -- no song of your own: the hunt theme
+  local THEME = S .. "music\\hunt.ogg"
+  A.files[THEME] = true
+  say("hype pack titan") M.advance(10)
+  reset()
+  kill() M.advance(3)
+  eq(A.music, THEME, "with no song of your own the hunt theme plays")
+  H.End("stop") eq(A.music, nil, "and stops with the hunt")
+  kill() M.advance(3) eq(A.music, THEME, "it plays again on the next hunt")
+  say("hype theme off") eq(A.music, nil, "switching the theme off stops it at once")
+  H.End("stop")
+  kill() M.advance(3) eq(A.music, nil, "and it stays off")
+  say("hype theme on")
+  H.Opts().multi = false
+
   -- your own song
   reset()
   ns4.KillsToday, ns4.char.points = realToday, realPoints
@@ -958,7 +1213,9 @@ do
   A.files[OWN .. "voice\\titan\\godlike.ogg"] = true
   A.played = {}
   kill() kill() kill() kill() M.advance(6)
-  check(A.played[#A.played].path == OWN .. "voice\\titan\\godlike.ogg", "a line tuned to your song is used before the built-in one")
+  local tuned = false
+  for _, p in ipairs(A.played) do if p.path == OWN .. "voice\\titan\\godlike.ogg" then tuned = true end end
+  check(tuned, "a line tuned to your song is used before the built-in one")
   H.End("stop") M.advance(20)
 
   -- the guild: a guildmate's score going up is news, a first sighting is not
@@ -1029,11 +1286,15 @@ do
   M.advance(30) A.played, M.printed = {}, {}
   M.addUnit("target", { name = "Fresh Victim", guid = "Player-1-0000F001", guild = "OLYMPUS", class = "WARRIOR", faction = "Alliance" })
   M.fire("PLAYER_TARGET_CHANGED")
+  eq(title(), "OLYMPIAN SIGHTED", "targeting a living Olympian is a sighting, through the real path")
+  check(line():find("Fresh Victim", 1, true) and line():find("<OLYMPUS>", 1, true), "with who it is: " .. line())
+  M.advance(8)
+  eq(groups(), "spot", "and the announcer says so")
   M.fire("PARTY_KILL", ME, "Player-1-0000F001")
   M.fire("PARTY_KILL", ME, "Player-1-0000F001")
   M.advance(12)
   eq(H.Kills(), 1, "a kill reported twice is one kill")
-  check(groups():find("^olympus,plus_five"), "a real kill on OLYMPUS gets the Olympus call and five points, not FIRST BLOOD: " .. groups())
+  check(groups():find("^spot,olympus,plus_five"), "a real kill on OLYMPUS gets the Olympus call and five points, not FIRST BLOOD: " .. groups())
   check(not groups():find("first_blood", 1, true), "and FIRST BLOOD is not said over it")
   eq(title(), "OLYMPUS BLEEDS", "and the Olympus banner")
   M.fire("PARTY_KILL", ME, "Creature-0-0000-0000-00000001")

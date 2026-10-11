@@ -17,7 +17,9 @@ local ZONES = { "Stranglethorn Vale", "Hillsbrad Foothills", "Ashenvale", "", "Z
 local RACES = { "Human", "Dwarf", "Night Elf", "Gnome", "", "R|ace", ("Race"):rep(30) }
 local RANKS = { "Guild Master", "Lord", "Captain", "Member", "", "Rank|cff", ("Rank "):rep(20), "Sen\195\177or" }
 local SLASHES = { "hype", "hype test", "hype test olympus", "hype test king", "hype stop", "hype pack herald", "hype pack titan", "hype pack zz", "hype voice off", "hype voice on",
-                  "hype guild off", "hype guild on", "hype window 20", "hype blows", "hype all", "hype off", "hype on", "", "stats", "share", "top", "guilds", "log", "demo", "help", "sound", "toast", "chat", "tooltip", "minimap",
+                  "hype guild off", "hype guild on", "hype pack mix", "hype pack frost", "hype pack naturalist", "hype mix sable off", "hype mix sable on", "hype mix", "hype sfx off", "hype sfx on",
+                  "hype spot off", "hype spot on", "hype multi off", "hype multi on", "hype asides off", "hype asides on", "hype theme off", "hype theme on", "hype audition", "hype audition valkyrie",
+                  "hype say rampage", "hype say nothing", "hype test spot", "hype test king spot", "hype window 20", "hype blows", "hype all", "hype off", "hype on", "", "stats", "share", "top", "guilds", "log", "demo", "help", "sound", "toast", "chat", "tooltip", "minimap",
                   "add Method", "ignore OLYMPUS BETZ", "unignore OLYMPUS BETZ", "remove Method", "ignore Olympus", "unignore Olympus",
                   "add", "ignore   ", "reset", "reset roster", "bogus |cff", "add %s%d", "ignore ;;;",
                   "dossier Enemy", "dossier Enemy3 Last3", "dossier", "dossier %s|cff", "who asmon", "nemesis", "hitlist" }
