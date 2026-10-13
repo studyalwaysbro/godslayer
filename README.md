@@ -24,12 +24,19 @@ Made by **The True Torchmen**. For the Horde.
 - **Stats.** Kills by class, by zone, by guild rank and by hour of the day, plus your nemesis, your biggest upset and the highest level you have dropped.
 - **A louder kill banner.** "Level 34 Dwarf Paladin, Captain. Stranglethorn Vale. Third time today."
 - **Tooltip tags.** Mouse over an Olympian and see what they're worth, how often you've already collected, and whether they are still on the hit list.
-- **Your kill song, and an announcer who takes Olympus personally.** The first player you kill starts a hunt: your own song begins and FIRST BLOOD is called. Every kill that follows climbs a rung over the music: MEGA KILL, ULTRA KILL, GODLIKE, UNSTOPPABLE, BEYOND GODLIKE, GODSLAYER. Each kill keeps the hunt going another 90 seconds. Die and you get SHUT DOWN.
+- **Your kill song, and an announcer who takes Olympus personally.** The first player you kill starts a hunt: your own song begins and FIRST BLOOD is called. Every kill is heard the instant it lands, a blade that rings one note higher each time. The rungs are spaced so the top ones stay rare: MEGA KILL at two, ULTRA KILL at three, GODLIKE at five, UNSTOPPABLE at seven, BEYOND GODLIKE at ten, GODSLAYER at fifteen, and a call every five or ten kills after that, up to fifty. Between rungs the announcer mostly keeps quiet, which is why the next call lands. Each kill keeps the hunt going another 90 seconds. Die and you get SHUT DOWN.
+- **Moments.** Some kills are more than a number. REVENGE on the player you were fighting when you died. DOMINATION over one you keep killing. GIANT SLAYER for a victim well above your level, and a sad trombone for one far below it. OUTNUMBERED when you were alone against a crowd. COMEBACK after a bad run. A dry word about the victim's class, now and then ("The bubble was on cooldown.").
+- **DENIED.** Interrupt an enemy player's spell and you hear it, see it, and now and then get told about it.
+- **Duels.** Won or lost, the announcer has an opinion.
+- **A banner that moves.** The words slam in and throw light: a streak, a glow, a shockwave. Bigger moments add turning rays, claw marks for kills in a row, and a flash at the edges of the screen. Nothing covers the middle, where the fight is.
+- **The fuse.** A thin bar under the banner burns down the time you have left to kill again. It refills on every kill and beats red in the last ten seconds.
+- **The hunt card.** When a hunt of three kills or more ends, you get the sum of it and a grade stamped on: C, B, A, S, and one above S.
+- **The mix.** While the announcer speaks over the hunt's music, the music steps back, then returns. The hunt theme has a second, bigger half that takes over at five kills.
 - **Olympus kills get their own script.** A GOD BLEEDS. DOUBLE SACRILEGE. TITANOMACHY. Then the points, out loud: one for the network, five for the King's own guild. Then, now and then, a dry remark ("Zeus felt that one."). Earn a new title and the announcer says it. Kill the King and everybody within earshot of your speakers will know.
 - **Kills in a row.** Two kills within twelve seconds is a DOUBLE KILL. Then TRIPLE KILL, QUAD KILL and RAMPAGE, called before the rung, with a crowd under the big ones.
 - **Six announcers, each a character with a script of their own.** Titan, deep and huge. Herald, fierce and sharp. Valkyrie, a shield-maiden who chooses the slain and keeps choosing yours. Frostbite, an ice witch having a lovely time ("Olympus is a hill now! Great for sledding!"). The Naturalist, calm and British, filming a documentary about you ("A rampage. The camera crew has asked to leave."). Sable, who is only here because the stream was boring. By default a different one takes each hunt. `/godslayer hype pack` pins one, `/godslayer hype audition frost` plays every line of one.
 - **The spotter.** A living Olympian comes into view: a horn, their name and guild on screen, and the announcer says so. The King gets his own call.
-- **The end of a hunt.** A heartbeat and a word with ten seconds left, so you can do something about it. Then the sum of it in chat: kills, points, best run. Beat your best hunt and you hear about it at the kill that does it.
+- **The end of a hunt.** A heartbeat and a word with ten seconds left, so you can do something about it. Then the card, and the sum of it in chat: kills, points, best run. Ten kills without dying is a FLAWLESS HUNT. Beat your best hunt and you hear about it at the kill that does it.
 - **A hunt theme.** No song of your own? The addon comes with one, so the first kill starts music for everybody.
 - **The guild feed.** When a guildmate's score goes up, you get a line in chat and, now and then, the announcer mentions it.
 
@@ -62,15 +69,19 @@ Try it without killing anyone:
 | `/godslayer hype test olympus` | An Olympus kill, with the points |
 | `/godslayer hype test king` | Regicide |
 | `/godslayer hype test spot` | An Olympian coming into view. `test king spot` for the King |
+| `/godslayer hype test moment revenge` | A moment. Also `dominate`, `giant`, `shame`, `outnumbered`, `comeback`, `clutch`, `class` |
+| `/godslayer hype test denied` | A spell interrupted |
+| `/godslayer hype test duel` | A duel won. `test duel lost` for the other kind |
+| `/godslayer hype test card` | Ends the test hunt and grades it |
 | `/godslayer hype audition <name>` | Every line of one announcer, with the words in chat |
 | `/godslayer hype say <line>` | One line, by name |
 | `/godslayer hype stop` | Ends the hunt and fades the music |
 
-`/godslayer hype` shows the settings. `pack <name>` pins an announcer and `pack mix` goes back to a different one each hunt; `mix <name> off` leaves one out of the mix. On or off: `music`, `voice`, `guild`, `sfx` (crowd, horn, heartbeat), `spot`, `multi` (double kill and up), `asides` (the remarks), `theme`. `window <seconds>` sets how long a hunt lasts, `blows` counts only your own killing blows, `all` counts every kill you get credit for. Pretend kills score nothing.
+`/godslayer hype` shows the settings. `pack <name>` pins an announcer and `pack mix` goes back to a different one each hunt; `mix <name> off` leaves one out of the mix. On or off: `music`, `voice`, `guild`, `sfx` (every sound under the voice), `spot`, `multi` (double kill and up), `asides` (the remarks), `theme`, `moments`, `barks` (the short word between rungs), `deny`, `duels`, `fx` (banner light and motion; off gives plain words), `fuse`, `duck` (the music stepping back), `photo` (a screenshot of your biggest moments, off unless you ask). `channel master`, `dialog` or `sfx` picks which volume slider the announcer follows. `window <seconds>` sets how long a hunt lasts, `blows` counts only your own killing blows, `all` counts every kill you get credit for. Pretend kills score nothing.
 
 ## How the voice was made
 
-Every line is in `tools/voice_script.json`: six packs, five scripts. `tools/build_voice.py` asks a voice service for a take of each line, has the take transcribed back and throws it away if the words are wrong or it runs long. A kill call gets three good takes and the fiercest is kept (the most even one, for the Naturalist). The kept take gets the arena treatment with ffmpeg, with the pack's own impact under it: a boom for Titan, a war drum and a sword for Valkyrie, breaking ice for Frostbite. The same script builds the sound effects and the hunt theme.
+Every line is in `tools/voice_script.json`: six packs, five scripts. `tools/build_voice.py` asks a voice service for a take of each line, has the take transcribed back and throws it away if the words are wrong or it runs long. A kill call gets three good takes and the fiercest is kept (the most even one, for the Naturalist). The kept take gets the arena treatment with ffmpeg, with the pack's own impact under it: a boom for Titan, a war drum and a sword for Valkyrie, breaking ice for Frostbite. The same script builds the sound effects and the hunt theme. The light the banners are made of is drawn by `tools/build_art.py`.
 
 `tools/voice_report.md` lists every clip, the take that was kept and what the transcription heard. `tools/audition.html` is a page with a button for every clip; open it in a browser to listen through a pack in a minute.
 

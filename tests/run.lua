@@ -10,7 +10,7 @@ local function eq(a, b, label) check(a == b, label .. " (got " .. tostring(a) ..
 local ME = "Player-1-0000AAAA"
 M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", faction = "Horde" })
 
-local ns = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+local ns = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Hype.lua", "Comm.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "SomethingElse")
 check(GodslayerDB == nil, "ignores other addons loading")
 M.fire("PARTY_KILL", ME, "Player-1-00000001") -- before init: must not error
@@ -576,7 +576,7 @@ checkPhrases("1 kill")
 local saved = GodslayerDB
 M.frames, M.timers = { UIParent, Minimap, GameTooltip }, {}
 GodslayerFrame, GodslayerMinimapButton = nil, nil
-local ns2 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+local ns2 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Hype.lua", "Comm.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
 check(GodslayerDB == saved and ns2.char.kills == 1, "totals reload from saved variables")
 eq(GodslayerDB.version, 2, "data version")
@@ -594,7 +594,7 @@ do
   }
   M.frames, M.timers = { UIParent, Minimap, GameTooltip }, {}
   GodslayerFrame, GodslayerWindow, GodslayerMinimapButton, M.failTemplate = nil, nil, nil, nil
-  local ns3 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+  local ns3 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Hype.lua", "Comm.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
   local c3 = ns3.char
   eq(GodslayerDB.version, 2, "old data is marked as migrated"); eq(c3.kills, 2, "old kills kept"); eq(c3.points, 10, "old points kept")
@@ -669,7 +669,7 @@ do
   local OWN = "Interface\\AddOns\\GodslayerMusic\\"
   local SONG = OWN .. "kill.mp3"
   M.frames = {} -- one client, one copy of the addon: the copies loaded earlier in this file stop listening
-  local ns4 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+  local ns4 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Hype.lua", "Comm.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer") M.fire("PLAYER_LOGIN")
   local H = ns4.Hype
   local realToday, realPoints = ns4.KillsToday, ns4.char.points
@@ -771,15 +771,16 @@ do
   eq(title(), "MEGA KILL", "second kill") eq(groups(), "first_blood,mega_kill", "is called")
   check(line():find("Hera is dead", 1, true) and line():find("x2", 1, true), "the banner names the victim and the count")
   for _ = 3, 9 do kill() M.advance(6) end
-  eq(groups(), "first_blood,mega_kill,ultra_kill,godlike,unstoppable,beyond_godlike,godslayer,godslayer,godslayer", "the ladder, and the top rung repeats")
-  eq(title(), "GODSLAYER", "banner on the top rung") eq(H.Kills(), 9, "nine kills in the hunt")
+  eq(groups(), "first_blood,mega_kill,ultra_kill,godlike,unstoppable", "the ladder is spaced out: nothing is called at four, six, eight or nine")
+  eq(title(), "9 KILLS", "between rungs the banner is the count") eq(H.Kills(), 9, "nine kills in the hunt")
+  check(line():find("1 more: BEYOND GODLIKE", 1, true), "and says how far the next rung is: " .. line())
   M.advance(80) check(H.Active(), "still hunting 80 seconds after the last kill")
   kill() M.advance(85) check(H.Active(), "a kill resets the clock")
   M.advance(10) check(not H.Active(), "90 seconds with nobody dead ends the hunt")
   eq(GodslayerDB.opts.hype.best, 10, "the best hunt is remembered")
   reset()
   kill() kill() kill() kill() M.advance(6)
-  eq(groups(), "godlike", "four at once is one GODLIKE, not four calls over each other")
+  eq(groups(), "ultra_kill", "four at once is one call, for the highest rung they reached, not four over each other")
 
   -- the same take is never played twice running
   math.random = realRandom
@@ -861,7 +862,7 @@ do
     end
   end
   check(rare > n * 0.02 and rare < n * 0.09, "a rare line on roughly one kill in twenty (" .. rare .. " in " .. n .. ")")
-  check(tails > n * 0.25 and tails < n * 0.5, "an ordinary remark on roughly four in ten (" .. tails .. ")")
+  check(tails > n * 0.15 and tails < n * 0.35, "an ordinary remark on roughly one in four (" .. tails .. ")")
   noAsides()
 
   -- many Olympians at once: one call, and the points pour in
@@ -960,7 +961,7 @@ do
   noAsides()
   reset()
   kill("Zeus") M.advance(8) kill("Hera") M.advance(8)
-  eq(groups(), "first_blood,double_kill,mega_kill", "two inside twelve seconds: DOUBLE KILL, then the rung")
+  eq(groups(), "first_blood,double_kill", "two inside twelve seconds: DOUBLE KILL, and the small rung is left to the banner")
   check(line():find("DOUBLE KILL", 1, true) and line():find("x2", 1, true), "and the banner says so: " .. line())
   eq(title(), "MEGA KILL", "the rung keeps the banner for a double")
   reset()
@@ -968,18 +969,18 @@ do
   eq(groups(), "first_blood,mega_kill", "thirteen seconds apart is not a double kill")
   reset()
   kill() M.advance(1) kill() M.advance(1) kill() M.advance(12)
-  eq(groups(), "first_blood,double_kill,triple_kill,ultra_kill", "a kill arriving before the rung is said takes its place: " .. groups())
+  eq(groups(), "first_blood,double_kill,triple_kill", "a run is one call a kill: " .. groups())
   check(effects():find("crowd", 1, true), "a triple kill gets the crowd")
   reset()
   kill() M.advance(3) kill() M.advance(3) kill() M.advance(3) kill() M.advance(0.1)
-  eq(title(), "QUAD KILL", "four in a run: the banner is the run") check(line():find("GODLIKE", 1, true), "with the rung beside it: " .. line())
+  eq(title(), "QUAD KILL", "four in a run: the banner is the run") check(line():find("ULTRA KILL", 1, true), "with the rung beside it: " .. line())
   M.advance(3) kill() M.advance(0.1) eq(title(), "RAMPAGE", "five is a RAMPAGE")
-  kill() M.advance(10) eq(title(), "RAMPAGE", "and so is six")
+  kill() M.advance(10) eq(title(), "6 KILLS", "six in a run is not called again") check(line():find("RAMPAGE", 1, true), "but the banner still says what it is: " .. line())
   check(groups():find("rampage,", 1, true), "called out loud: " .. groups())
   eq(H.MultiFor(1), nil, "one kill is not a run") eq(H.MultiFor(40)[2], "RAMPAGE", "forty is still a RAMPAGE")
   reset()
   kill() kill() kill() M.advance(8)
-  eq(groups(), "triple_kill,ultra_kill", "three in the same moment: one TRIPLE KILL, one rung")
+  eq(groups(), "triple_kill", "three in the same moment: one TRIPLE KILL")
   -- on Olympus the god's own call stands for a double; from three the run is said first
   reset()
   god("network", 1) M.advance(3) god("network", 2) M.advance(12)
@@ -1024,7 +1025,7 @@ do
   for _ = 1, 3 do kill() M.advance(13) end
   check(not groups():find("record", 1, true), "matching your best is not a record")
   kill() M.advance(13)
-  check(groups():find("godlike,record$"), "the kill that passes it is: " .. groups())
+  check(groups():find("ultra_kill,record$"), "the kill that passes it is: " .. groups())
   kill() M.advance(13)
   eq(select(2, groups():gsub("record", "")), 1, "and it is said once in a hunt")
   H.End("test") eq(GodslayerDB.opts.hype.best, 5, "the new best is kept")
@@ -1178,7 +1179,7 @@ do
   ns4.KillsToday, ns4.char.points = realToday, realPoints
   A.files[SONG] = true
   M.frames = {}
-  local ns5 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+  local ns5 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Hype.lua", "Comm.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer") M.fire("PLAYER_LOGIN")
   H = ns5.Hype
   A.played, A.stopped, A.music, A.musicStops = {}, {}, nil, 0
@@ -1212,7 +1213,7 @@ do
   say("hype pack titan") M.advance(10)
   A.files[OWN .. "voice\\titan\\godlike.ogg"] = true
   A.played = {}
-  kill() kill() kill() kill() M.advance(6)
+  kill() kill() kill() kill() kill() M.advance(6)
   local tuned = false
   for _, p in ipairs(A.played) do if p.path == OWN .. "voice\\titan\\godlike.ogg" then tuned = true end end
   check(tuned, "a line tuned to your song is used before the built-in one")

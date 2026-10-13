@@ -34,7 +34,8 @@ function PlaySound() end
 -- sound files and music: M.audio.files names the files that exist on disk
 M.audio = { files = {}, played = {}, stopped = {}, music = nil, musicStops = 0, cvars = { Sound_EnableAllSound = "1", Sound_EnableMusic = "1" }, next = 0 }
 function PlaySoundFile(path, channel)
-  assert(type(path) == "string" and channel == "Master", "PlaySoundFile(path, \"Master\")")
+  assert(type(path) == "string" and (channel == "Master" or channel == "Dialog" or channel == "SFX"), "PlaySoundFile(path, channel)")
+  M.audio.channel = channel
   if not M.audio.files[path] then return false end
   M.audio.next = M.audio.next + 1
   M.audio.played[#M.audio.played + 1] = { path = path, handle = M.audio.next, at = M.now }
@@ -44,6 +45,15 @@ function StopSound(handle, fade) assert(type(handle) == "number") M.audio.stoppe
 function PlayMusic(path) assert(M.audio.files[path], "PlayMusic on a missing file") M.audio.music = path end
 function StopMusic() if M.audio.music then M.audio.musicStops = M.audio.musicStops + 1 end M.audio.music = nil end
 function GetCVar(name) return M.audio.cvars[name] end
+function SetCVar(name, value) if M.audio.lockCVars then return end M.audio.cvars[name] = tostring(value) M.audio.sets = (M.audio.sets or 0) + 1 end
+M.audio.cvars.Sound_MusicVolume = "0.8"
+M.shots = 0
+function Screenshot() M.shots = M.shots + 1 end
+function UnitHealth(t) if M.secretHealth then return M.secret() end return t == "player" and (M.myHealth or 100) or 100 end
+function UnitHealthMax(t) return 100 end
+function GetNumGroupMembers() return M.groupSize or 0 end
+function UnitIsUnit(a, b) if M.secretTargets then return M.secret() end local x, y = M.units[a], M.units[b] if b == "player" then return x ~= nil and x.isMe == true end return x ~= nil and x == y end
+C_Spell = { GetSpellName = function(id) return M.spells and M.spells[id] end }
 function UIFrameFadeOut(frame, seconds, from, to) frame.__fading = true end
 function UIFrameFadeRemoveFrame(frame) frame.__fading = nil end
 UISpecialFrames = {}
@@ -146,6 +156,17 @@ frameMT.__index = function(self, key)
     GetEffectiveScale = function() return 1 end,
     CreateFontString = function(f) return M.newFrame("FontString", nil, f) end,
     CreateTexture = function(f) return M.newFrame("Texture", nil, f) end,
+    -- animations: what was played is written down, nothing moves
+    CreateAnimationGroup = function(f) if M.noAnimations then return nil end local g = M.newFrame("AnimationGroup", nil, f) g.__plays = 0 return g end,
+    CreateAnimation = function(f, kind) return M.newFrame(kind, nil, f) end,
+    Play = function(f) f.__plays = (f.__plays or 0) + 1 f.__playing = true end,
+    Stop = function(f) f.__playing = false end,
+    SetAlpha = function(f, a) f.__alpha = a end,
+    GetAlpha = function(f) return f.__alpha or 1 end,
+    SetWidth = function(f, w) f.__width = w end,
+    SetTexture = function(f, path) if M.failTexture then error("no texture") end f.__texture = path end,
+    SetVertexColor = function(f, r, g, b) f.__color = { r, g, b } end,
+    SetTextColor = function(f, r, g, b) f.__color = { r, g, b } end,
     AddLine = function(f, text) assert(type(text) == "string") f.__lines[#f.__lines + 1] = text end,
     GetUnit = function(f) return "x", f.__unit end,
     StartMoving = function() end, StopMovingOrSizing = function() end,

@@ -105,8 +105,13 @@ def spoken(text):
     return re.sub(r"\s+", " ", re.sub(r"\[[^\]]*\]", "", text)).strip()
 
 
+NUMBERS = {"20": "twenty", "25": "twenty five", "30": "thirty", "40": "forty", "50": "fifty", "1": "one", "5": "five"}
+
+
 def words(text):
-    return re.sub(r"[^a-z0-9 ]", "", spoken(text).lower().replace("'", "")).split()
+    # the transcription writes numbers as digits; the script spells them
+    plain = re.sub(r"[^a-z0-9 ]", "", spoken(text).lower().replace("'", "").replace("-", " "))
+    return " ".join(NUMBERS.get(word, word) for word in plain.split()).split()
 
 
 def match(expected, heard):
@@ -258,7 +263,11 @@ def finish(raw, dst, loudness, quality=4, fade_in=0.01, fade_out=0.25, trim=True
     cut = ("silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.02,areverse,"
            "silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.05,areverse,") if trim else ""
     tmp = dst + ".tmp.wav"
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", raw, "-af", cut + "aformat=channel_layouts=stereo,loudnorm=I=%.1f:TP=-1.5:LRA=9" % loudness, "-ar", "44100", tmp], check=True)
+    # a sound the trim cannot make sense of must fail, not hang the build
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", raw, "-af", cut + "aformat=channel_layouts=stereo,loudnorm=I=%.1f:TP=-1.5:LRA=9" % loudness, "-ar", "44100", tmp], check=True, timeout=120)
+    if probe(tmp) < 0.15:
+        os.remove(tmp)
+        raise RuntimeError("nothing left after trimming: the sound came back silent")
     length = probe(tmp)
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp, "-af", "afade=t=in:st=0:d=%.3f,afade=t=out:st=%.3f:d=%.3f" % (fade_in, max(0, length - fade_out), fade_out),
                     "-c:a", "libvorbis", "-q:a", str(quality), dst], check=True)
@@ -353,13 +362,22 @@ def main():
         recipe = hashlib.md5(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:12]
         if not os.path.exists(dst) or built.get("sfx/" + name, {}).get("recipe") != recipe:
             try:
-                finish(generated("sfx_" + name, spec["prompt"], spec["seconds"]), dst, spec.get("loudness", -16), fade_out=spec.get("fade", 0.4))
+                finish(generated("sfx_" + name, spec["prompt"], spec["seconds"]), dst, spec.get("loudness", -16), fade_out=spec.get("fade", 0.4), trim=spec.get("trim", True))
+                # the same sound up a scale: name_1 is the sound itself, each step a few semitones higher
+                for i, semitones in enumerate(spec.get("steps", []), 1):
+                    ratio = 2 ** (semitones / 12.0)
+                    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", dst, "-af", "asetrate=44100*%.5f,aresample=44100,atempo=%.5f" % (ratio, max(0.5, 1 / ratio ** 0.5)),
+                                    "-c:a", "libvorbis", "-q:a", "4", os.path.join(OUT, "sfx", "%s_%d.ogg" % (name, i))], check=True)
                 built["sfx/" + name] = {"recipe": recipe}
                 print("sfx       %-18s %4.1fs" % (name, probe(dst)), flush=True)
             except Exception as e:
                 failed.append(("sfx/" + name, str(e)))
         if os.path.exists(dst):
             sfx[name] = probe(dst)
+            for i in range(1, len(spec.get("steps", [])) + 1):
+                step = os.path.join(OUT, "sfx", "%s_%d.ogg" % (name, i))
+                if os.path.exists(step):
+                    sfx["%s_%d" % (name, i)] = probe(step)
     for name, spec in script.get("music", {}).items():
         dst = os.path.join(OUT, "music", name + ".ogg")
         recipe = hashlib.md5(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:12]

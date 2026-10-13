@@ -14,7 +14,7 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "1.4.1"
+ns.VERSION = "2.0.0"
 
 local DEDUPE_SECONDS = 10        -- the signals above can all describe the same death
 local MATCH_WINDOW = 8           -- honorable-kill credit and a seen death must be this close
@@ -391,6 +391,57 @@ local function details(id)
   return d
 end
 
+-- What the announcer may want to know about someone: class and level when they were ever on screen.
+function ns.VictimInfo(id)
+  if type(id) ~= "string" then return nil end
+  local e, k = seen[id], GodslayerDB.known[id]
+  local class, level = (e and e.class) or (k and k.c), (e and e.level) or (k and k.l)
+  local myLevel = plain(try(UnitLevel, "player"))
+  return { class = class, level = level, myLevel = type(myLevel) == "number" and myLevel > 0 and myLevel or nil, name = (e and e.name) or (k and k.n) }
+end
+
+-- Living enemy players on screen right now, and whether you are alone.
+function ns.Odds()
+  local enemies = 0
+  for i = 1, 40 do
+    local unit = "nameplate" .. i
+    if plain(try(UnitExists, unit)) and plain(try(UnitIsPlayer, unit)) and plain(try(UnitCanAttack, "player", unit)) == true
+       and plain(try(UnitIsDeadOrGhost, unit)) ~= true then
+      enemies = enemies + 1
+    end
+  end
+  local group = plain(try(GetNumGroupMembers))
+  return enemies, type(group) ~= "number" or group <= 1
+end
+
+-- Who probably killed you: enemy players who had you targeted, when the client says; otherwise
+-- the one you were fighting. A guess, and treated as one.
+function ns.Suspects()
+  local list, have = {}, {}
+  local function add(unit)
+    if not (plain(try(UnitExists, unit)) and plain(try(UnitIsPlayer, unit)) and plain(try(UnitCanAttack, "player", unit)) == true) then return end
+    local guid = plain(try(UnitGUID, unit))
+    if type(guid) ~= "string" or have[guid] or #list >= 5 then return end
+    have[guid] = true
+    list[#list + 1] = { id = guid, name = fullName(unit) }
+  end
+  local readable = false
+  for i = 1, 40 do
+    local unit = "nameplate" .. i
+    if plain(try(UnitExists, unit)) then
+      local onMe = try(UnitIsUnit, unit .. "target", "player")
+      if not issecret(onMe) then
+        readable = true
+        if onMe then add(unit) end
+      end
+    end
+  end
+  if #list == 0 then add("target") end
+  GodslayerDB.probe = GodslayerDB.probe or {}
+  GodslayerDB.probe.targeting = readable and "readable" or "hidden"
+  return list
+end
+
 -- For the tooltip: tier and guild of a visible unit, if it is in the network.
 function ns.UnitTier(unit)
   local id, guild = ObserveUnit(unit)
@@ -528,8 +579,12 @@ local function retryPending(id)
   if guild then resolvePending(id, guild, ns.Classify(guild), class) end
 end
 
--- A player died and we get credit. kb = it was our own killing blow.
-local function RegisterKill(id, name, kb, source)
+-- A player died and we get credit. kb = it was our own killing blow. calledAs = the name the
+-- announcer already called this kill under, when it was called before anyone knew whose it was.
+local claimCalled
+local deaths, credits = {}, {}
+local matchCredits
+local function RegisterKill(id, name, kb, source, calledAs)
   if type(id) ~= "string" or id == "" then return end
   local now = GetTime()
   local rec = recent[id]
@@ -548,6 +603,8 @@ local function RegisterKill(id, name, kb, source)
     return
   end
   prune()
+  -- a killing blow or an honor line that arrives after its credit was called: the same kill
+  if not calledAs and source ~= "HK" and claimCalled then calledAs = claimCalled() end
 
   sweepUnits()
   local guild, class, seenName = lookup(id)
@@ -562,20 +619,32 @@ local function RegisterKill(id, name, kb, source)
   rec.zone, rec.sub = clean((try(GetRealZoneText))), clean((try(GetSubZoneText)))
   rec.myLevel = type(myLevel) == "number" and myLevel >= 1 and math.floor(myLevel) or nil
   recent[id] = rec
+  if source ~= "HK" then
+    -- this kill's own honor credit must find it, whatever noteDeath thinks of the victim
+    local have
+    for _, d in ipairs(deaths) do if d.id == id and now - d.t < 5 then have = d end end
+    if not have then have = { id = id, t = now } deaths[#deaths + 1] = have end
+    if calledAs then have.used = true end
+  end
   ns.Log("kill", tostring(name or id) .. " via " .. source .. (kb and " kb" or ""))
   if ns.Hype then
     local mode = GodslayerDB.opts.hype and GodslayerDB.opts.hype.mode
     if kb or mode ~= "blows" then rec.hyped = true end
-    hype("Kill", name, kb and true or false, id)
+    -- the announcer may already have called this kill before anyone knew whose it was: give it its name
+    if not (calledAs and hype("Named", calledAs, id, name, kb and true or false)) then
+      hype("Kill", name, kb and true or false, id)
+    end
   end
 
   if guild then
     local tier = ns.Classify(guild)
     if tier then Score(id, name, guild, tier, rec, class) end
+    if source ~= "HK" and #credits > 0 then matchCredits() end
     return
   end
   -- Guild not known yet. Keep the kill and credit it if we see their tag soon.
   pending[id] = rec
+  if source ~= "HK" and #credits > 0 then matchCredits() end
   C_Timer.After(1.5, function() retryPending(id) end)
   C_Timer.After(6, function() retryPending(id) end)
 end
@@ -595,9 +664,8 @@ end
 -- Honorable-kill credit matched to a death we saw
 -- ---------------------------------------------------------------------------
 
-local deaths, credits = {}, {}
+local ANON_AFTER, anonCount = 1.2, 0 -- seconds a credit waits for its death before it is called without a name
 local lastHK, lastCreditEvent = nil, 0
-local matchCredits
 
 -- An enemy player died near us. Two events can report the same death.
 local function noteDeath(guid)
@@ -630,17 +698,29 @@ local function feigning(guid)
   return type(unit) == "string" and plain(try(UnitIsFeignDeath, unit)) == true
 end
 
+-- The credit that was called without a name and is still waiting for its death, if there is one.
+claimCalled = function()
+  local now = GetTime()
+  for i, credit in ipairs(credits) do
+    if credit.called and now - credit.t <= MATCH_WINDOW then
+      table.remove(credits, i)
+      return credit.called
+    end
+  end
+end
+
 function matchCredits()
   local now = GetTime()
   for i = #deaths, 1, -1 do
     if now - deaths[i].t > MATCH_WINDOW + 2 then table.remove(deaths, i) end
   end
   for i = #credits, 1, -1 do
-    if now - credits[i] > MATCH_WINDOW + 2 then table.remove(credits, i) end
+    if now - credits[i].t > MATCH_WINDOW + 2 then table.remove(credits, i) end
   end
   local c = 1
   while c <= #credits do
-    local ct, best, bestGap, bestWeight, already = credits[c], nil, nil, -1, nil
+    local credit = credits[c]
+    local ct, best, bestGap, bestWeight, already = credit.t, nil, nil, -1, nil
     for _, d in ipairs(deaths) do
       local gap = math.abs(d.t - ct)
       if not d.used and gap <= MATCH_WINDOW then
@@ -660,8 +740,16 @@ function matchCredits()
     if d then
       d.used = true
       table.remove(credits, c)
-      if not already then RegisterKill(d.id, nameFromGUID(d.id), false, "HK") end
+      if not already then RegisterKill(d.id, nameFromGUID(d.id), false, "HK", credit.called) end
     else
+      -- credit for a kill nobody saw die (too far, behind a wall, a crowd): it is still a kill, and
+      -- the announcer says so now. If the death turns up in the next seconds it gets its name then.
+      if not credit.called and now - ct >= ANON_AFTER and ns.Hype then
+        anonCount = anonCount + 1
+        credit.called = "anon:" .. anonCount
+        ns.Log("kill", "unseen victim via HK")
+        hype("Kill", nil, false, credit.called)
+      end
       c = c + 1
     end
   end
@@ -743,7 +831,8 @@ function handlers.PARTY_KILL(attackerGUID, targetGUID)
   local secret = issecret(attackerGUID) or issecret(targetGUID)
   attackerGUID, targetGUID = plain(attackerGUID), plain(targetGUID)
   if type(targetGUID) ~= "string" then
-    if secret then ns.Log("party_kill", "victim hidden by the client") end
+    -- the client hides creatures' identities, so every dungeon pull would write this: say it once
+    if secret and not ns.hiddenLogged then ns.hiddenLogged = true ns.Log("party_kill", "victim hidden by the client (logged once per session)") end
     return
   end
   if targetGUID:sub(1, 7) ~= "Player-" then return end
@@ -755,6 +844,8 @@ function handlers.PARTY_KILL(attackerGUID, targetGUID)
     return
   end
   RegisterKill(targetGUID, nameFromGUID(targetGUID), mine and true or false, "PARTY_KILL")
+  -- the killing blow is also a death seen: the honor credit for it must not be called as a second kill
+  noteDeath(targetGUID)
 end
 
 function handlers.UNIT_DIED(guid)
@@ -771,7 +862,8 @@ function handlers.UNIT_HEALTH(unit)
 end
 
 function handlers.PLAYER_PVP_KILLS_CHANGED(unit)
-  -- the event names whose count changed; only your own is a credit
+  -- the event names whose count changed; only your own is a credit, and a hidden name is not known to be yours
+  if issecret(unit) then return end
   unit = plain(unit)
   if unit ~= nil and unit ~= "player" then return end
   local now = GetTime()
@@ -789,10 +881,11 @@ function handlers.PLAYER_PVP_KILLS_CHANGED(unit)
     gained = (now - lastCreditEvent > 0.5) and 1 or 0
   end
   lastCreditEvent = now
-  for _ = 1, gained do credits[#credits + 1] = now end
+  for _ = 1, gained do credits[#credits + 1] = { t = now } end
   if gained > 0 then
     -- the death and the killing blow can arrive just after the credit
     C_Timer.After(0.6, matchCredits)
+    C_Timer.After(ANON_AFTER + 0.05, matchCredits)
     C_Timer.After(3, matchCredits)
     C_Timer.After(MATCH_WINDOW + 0.5, matchCredits)
   end
@@ -850,6 +943,7 @@ function handlers.PLAYER_LOGIN()
   C_Timer.NewTicker(2, function()
     for i = 1, 40 do ObserveUnit("nameplate" .. i) end
   end)
+  if ns.Hype then hype("Login") end
   if ns.Comm then ns.Comm.Init() end
   if ns.UI then ns.UI.Init() end
 end
@@ -858,7 +952,7 @@ local frame = CreateFrame("Frame")
 ns.frame = frame
 
 local function safeCall(event, ...)
-  local h = handlers[event] or (ns.Comm and ns.Comm.handlers[event])
+  local h = handlers[event] or (ns.Comm and ns.Comm.handlers[event]) or (ns.Hype and ns.Hype.handlers and ns.Hype.handlers[event])
   if not h then return end
   local ok, err = pcall(h, ...)
   if not ok then
@@ -887,6 +981,9 @@ for _, event in ipairs({
   "CHAT_MSG_COMBAT_HONOR_GAIN", "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT",
   "PLAYER_FOCUS_CHANGED", "NAME_PLATE_UNIT_ADDED", "CHAT_MSG_ADDON",
   "PLAYER_GUILD_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_DEAD",
+  -- the announcer's own: duels, interrupts, coming back to life
+  "DUEL_REQUESTED", "DUEL_FINISHED", "CHAT_MSG_SYSTEM", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED",
+  "PLAYER_UNGHOST", "PLAYER_ALIVE",
 }) do
   pcall(frame.RegisterEvent, frame, event) -- an event this client lacks must not stop the rest
 end

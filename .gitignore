@@ -1,1 +1,4 @@
 *.zip
+logs/
+tools/.voice_cache/
+__pycache__/
