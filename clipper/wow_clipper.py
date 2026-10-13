@@ -430,8 +430,8 @@ def run():
         if game and proc is None and time.time() >= retry_at:
             since = since or time.time()
             audio = game_audio(cfg)
-            # the game has no sound stream until its login screen is up; give it a minute
-            if audio is None and time.time() - since > 60:
+            # the game has no sound stream until its login screen is up; give it three minutes
+            if audio is None and time.time() - since > 180:
                 audio = "default_output"
                 log("the game's own sound was not found; recording desktop sound")
             if audio:
