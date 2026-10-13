@@ -76,8 +76,24 @@ Try it without killing anyone:
 | `/godslayer hype audition <name>` | Every line of one announcer, with the words in chat |
 | `/godslayer hype say <line>` | One line, by name |
 | `/godslayer hype stop` | Ends the hunt and fades the music |
+| `/godslayer clip` | Marks this moment for your recorder |
 
-`/godslayer hype` shows the settings. `pack <name>` pins an announcer and `pack mix` goes back to a different one each hunt; `mix <name> off` leaves one out of the mix. On or off: `music`, `voice`, `guild`, `sfx` (every sound under the voice), `spot`, `multi` (double kill and up), `asides` (the remarks), `theme`, `moments`, `barks` (the short word between rungs), `deny`, `duels`, `fx` (banner light and motion; off gives plain words), `fuse`, `duck` (the music stepping back), `photo` (a screenshot of your biggest moments, off unless you ask). `channel master`, `dialog` or `sfx` picks which volume slider the announcer follows. `window <seconds>` sets how long a hunt lasts, `blows` counts only your own killing blows, `all` counts every kill you get credit for. Pretend kills score nothing.
+`/godslayer hype` shows the settings. `pack <name>` pins an announcer and `pack mix` goes back to a different one each hunt; `mix <name> off` leaves one out of the mix. On or off: `music`, `voice`, `guild`, `sfx` (every sound under the voice), `spot`, `multi` (double kill and up), `asides` (the remarks), `theme`, `moments`, `barks` (the short word between rungs), `deny`, `duels`, `fx` (banner light and motion; off gives plain words), `fuse`, `duck` (the music stepping back), `photo` (a screenshot of your biggest moments, off unless you ask), `clip` (a mark for a recorder when a hunt ends, off unless you ask; see Recording your hunts). `channel master`, `dialog` or `sfx` picks which volume slider the announcer follows. `window <seconds>` sets how long a hunt lasts, `blows` counts only your own killing blows, `all` counts every kill you get credit for. Pretend kills score nothing.
+
+## Recording your hunts
+
+The addon cannot record anything, and it cannot talk to a program that does. What it can do is take a screenshot. With `/godslayer hype clip on`, a small block of black and white squares shows in the top left corner for a moment when a hunt ends, and a screenshot is taken with it in view. The squares say how long the hunt ran, how many died, the rung you reached, your grade and where the best moment was. `/godslayer clip` marks any moment by hand.
+
+`clipper/` is a recorder for Linux that reads the mark. While the game runs, [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/about/) holds the last ten minutes in memory and writes nothing to disk. When a marked screenshot lands in the game's Screenshots folder, the clipper asks for the stretch that matters and cuts it to the hunt: 25 seconds before the first kill to 10 seconds after the last, then the hunt card. Hunts with two kills or more also get a short cut around the best moment. Any other screenshot keeps the last minute, so the screenshot key works as a clip button.
+
+Setting it up:
+
+1. `flatpak install --user flathub com.dec05eba.gpu_screen_recorder`, and have `ffmpeg`, Python 3, Pillow and numpy.
+2. Write `~/.config/wow-clipper/config.json` with at least `{"wow_dir": "/path/to/World of Warcraft/_classic_beta_"}`. Every other setting and its default is at the top of `clipper/wow_clipper.py`: where clips go, the size cap (the oldest clips are deleted past it; anything moved with `keep` is never deleted), the free space floor, the buffer length, game sound only or everything you hear.
+3. `python3 clipper/wow_clipper.py setup` once, and pick the screen the game runs on.
+4. Copy `clipper/wow-clipper.service` to `~/.config/systemd/user/`, fix the path in it, then `systemctl --user enable --now wow-clipper`.
+
+`wow_clipper.py status` says what it is doing, `list` shows the clips, `keep <clip>` protects one, and `short <clip>` makes a vertical cut for phones. It reads the Screenshots folder and the list of running programs, and nothing of the game itself. On Windows or with another recorder, the layout of the mark is written at the top of `Godslayer/Clip.lua`.
 
 ## How the voice was made
 

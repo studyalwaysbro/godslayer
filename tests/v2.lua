@@ -11,7 +11,7 @@ local function eq(a, b, label) check(a == b, label .. " (got " .. tostring(a) ..
 
 local ME = "Player-1-0000AAAA"
 M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", faction = "Horde" })
-local FILES = { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Hype.lua", "Comm.lua", "UI.lua" }
+local FILES = { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Comm.lua", "UI.lua" }
 local ns = M.load("Godslayer", FILES)
 M.fire("ADDON_LOADED", "Godslayer")
 M.fire("PLAYER_LOGIN")
@@ -495,6 +495,75 @@ do
   ns3.Hype.Kill("Hera", true, "z3")
   eq(GodslayerHypeBanner.title.__text, "MEGA KILL", "and the plain banner keeps working")
   eq(ns2.errors, nil, "no errors without animations")
+end
+
+-- the clip mark: a hunt written into a screenshot for a recorder
+do
+  -- the slash command belongs to the last copy loaded above, so this copy is driven directly
+  local C = ns.Clip
+  local function say(text) if text == "clip" then C.Command() else H.Command((text:gsub("^hype ", ""))) end end
+  M.advance(700)
+  local shots = M.shots
+  H.Kill("Ares", true, "c1") H.Kill("Hera", true, "c2")
+  M.advance(100)
+  eq(M.shots, shots, "no clip mark unless asked")
+  check(C.last == nil, "and nothing drawn")
+  say("hype clip on")
+  H.Kill("Ares", true, "c3") M.advance(30) H.Kill("Hera", true, "c4") M.advance(2) H.Kill("Zeus", true, "c5")
+  M.advance(90.5)
+  eq(M.shots, shots, "the mark waits for the card")
+  M.advance(8)
+  eq(M.shots, shots + 1, "a hunt that ran out is marked once")
+  local b = C.last
+  eq(#b, 16, "sixteen bytes")
+  eq(b[1], 0xAC, "the mark opens with its magic byte")
+  eq(b[2], 16 + C.KIND.quiet, "version one, a hunt that ran out")
+  eq(b[3], 3, "three kills")
+  eq(b[4] * 256 + b[5], 129, "seconds since the first kill")
+  eq(b[6] * 256 + b[7], 97, "seconds since the last kill")
+  eq(b[8], 3, "ULTRA KILL is the third rung")
+  eq(b[9], 2, "best run of two")
+  eq(b[10], 1, "three kills and a run under three grade C")
+  eq(b[12], 0, "no flags on a plain hunt")
+  eq(b[13] * 256 + b[14], 97, "the best moment was the kill that made the run")
+  eq(b[16], C.Crc({ b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15] }), "the last byte checks the rest")
+  check(C.Showing(), "the squares are up for the screenshot")
+  M.advance(2)
+  check(not C.Showing(), "and gone again")
+  -- the same bytes the recorder's own tests read (clipper/test_clipper.py)
+  eq(C.Crc({ 0xAC, 0x11, 7, 0, 200, 0, 98, 5, 3, 3, 5, 2, 0, 120, 9 }), 0x03, "CRC agrees with the recorder")
+  H.Kill("Ares", true, "c6")
+  M.advance(1)
+  M.units.player.dead = true
+  H.Died()
+  M.units.player.dead = nil
+  M.advance(4)
+  eq(M.shots, shots + 2, "a hunt you died in is marked too")
+  eq(C.last[2], 16 + C.KIND.died, "as a death")
+  eq(C.last[3], 1, "with its one kill")
+  check(C.last[15] ~= b[15], "every mark has its own count")
+  say("hype test")
+  say("hype stop")
+  M.advance(20)
+  eq(M.shots, shots + 2, "a hunt stopped by hand is not marked")
+  say("hype test")
+  M.advance(100)
+  eq(M.shots, shots + 3, "a pretend hunt is marked")
+  eq(C.last[12] % 2, 1, "and flagged as pretend")
+  say("clip")
+  M.advance(1)
+  eq(M.shots, shots + 4, "/godslayer clip marks by hand")
+  eq(C.last[2], 16 + C.KIND.manual, "as a manual mark")
+  check(C.Showing(), "the squares show until the screenshot lands")
+  M.fire("SCREENSHOT_SUCCEEDED")
+  check(not C.Showing(), "and go when it does")
+  local real = Screenshot
+  Screenshot = nil
+  M.printed = {}
+  check(pcall(say, "clip") and table.concat(M.printed, " "):find("would not take the screenshot", 1, true), "a client with no screenshots says so")
+  Screenshot = real
+  say("hype clip off")
+  M.advance(200)
 end
 
 M.printed = {}

@@ -147,6 +147,7 @@ frameMT.__index = function(self, key)
     Show = function(f) local was = f.__shown f.__shown = true if not was and f.__scripts.OnShow then f.__scripts.OnShow(f) end end,
     Hide = function(f) f.__shown = false end,
     IsShown = function(f) return f.__shown end,
+    SetShown = function(f, shown) f.__shown = shown and true or false end,
     SetText = function(f, t) assert(type(t) == "string" or type(t) == "number", "SetText needs text, got " .. type(t)) f.__text = t end,
     GetText = function(f) return f.__text end,
     GetName = function(f) return f.__name end,
@@ -185,6 +186,8 @@ function M.newFrame(kind, name, parent, template)
 end
 function CreateFrame(kind, name, parent, template) return M.newFrame(kind, name, parent, template) end
 UIParent = M.newFrame("Frame", "UIParent")
+WorldFrame = M.newFrame("Frame", "WorldFrame")
+function GetPhysicalScreenSize() return 2560, 1440 end
 Minimap = M.newFrame("Frame", "Minimap")
 GameTooltip = M.newFrame("GameTooltip", "GameTooltip")
 

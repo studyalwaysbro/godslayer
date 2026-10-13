@@ -1,0 +1,14 @@
+[Unit]
+Description=Godslayer clipper: records hunts while the game runs
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/python3 %h/projects/godslayer/clipper/wow_clipper.py run
+Restart=on-failure
+RestartSec=20
+KillMode=mixed
+TimeoutStopSec=15
+
+[Install]
+WantedBy=graphical-session.target

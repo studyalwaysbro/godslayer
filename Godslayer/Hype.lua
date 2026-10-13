@@ -135,6 +135,7 @@ local function opts()
   if h.deny == nil then h.deny = true end
   if h.duels == nil then h.duels = true end
   if h.photo == nil then h.photo = false end
+  if h.clip == nil then h.clip = false end
   if h.channel ~= "Dialog" and h.channel ~= "SFX" then h.channel = "Master" end
   if h.mode ~= "blows" then h.mode = "all" end -- all = any kill you get credit for; blows = only your own killing blows
   -- the mix arrived with the new announcers: everyone starts on it once, and may then pin one
@@ -461,6 +462,23 @@ local function photo(delay)
   C_Timer.After(delay or 1.2, function() pcall(Screenshot) end)
 end
 
+-- For a recorder: the hunt, written into a screenshot once its card has had its time on screen.
+local GRADE_INDEX = { C = 1, B = 2, A = 3, S = 4, ["S+"] = 5 }
+local function clipMark(h, reason, grade, wait)
+  if not (opts().clip and ns.Clip) then return end
+  C_Timer.After(wait, function()
+    local now, rung = GetTime(), 0
+    for i, r in ipairs(LADDER) do if h.kills >= r[1] then rung = i end end
+    local F = ns.Clip.FLAG
+    pcall(ns.Clip.Mark, ns.Clip.KIND[reason], {
+      kills = h.kills, seconds = now - h.started, since = now - (h.last or now), rung = rung, run = h.bestRun,
+      grade = GRADE_INDEX[grade] or 0, points = h.points, peak = now - (h.peak or h.last or now),
+      flags = (h.pretend and F.pretend or 0) + (h.record and F.record or 0) + (h.king and F.king or 0)
+        + ((reason == "quiet" and h.kills >= FLAWLESS_FROM) and F.flawless or 0),
+    })
+  end)
+end
+
 -- reason: died, quiet (the fuse ran out), or off/stop. payback = the name of someone you had
 -- killed who was there when you died.
 local function endHunt(reason, payback)
@@ -496,6 +514,7 @@ local function endHunt(reason, payback)
   end
   if h.kills >= 2 and (reason == "died" or reason == "quiet") then recap(h) end
   if grade and (grade == "S" or grade == "S+") and (reason == "died" or reason == "quiet") then photo(1.6) end
+  if reason == "died" or reason == "quiet" then clipMark(h, reason, grade, stamp and 7.5 or 3) end
   local best = GodslayerDB.opts.hype.best or 0
   if h.kills > best and not h.pretend then GodslayerDB.opts.hype.best = h.kills end
 end
@@ -720,6 +739,7 @@ local function announceGods(gods, huntKills, run, record)
   local size = top.info.king and 5 or ((ladder and ladder[1] >= 5) and 4 or ((ladder or top.tier == "original" or promoted) and 3 or 2))
   showBanner(title, top.tier == "original" and GOLD or GODRED, table.concat(parts, "    "), { size = size, claws = huntKills and run or nil })
   if top.info.king then photo() end
+  if top.info.king and hunt then hunt.king = true end
 end
 
 local function flush()
@@ -830,6 +850,8 @@ function Hype.Kill(who, killingBlow, id, pretend)
   if moment and moment.size and moment.size > size then size = moment.size end
   showBanner(title, rung[4], table.concat(parts, "    "), { size = size, claws = h.run })
   if reached and reached[1] == 15 then photo() end
+  -- the moment a recorder should cut to: the kill that topped the best run, or with no run the last rung
+  if (h.run >= 2 and h.run == h.bestRun) or (h.bestRun == 1 and reached) then h.peak = now end
   local key = id or (name or "?") .. "#" .. h.kills
   h.ids[key], h.lastKey = true, key
   local w = waiting[key] or {}
@@ -1082,7 +1104,7 @@ local SWITCHES = {
   theme = "Hunt theme when you have no song of your own", multi = "Double, triple and rampage calls", asides = "Remarks after an Olympus kill",
   fx = "Banner light and motion", fuse = "The fuse under the banner", moments = "Revenge, domination and the other moments",
   barks = "A word on kills between rungs", duck = "Music steps back while the announcer speaks", deny = "DENIED on a spell you interrupt",
-  duels = "Duel results", photo = "A screenshot of your biggest moments",
+  duels = "Duel results", photo = "A screenshot of your biggest moments", clip = "A mark for your recorder when a hunt ends",
 }
 
 local function listPacks(o)
@@ -1276,12 +1298,13 @@ function Hype.Command(rest)
       onOff(o.moments), onOff(o.barks), onOff(o.deny), onOff(o.duels)))
     print(("  Banner light %s, fuse %s, music steps back under the voice %s, screenshots of big moments %s, channel %s."):format(
       onOff(o.fx), onOff(o.fuse), onOff(o.duck), onOff(o.photo), o.channel))
+    print(("  Clip mark for a recorder %s. /godslayer clip marks one by hand."):format(onOff(o.clip)))
     print(("  Kills within %d seconds of each other: DOUBLE KILL, TRIPLE KILL, QUAD KILL, RAMPAGE (%s)."):format(MULTI_WINDOW, onOff(o.multi)))
     print("  Olympus kills have their own calls, and the points are read out. /godslayer hype test olympus plays one.")
     print(("  Sound effects %s, Olympian spotter %s, remarks %s, hunt theme %s."):format(onOff(o.sfx), onOff(o.spot), onOff(o.asides), onOff(o.theme)))
     print("  Your song: a file named kill.mp3 or kill.ogg in Interface\\AddOns\\GodslayerMusic. Restart the game after adding it.")
     print("  /godslayer hype pack | mix | audition [name] | say <line> | stop | on | off | window <seconds> | blows | all | channel <name> | probe")
     print("  /godslayer hype test [olympus | king | spot | king spot | moment <name> | duel | duel lost | denied | card]")
-    print("  /godslayer hype music | voice | guild | sfx | spot | multi | asides | theme | fx | fuse | moments | barks | duck | deny | duels | photo  on|off")
+    print("  /godslayer hype music | voice | guild | sfx | spot | multi | asides | theme | fx | fuse | moments | barks | duck | deny | duels | photo | clip  on|off")
   end
 end
