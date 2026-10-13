@@ -244,6 +244,14 @@ def stop_recorder(proc):
             proc.wait(timeout=8)
         except subprocess.TimeoutExpired:
             proc.terminate()
+    # a recorder still waiting on the screen picker ignores the polite signal
+    for _ in range(20):
+        if not recorder_pid():
+            break
+        time.sleep(0.25)
+    pid = recorder_pid()
+    if pid:
+        os.kill(pid, signal.SIGKILL)
     for p in RAW.glob("*"):
         p.unlink()
 
