@@ -14,7 +14,7 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "2.1.0"
+ns.VERSION = "2.2.0"
 
 local DEDUPE_SECONDS = 10        -- the signals above can all describe the same death
 local MATCH_WINDOW = 8           -- honorable-kill credit and a seen death must be this close
@@ -945,19 +945,26 @@ function handlers.PLAYER_LOGIN()
   end)
   if ns.Hype then hype("Login") end
   if ns.Comm then ns.Comm.Init() end
+  if ns.Fight then ns.Fight.Init() end
   if ns.UI then ns.UI.Init() end
 end
 
 local frame = CreateFrame("Frame")
 ns.frame = frame
 
+-- every part that listens for an event hears it; one failing does not keep it from the rest
 local function safeCall(event, ...)
-  local h = handlers[event] or (ns.Comm and ns.Comm.handlers[event]) or (ns.Hype and ns.Hype.handlers and ns.Hype.handlers[event])
-  if not h then return end
-  local ok, err = pcall(h, ...)
-  if not ok then
-    ns.errors = (ns.errors or 0) + 1
-    if ns.errors <= 25 then ns.Log("error", event .. ": " .. tostring(err)) end
+  -- the fight first: a fight starting is called before the spotter can call the same player
+  local tables = { ns.Fight and ns.Fight.handlers, handlers, ns.Comm and ns.Comm.handlers, ns.Hype and ns.Hype.handlers }
+  for i = 1, 4 do
+    local h = tables[i] and tables[i][event]
+    if h then
+      local ok, err = pcall(h, ...)
+      if not ok then
+        ns.errors = (ns.errors or 0) + 1
+        if ns.errors <= 25 then ns.Log("error", event .. ": " .. tostring(err)) end
+      end
+    end
   end
 end
 
@@ -984,9 +991,13 @@ for _, event in ipairs({
   -- the announcer's own: duels, interrupts, coming back to life
   "DUEL_REQUESTED", "DUEL_FINISHED", "CHAT_MSG_SYSTEM", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED",
   "PLAYER_UNGHOST", "PLAYER_ALIVE",
+  -- a fight with a player starting and ending, before anyone dies
+  "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_SOFT_ENEMY_CHANGED", "PLAYER_ENTER_COMBAT",
 }) do
   pcall(frame.RegisterEvent, frame, event) -- an event this client lacks must not stop the rest
 end
+-- hits on you only: the same event for everyone else in view would be most of what the frame hears
+if not (frame.RegisterUnitEvent and pcall(frame.RegisterUnitEvent, frame, "UNIT_COMBAT", "player")) then pcall(frame.RegisterEvent, frame, "UNIT_COMBAT") end
 
 -- ---------------------------------------------------------------------------
 -- Maintenance used by the slash commands

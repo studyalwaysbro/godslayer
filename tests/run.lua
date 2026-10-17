@@ -10,7 +10,7 @@ local function eq(a, b, label) check(a == b, label .. " (got " .. tostring(a) ..
 local ME = "Player-1-0000AAAA"
 M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", faction = "Horde" })
 
-local ns = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+local ns = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Comm.lua", "Wheel.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "SomethingElse")
 check(GodslayerDB == nil, "ignores other addons loading")
 M.fire("PARTY_KILL", ME, "Player-1-00000001") -- before init: must not error
@@ -576,7 +576,7 @@ checkPhrases("1 kill")
 local saved = GodslayerDB
 M.frames, M.timers = { UIParent, Minimap, GameTooltip }, {}
 GodslayerFrame, GodslayerMinimapButton = nil, nil
-local ns2 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+local ns2 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Comm.lua", "Wheel.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
 check(GodslayerDB == saved and ns2.char.kills == 1, "totals reload from saved variables")
 eq(GodslayerDB.version, 2, "data version")
@@ -594,7 +594,7 @@ do
   }
   M.frames, M.timers = { UIParent, Minimap, GameTooltip }, {}
   GodslayerFrame, GodslayerWindow, GodslayerMinimapButton, M.failTemplate = nil, nil, nil, nil
-  local ns3 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+  local ns3 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Comm.lua", "Wheel.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
   local c3 = ns3.char
   eq(GodslayerDB.version, 2, "old data is marked as migrated"); eq(c3.kills, 2, "old kills kept"); eq(c3.points, 10, "old points kept")
@@ -669,7 +669,7 @@ do
   local OWN = "Interface\\AddOns\\GodslayerMusic\\"
   local SONG = OWN .. "kill.mp3"
   M.frames = {} -- one client, one copy of the addon: the copies loaded earlier in this file stop listening
-  local ns4 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+  local ns4 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Comm.lua", "Wheel.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer") M.fire("PLAYER_LOGIN")
   local H = ns4.Hype
   local realToday, realPoints = ns4.KillsToday, ns4.char.points
@@ -1179,7 +1179,7 @@ do
   ns4.KillsToday, ns4.char.points = realToday, realPoints
   A.files[SONG] = true
   M.frames = {}
-  local ns5 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Comm.lua", "UI.lua" })
+  local ns5 = M.load("Godslayer", { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Comm.lua", "Wheel.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer") M.fire("PLAYER_LOGIN")
   H = ns5.Hype
   A.played, A.stopped, A.music, A.musicStops = {}, {}, nil, 0

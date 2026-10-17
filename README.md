@@ -24,8 +24,13 @@ Made by **The True Torchmen**. For the Horde.
 - **Stats.** Kills by class, by zone, by guild rank and by hour of the day, plus your nemesis, your biggest upset and the highest level you have dropped.
 - **A louder kill banner.** "Level 34 Dwarf Paladin, Captain. Stranglethorn Vale. Third time today."
 - **Tooltip tags.** Mouse over an Olympian and see what they're worth, how often you've already collected, and whether they are still on the hit list.
-- **Your kill song, and an announcer who takes Olympus personally.** The first player you kill starts a hunt: your own song begins and FIRST BLOOD is called. Every kill is heard the instant it lands, a blade that rings one note higher each time. The rungs are spaced so the top ones stay rare: MEGA KILL at two, ULTRA KILL at three, GODLIKE at five, UNSTOPPABLE at seven, BEYOND GODLIKE at ten, GODSLAYER at fifteen, and a call every five or ten kills after that, up to fifty. Between rungs the announcer mostly keeps quiet, which is why the next call lands. Each kill keeps the hunt going another 90 seconds. Die and you get SHUT DOWN.
+- **The song starts with the fight.** The moment you are in a fight with an enemy player, before anyone has died, your song starts: war drums, a small ENGAGED banner with who it is, and now and then a word from the announcer ("Blood in the water!"). An Olympian gets a banner and a line of their own. The song plays on into the hunt and fades a little while after the last fight ends if nobody died. The combat log is closed to addons, so the addon reads the room: you in combat, and an enemy player in combat as your target, your soft target or your focus, or one on screen with you targeted, or a hit taken with one in view and no creature in your sights.
+- **Your kill song, and an announcer who takes Olympus personally.** The first player you kill starts a hunt: FIRST BLOOD is called, over the song already playing. Every kill is heard the instant it lands, a blade that rings one note higher each time. The rungs are spaced so the top ones stay rare: MEGA KILL at two, ULTRA KILL at three, GODLIKE at five, UNSTOPPABLE at seven, BEYOND GODLIKE at ten, GODSLAYER at fifteen, and a call every five or ten kills after that, up to fifty. Between rungs the announcer mostly keeps quiet, which is why the next call lands. Each kill keeps the hunt going another 90 seconds. Die and you get SHUT DOWN.
 - **Moments.** Some kills are more than a number. REVENGE on the player you were fighting when you died. DOMINATION over one you keep killing. GIANT SLAYER for a victim well above your level, and a sad trombone for one far below it. OUTNUMBERED when you were alone against a crowd. COMEBACK after a bad run. A dry word about the victim's class, now and then ("The bubble was on cooldown.").
+- **Your class has a sound.** Your own big spells, cast in a fight with a player, make a noise worth making. The sheep when you Polymorph. A choir when you bubble. A bonk on Hammer of Justice, chains breaking and an eagle on Blessing of Freedom, a smoke puff on Vanish, a body hitting the floor on Feign Death, a scream on Psychic Scream, a demon on Death Coil, a bear when you become one. Seventy-three spells over all nine classes and the racials that matter, each rationed so a rotation is not a drum solo.
+- **Finishers.** A player who dies to you a moment after your spell landed is named by it, on the banner and out loud after the kill call: EXECUTED, PYROBLASTED, INCINERATED, SHATTERED, EVISCERATED, IN THE BACK, DEATH BY WAND, JUDGED, SMITED, MIND BLOWN, SOUL TAKEN, THUNDERSTRUCK, SHOCKED, SNIPED, MOONSTRUCK, MAULED. Every announcer says them in their own way ("Mauled. Nature is not kind.").
+- **The whole guild hears your big ones.** Hit GODLIKE, a RAMPAGE, GODSLAYER, or kill the King, and every guildmate running Godslayer gets a line in chat and, when they are not in a fight of their own, the announcer: "A Torchman is GODLIKE!" Rationed per guildmate, and the King is news every time.
+- **The chat wheel.** Dota's, with lines of our own. Bind a key (Key Bindings, AddOns, Godslayer), hold it, point at a line and let go. Banter on the first ring ("Easiest honor of my life."), callouts on the second ("Focus the healer!", "Rogue in stealth! Watch out!"); right-click turns the ring. Your party or raid hears the same line in the same voice if they run Godslayer, with your name in their chat. Nothing is written in any chat channel and nobody outside your group hears it. `/godslayer wheel` opens it for clicking.
 - **DENIED.** Interrupt an enemy player's spell and you hear it, see it, and now and then get told about it.
 - **Duels.** Won or lost, the announcer has an opinion.
 - **A banner that moves.** The words slam in and throw light: a streak, a glow, a shockwave. Bigger moments add turning rays, claw marks for kills in a row, and a flash at the edges of the screen. Nothing covers the middle, where the fight is.
@@ -71,6 +76,10 @@ Try it without killing anyone:
 | `/godslayer hype test spot` | An Olympian coming into view. `test king spot` for the King |
 | `/godslayer hype test moment revenge` | A moment. Also `dominate`, `giant`, `shame`, `outnumbered`, `comeback`, `clutch`, `class` |
 | `/godslayer hype test denied` | A spell interrupted |
+| `/godslayer hype test engage` | A fight starting: the song, the drums, the banner. `test engage god` for an Olympian |
+| `/godslayer hype test finisher execute` | A kill with a finisher. Also `pyro`, `fire`, `shatter`, `arcane`, `evisc`, `back`, `wand`, `judged`, `smite`, `mind`, `soul`, `thunder`, `shock`, `sniped`, `moon`, `mauled` |
+| `/godslayer hype test sig polymorph` | One of your class's sounds, by spell name |
+| `/godslayer hype test streak godlike` | A guildmate's big moment. Also `rampage`, `godslayer`, `regicide` |
 | `/godslayer hype test duel` | A duel won. `test duel lost` for the other kind |
 | `/godslayer hype test card` | Ends the test hunt and grades it |
 | `/godslayer hype audition <name>` | Every line of one announcer, with the words in chat |
@@ -78,7 +87,7 @@ Try it without killing anyone:
 | `/godslayer hype stop` | Ends the hunt and fades the music |
 | `/godslayer clip` | Marks this moment for your recorder |
 
-`/godslayer hype` shows the settings. `pack <name>` pins an announcer and `pack mix` goes back to a different one each hunt; `mix <name> off` leaves one out of the mix. On or off: `music`, `voice`, `guild`, `sfx` (every sound under the voice), `spot`, `multi` (double kill and up), `asides` (the remarks), `theme`, `moments`, `barks` (the short word between rungs), `deny`, `duels`, `fx` (banner light and motion; off gives plain words), `fuse`, `duck` (the music stepping back), `photo` (a screenshot of your biggest moments, off unless you ask), `clip` (a mark for a recorder when a hunt ends, off unless you ask; see Recording your hunts). `channel master`, `dialog` or `sfx` picks which volume slider the announcer follows. `window <seconds>` sets how long a hunt lasts, `blows` counts only your own killing blows, `all` counts every kill you get credit for. Pretend kills score nothing.
+`/godslayer hype` shows the settings. `pack <name>` pins an announcer and `pack mix` goes back to a different one each hunt; `mix <name> off` leaves one out of the mix. On or off: `music`, `voice`, `guild`, `sfx` (every sound under the voice), `spot`, `multi` (double kill and up), `asides` (the remarks), `theme`, `moments`, `barks` (the short word between rungs), `deny`, `duels`, `fx` (banner light and motion; off gives plain words), `fuse`, `duck` (the music stepping back), `engage` (the song starting with the fight), `class` (your class's sounds), `finishers`, `streaks` (telling the guild your big moments and hearing theirs), `wheel` (hearing your group's chat wheel), `photo` (a screenshot of your biggest moments, off unless you ask), `clip` (a mark for a recorder when a hunt ends, off unless you ask; see Recording your hunts). `channel master`, `dialog` or `sfx` picks which volume slider the announcer follows. `window <seconds>` sets how long a hunt lasts, `blows` counts only your own killing blows, `all` counts every kill you get credit for. Pretend kills score nothing.
 
 ## Recording your hunts
 
@@ -97,7 +106,7 @@ Setting it up:
 
 ## How the voice was made
 
-Every line is in `tools/voice_script.json`: six packs, five scripts. `tools/build_voice.py` asks a voice service for a take of each line, has the take transcribed back and throws it away if the words are wrong or it runs long. A kill call gets three good takes and the fiercest is kept (the most even one, for the Naturalist). The kept take gets the arena treatment with ffmpeg, with the pack's own impact under it: a boom for Titan, a war drum and a sword for Valkyrie, breaking ice for Frostbite. The same script builds the sound effects and the hunt theme. The light the banners are made of is drawn by `tools/build_art.py`.
+Every line is in `tools/voice_script.json`: six packs, five scripts, and the chat wheel. `tools/build_voice.py` asks a voice service for a take of each line, has the take transcribed back and throws it away if the words are wrong or it runs long. A kill call gets three good takes and the fiercest is kept (the most even one, for the Naturalist). The kept take gets the arena treatment with ffmpeg, with the pack's own impact under it: a boom for Titan, a war drum and a sword for Valkyrie, breaking ice for Frostbite. The same script builds the sound effects and the hunt theme. The light the banners are made of is drawn by `tools/build_art.py`.
 
 `tools/voice_report.md` lists every clip, the take that was kept and what the transcription heard. `tools/audition.html` is a page with a button for every clip; open it in a browser to listen through a pack in a minute.
 
@@ -115,6 +124,7 @@ Every line is in `tools/voice_script.json`: six packs, five scripts. `tools/buil
 | `/godslayer share` | Post a brag line to guild chat |
 | `/godslayer top` | Post the top 3 to guild chat |
 | `/godslayer demo` | Preview the kill banner |
+| `/godslayer wheel` | The chat wheel. `wheel list` shows the lines, `wheel <number>` says one |
 | `/godslayer add <guild>` | Count a guild with no "olympus" in its name |
 | `/godslayer ignore <guild>` | Stop counting a guild |
 | `/godslayer help` | Everything else |
@@ -140,6 +150,8 @@ Killing the other faction on a PvP realm is the game. Be a menace with a sword, 
 ## For tinkerers
 
     lua tests/run.lua          # scenario tests, Lua 5.1
+    lua tests/v2.lua           # what 2.0 added
+    lua tests/v22.lua          # what 2.2 added: fights, class sounds, finishers, streaks, the wheel
     lua tests/fuzz.lua 3000    # 3,000 random sessions against a fake client
 
 `tests/mock.lua` is a small stand-in for the game API, including the "secret values" the Forever client uses. Bug reports and new brag lines are welcome in Issues. If a kill does not register, `/godslayer log` shows what the addon saw.

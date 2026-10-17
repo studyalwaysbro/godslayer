@@ -101,15 +101,69 @@ local function noteVersion(theirs)
 end
 Comm.NoteVersion = noteVersion
 
+-- A big moment of our own, for the guild: GODLIKE, a RAMPAGE, GODSLAYER, the King. Older versions
+-- do not know the message and drop it.
+-- One that cannot go now (inside an instance, or right after the last) waits its turn, for a while.
+local lastStreak, pendingStreaks = -1000, {}
+local STREAK_GAP, STREAK_KEEP, STREAK_PENDING = 20, 600, 4
+local function flushStreaks()
+  local now = GetTime()
+  while pendingStreaks[1] and now - pendingStreaks[1].t > STREAK_KEEP do table.remove(pendingStreaks, 1) end
+  local p = pendingStreaks[1]
+  if not p or (p.kind ~= "regicide" and now - lastStreak < STREAK_GAP) then return end
+  if not send(table.concat({ "R", PROTO, p.kind, token }, ";")) then return end
+  table.remove(pendingStreaks, 1)
+  lastStreak = now
+  if pendingStreaks[1] then C_Timer.After(STREAK_GAP + 0.5, flushStreaks) end
+end
+function Comm.Streak(kind)
+  if not (ns.Hype and ns.Hype.STREAKS and ns.Hype.STREAKS[kind]) then return false end
+  if #pendingStreaks >= STREAK_PENDING then table.remove(pendingStreaks, 1) end
+  pendingStreaks[#pendingStreaks + 1] = { kind = kind, t = GetTime() }
+  local waiting = #pendingStreaks
+  flushStreaks()
+  if #pendingStreaks >= waiting and pendingStreaks[1] then C_Timer.After(STREAK_GAP + 0.5, flushStreaks) end
+  return true
+end
+Comm.PendingStreaks = function() return #pendingStreaks end
+
+-- The chat wheel, for the people you are grouped with: their Godslayer plays the same line.
+function Comm.Wheel(n)
+  if not (C_ChatInfo and C_ChatInfo.SendAddonMessage) or lockedDown() then return false end
+  local group = plain(try(GetNumGroupMembers)) or 0
+  if group <= 1 then return false end
+  local channel = plain(try(IsInRaid)) and "RAID" or "PARTY"
+  -- a group the game made for a battleground talks on its own channel
+  local instance = LE_PARTY_CATEGORY_INSTANCE
+  if instance and plain(try(IsInGroup, instance)) then channel = "INSTANCE_CHAT" end
+  local ok, res = pcall(C_ChatInfo.SendAddonMessage, PREFIX, table.concat({ "W", PROTO, n, token }, ";"), channel)
+  res = plain(res)
+  return ok and (res == nil or res == true or res == 0)
+end
+
 function Comm.handlers.CHAT_MSG_ADDON(prefix, text, channel, sender)
   prefix, text, channel, sender = plain(prefix), plain(text), plain(channel), plain(sender)
-  if prefix ~= PREFIX or channel ~= "GUILD" then return end
+  if prefix ~= PREFIX then return end
+  if channel ~= "GUILD" and channel ~= "PARTY" and channel ~= "RAID" and channel ~= "INSTANCE_CHAT" then return end
   if type(text) ~= "string" or type(sender) ~= "string" then return end
   local who = shortName(sender):gsub("|", ""):sub(1, 48) -- no escape codes in the roster
   if who == ns.myName or sender == ns.myName then return end -- our own message echoed back
 
   local kind, proto, a, b, c, d, e, class, ver, kings, tag = strsplit(";", text)
   if tonumber(proto) ~= PROTO then return end
+  -- the group hears the wheel; everything else is the guild's
+  if (kind == "W") ~= (channel ~= "GUILD") then return end
+  if kind == "W" or kind == "R" then
+    if b == token then return end
+    if kind == "W" and ns.Wheel then
+      local ok, err = pcall(ns.Wheel.Heard, who, tonumber(a))
+      if not ok then ns.errors = (ns.errors or 0) + 1 ns.Log("error", "wheel: " .. tostring(err)) end
+    elseif kind == "R" and ns.Hype then
+      local ok, err = pcall(ns.Hype.AllyStreak, who, a)
+      if not ok then ns.errors = (ns.errors or 0) + 1 ns.Log("error", "hype streak: " .. tostring(err)) end
+    end
+    return
+  end
   if tag == token or (kind == "H" and a == token) then return end -- ours, under another spelling of our name
   if kind == "H" then
     if GetTime() - lastReply > 20 then
@@ -150,6 +204,8 @@ end
 
 function Comm.handlers.PLAYER_ENTERING_WORLD()
   if dirty then C_Timer.After(MIN_GAP, broadcast) end
+  -- out of an instance: whatever we could not tell the guild in there goes now
+  if pendingStreaks[1] then C_Timer.After(MIN_GAP, flushStreaks) end
 end
 
 -- Everyone we have totals for in the current guild, plus ourselves, best first.
@@ -192,5 +248,5 @@ function Comm.Init()
     end
   end
   C_Timer.After(10, hello)
-  C_Timer.NewTicker(30, broadcast) -- picks up anything a lockdown or throttle held back
+  C_Timer.NewTicker(30, function() broadcast() flushStreaks() end) -- picks up anything a lockdown or throttle held back
 end

@@ -1,0 +1,5 @@
+<Bindings>
+	<Binding name="GODSLAYER_WHEEL" header="GODSLAYER" category="ADDONS" runOnUp="true">
+		Godslayer_Wheel(keystate)
+	</Binding>
+</Bindings>

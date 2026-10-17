@@ -4,7 +4,7 @@
 package.path = "tests/?.lua;" .. package.path
 local M = require("mock")
 local RUNS, EVENTS = tonumber(arg[1]) or 1000, tonumber(arg[2]) or 250
-local FILES = { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Comm.lua", "UI.lua" }
+local FILES = { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Comm.lua", "Wheel.lua", "UI.lua" }
 local ME, MATE, STRANGER = "Player-1-0000AAAA", "Player-1-0000BBBB", "Player-1-0000CCCC"
 local GUILDS = { "OLYMPUS", "OLYMPUS", "Olympus Kitchen", "OLYMPUS BETZ", "OLYMPUS XIlI", "HOELYMPUS", "The Enclave",
                  "0lympus", "Method", "The True Torchmen", "Olympic Swim Team", "", "x|cffff0000y|r", "Olympus;S;1", false }
@@ -22,7 +22,16 @@ local SLASHES = { "hype", "hype test", "hype test olympus", "hype test king", "h
                   "hype say rampage", "hype say nothing", "hype test spot", "hype test king spot", "hype window 20", "hype blows", "hype all", "hype off", "hype on", "", "stats", "share", "top", "guilds", "log", "demo", "help", "sound", "toast", "chat", "tooltip", "minimap",
                   "add Method", "ignore OLYMPUS BETZ", "unignore OLYMPUS BETZ", "remove Method", "ignore Olympus", "unignore Olympus",
                   "add", "ignore   ", "reset", "reset roster", "bogus |cff", "add %s%d", "ignore ;;;",
-                  "dossier Enemy", "dossier Enemy3 Last3", "dossier", "dossier %s|cff", "who asmon", "nemesis", "hitlist" }
+                  "dossier Enemy", "dossier Enemy3 Last3", "dossier", "dossier %s|cff", "who asmon", "nemesis", "hitlist",
+                  -- 2.2: fights, class sounds, finishers, streaks, the wheel
+                  "hype test engage", "hype test engage god", "hype engage off", "hype engage on", "hype class off", "hype class on",
+                  "hype finishers off", "hype finishers on", "hype test finisher execute", "hype test finisher zz", "hype test sig polymorph",
+                  "hype test sig", "hype test streak godlike", "hype test streak", "hype streaks off", "hype streaks on", "hype wheel off",
+                  "hype wheel on", "wheel", "wheel list", "wheel 3", "wheel 99", "wheel -1" }
+local SPELLS = { [118] = "Polymorph", [642] = "Divine Shield", [5308] = "Execute", [5019] = "Shoot", [116] = "Frostbolt", [2139] = "Counterspell",
+                 [1] = "Hearthstone", [2] = "Feign Death", [3] = "Bear Form", [4] = "Chaos Bolt" }
+local WHEEL_MESSAGES = { "W;1;1;aaa", "W;1;16;aaa", "W;1;0;aaa", "W;1;17;aaa", "W;1;x;aaa", "W;1;2.5;aaa", "W;1", "R;1;godlike;bbb", "R;1;regicide;bbb",
+                         "R;1;rampage", "R;1;zz;bbb", "R;1;;bbb", "R;2;godlike;bbb" }
 local failures, totalKills, totalEvents, migrated, dossiers = 0, 0, 0, 0, 0
 
 -- A database the way 1.0.0 wrote it: totals that add up, victims with none of the new fields.
@@ -99,7 +108,7 @@ for seed = 1, RUNS do
     return players[R(#players)].guid
   end
   for _ = 1, EVENTS do
-    local e = R(27)
+    local e = R(31)
     if e <= 4 then
       local token = TOKENS[R(#TOKENS)]
       M.units[token] = (R(4) == 1) and nil or players[R(#players)]
@@ -168,6 +177,25 @@ for seed = 1, RUNS do
         opportunities = opportunities + 1
         M.fire("PARTY_KILL", ME, p.guid)
       end
+    elseif e == 28 then
+      -- combat starts or ends, with someone or no one in sight
+      M.inCombat = R(2) == 1
+      local p = players[R(#players)]; p.combat = ({ true, false, "secret" })[R(3)]
+      if R(2) == 1 then M.units.target = p end
+      if R(4) == 1 then M.units["nameplate" .. R(3) .. "target"] = M.units.player end
+      M.fire(M.inCombat and "PLAYER_REGEN_DISABLED" or "PLAYER_REGEN_ENABLED")
+      if M.inCombat and R(3) == 1 then M.fire("PLAYER_ENTER_COMBAT") end
+    elseif e == 29 then
+      M.spells = SPELLS
+      local ids = { 118, 642, 5308, 5019, 116, 2139, 1, 2, 3, 4, 999 }
+      M.fire("UNIT_SPELLCAST_SUCCEEDED", ({ "player", "player", "target", M.secret() })[R(4)], "cast", R(10) == 1 and M.secret() or ids[R(#ids)])
+    elseif e == 30 then
+      M.fire("UNIT_COMBAT", R(8) == 1 and M.secret() or "player", ({ "WOUND", "HEAL", "MISS", M.secret() })[R(4)], "", R(0, 500), 1)
+      M.fire(({ "PLAYER_SOFT_ENEMY_CHANGED", "PLAYER_TARGET_CHANGED" })[R(2)])
+    elseif e == 31 then
+      M.groupSize = ({ 0, 1, 3, 5, 12, 40 })[R(6)]
+      M.fire("CHAT_MSG_ADDON", "Godslayer", WHEEL_MESSAGES[R(#WHEEL_MESSAGES)], ({ "PARTY", "RAID", "GUILD", "WHISPER" })[R(4)], ({ "Brakka Ashmane", "Zul Embertusk", "A|cffB" })[R(3)])
+      if R(3) == 1 then Godslayer_Wheel(R(2) == 1 and "down" or "up") end
     elseif e == 21 then
       if M.tooltipHook then GameTooltip.__unit = R(3) == 1 and M.secret() or TOKENS[R(#TOKENS)]; GameTooltip.__lines = {}; M.tooltipHook(GameTooltip) end
     else
@@ -185,8 +213,9 @@ for seed = 1, RUNS do
   for _, p in ipairs(M.audio.played) do
     local pack, clip = p.path:match("Sounds\\(%a+)\\([%w_]+)%.ogg$")
     if clip then
-      if prev and p.at - prev.at < prev.length - 0.5 - 0.02 then fail(seed, "two announcer lines overlapped: " .. prev.clip .. " then " .. clip) end
-      prev = { at = p.at, clip = clip, length = ns.VOICE[pack].clips[clip] }
+      -- a line cut short for a kill call (a fight starting, a guildmate's news) has stopped, and may be talked over
+      if prev and not M.audio.stopped[prev.handle] and p.at - prev.at < prev.length - 0.5 - 0.02 then fail(seed, "two announcer lines overlapped: " .. prev.clip .. " then " .. clip) end
+      prev = { at = p.at, clip = clip, length = ns.VOICE[pack].clips[clip], handle = p.handle }
     end
   end
   for _, line in ipairs(GodslayerDB.log) do if line:find(" error: ", 1, true) then fail(seed, line) end end
@@ -284,7 +313,11 @@ for seed = 1, RUNS do
   end
   for i = 2, #M.sentChat do end
   for _, m in ipairs(M.sentAddon) do
-    if m[3] ~= "GUILD" or #m[2] > 255 or m[1] ~= "Godslayer" then fail(seed, "bad addon message: " .. m[2]) end
+    -- the wheel goes to the group and only the wheel does; everything else stays in the guild
+    local wheel = m[2]:match("^W;1;(%d+);%x+$")
+    local channelOk = wheel and (m[3] == "PARTY" or m[3] == "RAID") or (not wheel and m[3] == "GUILD")
+    if not channelOk or #m[2] > 255 or m[1] ~= "Godslayer" then fail(seed, "bad addon message: " .. m[2] .. " on " .. tostring(m[3])) end
+    if m[2]:match("^R;") and not m[2]:match("^R;1;(%a+);%x+$") then fail(seed, "bad streak message: " .. m[2]) end
   end
   -- our totals go out at most once every five seconds, however long or busy the session
   local lastStats

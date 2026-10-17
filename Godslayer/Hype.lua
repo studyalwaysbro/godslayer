@@ -1,6 +1,10 @@
 -- Godslayer hype: your kill song, and an announcer who takes Olympus personally.
 --
--- THE HUNT. The first player you kill starts it: your song begins and FIRST BLOOD is called.
+-- THE FIGHT. The moment a fight with an enemy player starts, your song starts with it: war drums,
+-- and now and then a word from the announcer. It plays through the fight and on into the hunt,
+-- and fades a little while after the last fight ends if nobody died.
+--
+-- THE HUNT. The first player you kill starts it: FIRST BLOOD is called, over the song already playing.
 -- Every kill is heard at once, a blade that rings a note higher each time. The rungs are spaced
 -- out so the top ones stay rare: MEGA KILL at two, ULTRA KILL at three, GODLIKE at five,
 -- UNSTOPPABLE at seven, BEYOND GODLIKE at ten, GODSLAYER at fifteen, and a call every five or
@@ -38,7 +42,7 @@
 
 local ADDON, ns = ...
 
-local Hype = {}
+local Hype = { handlers = {} }
 ns.Hype = Hype
 
 local SOUNDS = "Interface\\AddOns\\Godslayer\\Sounds\\"
@@ -68,6 +72,10 @@ local DENY_WINDOW, DENY_VOICE_GAP = 0.6, 25
 local DUCK, CARD_FROM, FLAWLESS_FROM = 0.6, 3, 10
 local PHASE_TWO = 5        -- kills at which the hunt theme moves to its second, bigger half
 local KILL_NOTES = 8       -- the kill sound climbs this many steps and stays on the last
+local GRACE = 15           -- seconds out of combat before a fight with no kill in it lets the music go
+local GRACE_BG = 60        -- in a battleground, long enough to run back from the graveyard
+local ENGAGE_VOICE_GAP, ENGAGE_GOD_GAP = 180, 60 -- how often a fight starting gets a word, and one against an Olympian
+local ENGAGE_SHOW_GAP = 20 -- the banner for a fight starting, at most this often
 
 -- rung reached by this many kills in one hunt; each is called once, at the kill that reaches it
 -- { kills, banner, clip, colour, how big the moment is on screen (1 to 5) }
@@ -109,7 +117,10 @@ local function try(f, ...)
   if ok then return a, b end
 end
 
-local hunt          -- { kills, music = "music" | handle | nil, turn, run, bestRun, points, gods, started }
+local hunt          -- { kills, turn, run, bestRun, points, gods, started }
+local fight         -- a fight with a player is on, or was a moment ago: { started, turn, god }
+local track         -- the music this addon started: { music = "music" | handle, theme, phase }; a fight or a hunt holds it
+local engageGen = 0 -- moves on whenever a fight ends, so a word still waiting to be said about it is not
 local songPath      -- the song found this session; false once we know there is none
 local banner
 local voiceNow      -- the announcer speaking: the chosen one, or in the mix the one this hunt drew
@@ -136,6 +147,11 @@ local function opts()
   if h.duels == nil then h.duels = true end
   if h.photo == nil then h.photo = false end
   if h.clip == nil then h.clip = false end
+  if h.engage == nil then h.engage = true end
+  if h.class == nil then h.class = true end
+  if h.finishers == nil then h.finishers = true end
+  if h.wheel == nil then h.wheel = true end
+  if h.streaks == nil then h.streaks = true end
   if h.channel ~= "Dialog" and h.channel ~= "SFX" then h.channel = "Master" end
   if h.mode ~= "blows" then h.mode = "all" end -- all = any kill you get credit for; blows = only your own killing blows
   -- the mix arrived with the new announcers: everyone starts on it once, and may then pin one
@@ -220,6 +236,7 @@ end
 -- call outranks the points, the points outrank a dry remark, and when a new call arrives the
 -- remarks still waiting from the last kill are dropped so the voice never falls behind the fight.
 local queue, busyUntil, pumping = {}, 0, false
+local cuttable              -- the line in the air may be cut short by a kill call: { its sound handle, the busyUntil it set }
 local lastPick = {}
 
 local function soundOn()
@@ -234,9 +251,10 @@ Hype.ClipLength = clipLength
 
 -- A sound under the voice: the crowd, a horn, a fanfare. Never needed, so never an error.
 local function sfx(name)
-  if not name or not opts().sfx or not soundOn() or not (ns.SFX and ns.SFX[name]) then return end
-  try(PlaySoundFile, SOUNDS .. "sfx\\" .. name .. ".ogg", opts().channel)
+  if not name or not opts().sfx or not soundOn() or not (ns.SFX and ns.SFX[name]) then return false end
+  return plain(try(PlaySoundFile, SOUNDS .. "sfx\\" .. name .. ".ogg", opts().channel)) and true or false
 end
+Hype.Sfx = sfx
 
 -- One of clip_1, clip_2 ... that this pack has. They are dealt like cards: every take is heard
 -- once before any is heard again, and a new deal never opens with the take the last one closed on.
@@ -263,8 +281,9 @@ Hype.Pick = pick
 local function playNow(clip, pack)
   local channel = opts().channel
   -- lines re-pitched to your own song (tools/tune_announcer.py writes them) come first
-  local own = try(PlaySoundFile, OWN .. "voice\\" .. pack .. "\\" .. clip .. ".ogg", channel)
-  if not plain(own) then try(PlaySoundFile, SOUNDS .. pack .. "\\" .. clip .. ".ogg", channel) end
+  local own, handle = try(PlaySoundFile, OWN .. "voice\\" .. pack .. "\\" .. clip .. ".ogg", channel)
+  if not plain(own) then own, handle = try(PlaySoundFile, SOUNDS .. pack .. "\\" .. clip .. ".ogg", channel) end
+  return plain(handle)
 end
 
 -- THE MIX. While the announcer speaks over the hunt's music, the music steps back, and comes
@@ -288,7 +307,7 @@ Hype.Unduck = unduck
 
 local function duck(seconds)
   if duckBroken or type(SetCVar) ~= "function" or not opts().duck then return end
-  if not (hunt and hunt.music == "music") then return end
+  if not (track and track.music == "music") then return end
   if not ducked then
     local was = musicVolume()
     if not was or was < 0.08 then return end
@@ -322,8 +341,9 @@ pump = function()
   local length = clipLength(item[1], item[3]) or 1.5
   sfx(item[4])
   if item[2] >= 3 then duck(length) end -- for a call, not for every line after it
-  playNow(item[1], item[3])
+  local handle = playNow(item[1], item[3])
   busyUntil = GetTime() + math.max(0.4, length - OVERLAP)
+  cuttable = item[6] and handle and { handle, busyUntil } or nil
   if queue[1] then
     pumping = true
     C_Timer.After(busyUntil - GetTime(), pump)
@@ -342,6 +362,14 @@ local function speak(lines)
     for i = #queue, 1, -1 do
       if queue[i][2] < 2 then table.remove(queue, i) end
     end
+    -- a word about a fight starting gives way the moment someone dies in it, and so does a groupmate's chat wheel
+    -- (only the very line that said it may be cut: anything played since has moved busyUntil on)
+    if cuttable and cuttable[2] == busyUntil and GetTime() < busyUntil then
+      try(StopSound, cuttable[1], 150)
+      busyUntil = GetTime()
+    end
+    cuttable = nil
+    if ns.Wheel and ns.Wheel.Hush then pcall(ns.Wheel.Hush) end
   end
   for _, line in ipairs(lines) do
     if line[1] and clipLength(line[1], pack) then
@@ -410,12 +438,44 @@ local function stopMusic(how)
   if how == "music" then try(StopMusic) else try(StopSound, how, FADE_MS) end
 end
 
+-- The music is started once, by whichever comes first, the fight or the kill, and is held by both:
+-- it stops only when neither a hunt nor a fight is left.
+local function inBattleground()
+  local _, kind = try(IsInInstance)
+  return plain(kind) == "pvp"
+end
+
+-- Written down while it plays, so a reload or a crash mid-fight cannot leave your song on forever.
+local function holdMusic()
+  if track then return track end
+  local music, theme = startMusic()
+  if music then
+    track = { music = music, theme = theme, phase = 1 }
+    if music == "music" then opts().playing = true end
+  end
+  return track
+end
+
+local function dropMusic()
+  opts().playing = nil
+  if not track then return end
+  local t = track
+  track = nil
+  stopMusic(t.music)
+end
+
+local function settle()
+  if not fight then engageGen = engageGen + 1 end
+  if not hunt and not fight then dropMusic() end
+end
+
 -- The hunt theme has a second, bigger half. A hunt that gets far enough moves into it; the game
 -- crossfades one piece of music into the next by itself. Your own song is left alone.
-local function phaseTwo(h)
-  if h.phase == 2 or not (h.theme and h.music == "music" and ns.MUSIC and ns.MUSIC.hunt2) then return end
+local function phaseTwo()
+  local t = track
+  if not t or t.phase == 2 or not (t.theme and t.music == "music" and ns.MUSIC and ns.MUSIC.hunt2) then return end
   local ok, will = pcall(PlayMusic, SOUNDS .. "music\\hunt2.ogg")
-  if ok and plain(will) ~= false then h.phase = 2 end
+  if ok and plain(will) ~= false then t.phase = 2 end
 end
 
 -- THE HUNT ----------------------------------------------------------------------
@@ -483,10 +543,17 @@ end
 -- killed who was there when you died.
 local function endHunt(reason, payback)
   local h = hunt
-  if not h then return end
+  if not h then
+    -- stopped by hand with no hunt on: a fight's music stops too
+    if reason ~= "quiet" and reason ~= "died" then fight = nil settle() end
+    return
+  end
   hunt = nil
   lastIds, lastEnd = h.ids, GetTime()
-  stopMusic(h.music)
+  -- a hunt that runs out while you are still fighting leaves the music to the fight; any other end takes it
+  -- (a death in a battleground leaves it too: you are back in a minute)
+  if reason ~= "quiet" and not (reason == "died" and fight and inBattleground()) then fight = nil end
+  settle()
   if ns.Stage then pcall(ns.Stage.FuseOut) end
   local grade, gradeColor
   if h.kills >= CARD_FROM then grade, gradeColor = gradeFor(h) end
@@ -547,6 +614,9 @@ end
 -- Kills waiting out CALL_DELAY: by victim, so an Olympus score arriving in that moment can
 -- take the call over instead of following a generic one.
 local waiting, flushQueued = {}, false
+local tellGuild            -- below, with the guild's side of things
+-- the announcer has something to say, or is about to
+function Hype.Busy() return Hype.Speaking() or next(waiting) ~= nil end
 local barked = false       -- the last kill between rungs got a word
 
 local function progressLine()
@@ -605,6 +675,12 @@ local function momentFor(id, h, identityOnly)
   if type(id) == "string" and id:sub(1, 5) == "test#" then return nil end
   local real = type(id) == "string" and id:sub(1, 5) ~= "anon:"
   local found
+  -- the spell that ended it belongs to this kill whatever else it was, so it cannot spill onto the next
+  local finisher
+  if not identityOnly and ns.Fight and ns.Fight.Finisher then
+    local key, tag = ns.Fight.Finisher(h.kb, id)
+    if key and o.finishers then finisher = { tag = tag, clip = "fin_" .. key, size = 3, finisher = key } end
+  end
   if real then
     local f = faced[id]
     if not f then
@@ -643,6 +719,8 @@ local function momentFor(id, h, identityOnly)
   end
   if not found and deathsSinceKill >= 2 then found = MOMENTS.comeback end
   deathsSinceKill = 0
+  -- the spell that ended it: EXECUTED, PYROBLASTED, DEATH BY WAND; above a word about their class
+  if not found then found = finisher end
   if not found and real and h.victimClass and not h.quipped[h.victimClass] and math.random() < QUIP_CHANCE then
     local clip = "class_" .. h.victimClass:lower()
     if clipLength(clip) then
@@ -650,7 +728,8 @@ local function momentFor(id, h, identityOnly)
       found = { clip = clip }
     end
   end
-  if not o.moments then return nil end -- the history above is kept either way
+  -- the history above is kept either way; finishers have a switch of their own
+  if not o.moments then return finisher end
   return found
 end
 
@@ -738,7 +817,7 @@ local function announceGods(gods, huntKills, run, record)
   if huntKills and huntKills > 1 then parts[#parts + 1] = "|cffffd100x" .. huntKills .. "|r" end
   local size = top.info.king and 5 or ((ladder and ladder[1] >= 5) and 4 or ((ladder or top.tier == "original" or promoted) and 3 or 2))
   showBanner(title, top.tier == "original" and GOLD or GODRED, table.concat(parts, "    "), { size = size, claws = huntKills and run or nil })
-  if top.info.king then photo() end
+  if top.info.king then photo() tellGuild("regicide", hunt or {}) end
   if top.info.king and hunt then hunt.king = true end
 end
 
@@ -807,7 +886,8 @@ function Hype.Kill(who, killingBlow, id, pretend)
   if not hunt then
     if o.pack == "mix" and ns.VOICE then voiceNow = draw() end -- a new hunt, a new voice
     hunt = { kills = 0, run = 0, bestRun = 1, points = 0, started = now, ids = {}, quipped = {} }
-    hunt.music, hunt.theme = startMusic()
+    -- already playing when the fight started: the song carries on and is not begun again
+    holdMusic()
   end
   local h = hunt
   if pretend then h.pretend = true end -- a hunt with a test kill in it is never a record
@@ -818,12 +898,13 @@ function Hype.Kill(who, killingBlow, id, pretend)
   -- heard the instant it happens: the same blade, a note higher every kill
   sfx("kill_" .. math.min(h.kills, KILL_NOTES))
   arm(h)
-  if h.kills >= PHASE_TWO then phaseTwo(h) end
+  if h.kills >= PHASE_TWO then phaseTwo() end
   local rung, nextRung = rungFor(h.kills)
   local reached = rung[1] == h.kills and rung or nil
   -- a run is called as it grows, up to RAMPAGE; a longer one is on the banner and not in your ear again
   local multi = multiFor(h.run)
   local multiNew = multi and h.run <= MULTI[#MULTI][1] and multi or nil
+  h.kb = killingBlow
   local moment = momentFor(id, h)
   local name = type(who) == "string" and who ~= "" and who or nil
   local parts = { name and (name .. " is dead") or "A kill" }
@@ -850,6 +931,10 @@ function Hype.Kill(who, killingBlow, id, pretend)
   if moment and moment.size and moment.size > size then size = moment.size end
   showBanner(title, rung[4], table.concat(parts, "    "), { size = size, claws = h.run })
   if reached and reached[1] == 15 then photo() end
+  -- the guild hears about the big ones, once a hunt, and the biggest when two land on one kill
+  if reached and reached[1] == 15 then tellGuild("godslayer", h)
+  elseif multiNew and multiNew[1] == MULTI[#MULTI][1] then tellGuild("rampage", h)
+  elseif reached and reached[1] == 5 then tellGuild("godlike", h) end
   -- the moment a recorder should cut to: the kill that topped the best run, or with no run the last rung
   if (h.run >= 2 and h.run == h.bestRun) or (h.bestRun == 1 and reached) then h.peak = now end
   local key = id or (name or "?") .. "#" .. h.kills
@@ -949,13 +1034,155 @@ function Hype.Died()
       f.kills = 0
     end
   end
+  -- in a battleground you are back in a minute: the song waits for you, the hunt does not
+  if not inBattleground() then fight = nil end
   endHunt("died", payback)
+  if fight then Hype.Disengage() end
+  settle() -- a fight lost with no kill in it: the music goes with you
+end
+
+-- THE FIGHT -------------------------------------------------------------------------
+-- Fight.lua says when a fight with a player has started. The song starts there and then, so the
+-- first kill lands on music that is already going. info = { name, guild, tier, king } as far as
+-- the client lets anyone know who it is.
+local lastEngageVoice, lastEngageGod, lastEngageShow, lastDrums = -1000, -1000, -1000, -1000
+local ENGAGE_VOICE_DELAY = 0.7
+function Hype.DrumsAgo() return GetTime() - lastDrums end
+local hushed = false -- stopped by hand mid-combat: no fight music again until combat is over
+function Hype.Engage(info, pretend)
+  if not GodslayerDB then return false end
+  local o = opts()
+  if not (o.on and o.engage) and not pretend then return false end
+  if hushed and not pretend then return false end
+  info = type(info) == "table" and info or {}
+  local now = GetTime()
+  local fresh = not fight
+  fight = fight or { started = now, turn = 0 }
+  fight.turn = fight.turn + 1 -- whatever was counting down to letting the music go is called off
+  local god = info.tier ~= nil and not fight.god
+  -- the fight goes on: only an Olympian joining it is news
+  if not fresh and not god then return true end
+  if god then fight.god = true end
+  if hunt and not hunt.pretend and not pretend then return true end -- a hunt is on: it has the music and the voice already
+  local before = track
+  holdMusic()
+  if (not before and track) or pretend then
+    sfx("engage")
+    lastDrums = now
+  end
+  local line
+  if god and (now - lastEngageGod >= ENGAGE_GOD_GAP or pretend) then
+    lastEngageGod, lastEngageVoice = now, now
+    line = info.king and "king_spot" or "engage_god"
+  elseif not god and fresh and (now - lastEngageVoice >= ENGAGE_VOICE_GAP or pretend) then
+    lastEngageVoice = now
+    line = "engage"
+  end
+  if line then
+    -- a breath after the drums, and not at all if a kill got there first or the fight is already gone
+    local gen, f = engageGen, fight
+    C_Timer.After(ENGAGE_VOICE_DELAY, function()
+      if gen ~= engageGen or (not pretend and fight ~= f) then return end
+      -- an Olympian's line waits for the one in the air; a plain fight's word is let go
+      if (hunt and not hunt.pretend and not pretend) or next(waiting) or (line == "engage" and Hype.Speaking()) then return end
+      if not voiceNow and ns.VOICE then currentPack() end
+      local king = line == "king_spot"
+      speak({ { pick(line), king and 3 or 1.3, nil, nil, nil, not king } })
+    end)
+  end
+  if (fresh or god) and (now - lastEngageShow >= ENGAGE_SHOW_GAP or god or pretend) then
+    lastEngageShow = now
+    local who = type(info.name) == "string" and info.name or nil
+    local line = (who or "An enemy player") .. (type(info.guild) == "string" and ("    |cffbbbbbb<" .. info.guild .. ">|r") or "")
+    showBanner(info.king and "THE KING" or (god and "OLYMPIAN ENGAGED" or "ENGAGED"), god and GODRED or { 1, 0.55, 0.15 }, line, { size = god and 2 or 1, hold = 1.8 })
+  end
+  return true
+end
+
+-- Out of combat. The music waits a little in case the fight is not over, then goes, unless a
+-- hunt is holding it.
+function Hype.Disengage()
+  hushed = false
+  local f = fight
+  if not f then return end
+  local turn = f.turn
+  C_Timer.After(inBattleground() and GRACE_BG or GRACE, function()
+    if fight ~= f or f.turn ~= turn then return end
+    if ns.Fight and ns.Fight.InCombat and ns.Fight.InCombat() then
+      -- still in combat, but no longer with a player as far as anyone can see: check again later
+      Hype.Disengage()
+      return
+    end
+    fight = nil
+    settle()
+  end)
+end
+
+function Hype.Fighting() return fight ~= nil end
+
+-- A new zone. A fight kept alive through a battleground death does not follow you out of it.
+function Hype.handlers.PLAYER_ENTERING_WORLD()
+  if fight and not hunt and not inBattleground() and not (ns.Fight and ns.Fight.InCombat and ns.Fight.InCombat()) then
+    fight = nil
+    settle()
+  end
+end
+function Hype.InPvP() return fight ~= nil or hunt ~= nil end
+function Hype.Playing() return track ~= nil end
+
+-- A guildmate somewhere else just reached a big moment of their own: Dota's word for the whole
+-- server. A line in chat, and the announcer says it when you are not busy with your own fight.
+local STREAKS = {
+  godlike = { "is |cffff4019GODLIKE|r", "ally_godlike" }, rampage = { "is on a |cffff7d0aRAMPAGE|r", "ally_rampage" },
+  godslayer = { "has become a |cffb35aff GODSLAYER|r", "ally_godslayer" }, regicide = { "has |cffff3010killed the King of Olympus|r", "ally_regicide" },
+}
+Hype.STREAKS = STREAKS
+local streakLog, lastStreakVoice, streakHeard = {}, -1000, {}
+local STREAK_SENDER_GAP, STREAK_SENDER_HOURLY, STREAK_VOICE_GAP, STREAK_KINGS_HOURLY, STREAK_PER_MINUTE = 60, 10, 30, 3, 6
+function Hype.AllyStreak(who, kind, pretend)
+  if not GodslayerDB or type(who) ~= "string" or not STREAKS[kind] then return false end
+  local o = opts()
+  if not (o.on and o.guild and o.streaks) and not pretend then return false end
+  local now, log = GetTime(), streakLog[who]
+  if not log then log = {} streakLog[who] = log end
+  while log[1] and now - log[1].t > 3600 do table.remove(log, 1) end
+  -- the King is news even right after another call, a few times an hour at most; anything else from one guildmate is rationed
+  if kind == "regicide" then
+    local kings = 0
+    for _, entry in ipairs(log) do if entry.king then kings = kings + 1 end end
+    if kings >= STREAK_KINGS_HOURLY then return false end
+  elseif #log >= STREAK_SENDER_HOURLY or (log[#log] and now - log[#log].t < STREAK_SENDER_GAP) then
+    return false
+  end
+  -- and the whole guild together is held to a handful a minute
+  while streakHeard[1] and now - streakHeard[1] > 60 do table.remove(streakHeard, 1) end
+  if #streakHeard >= STREAK_PER_MINUTE then return false end
+  streakHeard[#streakHeard + 1] = now
+  log[#log + 1] = { t = now, king = kind == "regicide" or nil }
+  ns.Print(("|cffffd100%s|r %s."):format(who, STREAKS[kind][1]))
+  if not pretend then
+    -- your own fight first; the King waits for a line in progress, anything else is let go
+    if (hunt and not hunt.pretend) or fight or next(waiting) then return true end
+    if kind ~= "regicide" and (Hype.Speaking() or now - lastStreakVoice < STREAK_VOICE_GAP) then return true end
+  end
+  lastStreakVoice = now
+  if not voiceNow and ns.VOICE then currentPack() end
+  speak({ { pick(STREAKS[kind][2]), kind == "regicide" and 2 or 1.2, nil, "ally", nil, true } })
+  return true
+end
+
+-- Our own big moment, told to the guild once. Never a test, never from a preview.
+tellGuild = function(kind, h)
+  if not h or h.pretend or not (opts().streaks and ns.Comm and ns.Comm.Streak) then return end
+  h.told = h.told or {}
+  if h.told[kind] then return end
+  h.told[kind] = true
+  pcall(ns.Comm.Streak, kind)
 end
 
 -- DENIED. Your interrupt went out and their cast stopped in the same breath.
 local INTERRUPTS = { Counterspell = true, Kick = true, Pummel = true, ["Shield Bash"] = true, ["Earth Shock"] = true, ["Spell Lock"] = true, Silence = true }
 local lastKick, lastDeny, lastDenyVoice = -1000, -1000, -1000
-Hype.handlers = {}
 
 function Hype.Denied(who)
   local o = opts()
@@ -1052,6 +1279,11 @@ function Hype.Login()
     pcall(SetCVar, "Sound_MusicVolume", o.duckFrom)
     o.duckFrom = nil
   end
+  -- the interface was reloaded with our song playing: nothing holds it now, so the zone gets its music back
+  if o.playing then
+    o.playing = nil
+    try(StopMusic)
+  end
 end
 
 -- A guildmate's score went up. A line in chat, and a spoken one now and then, never over your
@@ -1084,8 +1316,8 @@ function Hype.Spot(id, name, guild, tier, king)
   local now = GetTime()
   if now - lastSpot < (king and SPOT_KING_GAP or SPOT_GAP) then return false end
   if spotted[id] and now - spotted[id] < SPOT_AGAIN then return false end
-  -- never over a kill being called, and not in the seconds after one
-  if Hype.Speaking() or next(waiting) or (hunt and hunt.last and now - hunt.last < 10) then return false end
+  -- never over a kill being called, not in the seconds after one, and not in a fight: that has its own call
+  if fight or Hype.Speaking() or next(waiting) or (hunt and hunt.last and now - hunt.last < 10) then return false end
   if spottedCount > 400 then spotted, spottedCount = {}, 0 end
   if not spotted[id] then spottedCount = spottedCount + 1 end
   spotted[id], lastSpot = now, now
@@ -1105,6 +1337,9 @@ local SWITCHES = {
   fx = "Banner light and motion", fuse = "The fuse under the banner", moments = "Revenge, domination and the other moments",
   barks = "A word on kills between rungs", duck = "Music steps back while the announcer speaks", deny = "DENIED on a spell you interrupt",
   duels = "Duel results", photo = "A screenshot of your biggest moments", clip = "A mark for your recorder when a hunt ends",
+  engage = "Your song starts the moment a fight with a player does", class = "Sounds for your own class's big spells in a fight",
+  finishers = "EXECUTED, PYROBLASTED and the other finishers", wheel = "Hearing your group's chat wheel lines",
+  streaks = "Telling the guild your big moments, and hearing theirs",
 }
 
 local function listPacks(o)
@@ -1149,14 +1384,14 @@ function Hype.Command(rest)
   word, value = word:lower(), value:lower()
   if word == "on" or word == "off" then
     o.on = word == "on"
-    if not o.on then waiting = {} auditionTurn = auditionTurn + 1 endHunt("off") end
+    if not o.on then waiting = {} auditionTurn = auditionTurn + 1 fight = nil endHunt("off") settle() end
+    hushed = false
     say("Kill song and announcer " .. (o.on and "on." or "off."))
   elseif SWITCHES[word] then
     if value == "on" or value == "off" then o[word] = value == "on" end
-    if hunt and hunt.music and ((word == "music" and not o.music) or (word == "theme" and not o.theme and hunt.theme)) then
-      stopMusic(hunt.music)
-      hunt.music, hunt.theme = nil, nil
-    end
+    if track and ((word == "music" and not o.music) or (word == "theme" and not o.theme and track.theme)) then dropMusic() end
+    -- no music for fights any more: one with no hunt in it gives the music up now
+    if word == "engage" and not o.engage then fight = nil settle() end
     if word == "voice" and not o.voice then hush() end
     if word == "duck" and not o.duck then unduck() end
     if (word == "fuse" or word == "fx") and not (o.fuse and o.fx) and ns.Stage then pcall(ns.Stage.FuseOut) end
@@ -1221,8 +1456,62 @@ function Hype.Command(rest)
     else
       say("Channel is " .. o.channel .. ". /godslayer hype channel master | dialog | sfx")
     end
+  elseif word == "test" and (value:match("^sig") or value:match("^streak")) then
+    -- previews that touch nothing: a sound of your class, a guildmate's big moment
+    local what = value:match("^%S+%s+(.+)$")
+    if value:match("^sig") then
+      local spells = {}
+      for spell in pairs(ns.Fight and ns.Fight.SIGNATURES or {}) do spells[#spells + 1] = spell end
+      table.sort(spells)
+      local found
+      for _, spell in ipairs(spells) do if spell:lower() == what then found = spell end end
+      if found then
+        say(found .. (ns.Fight.Signature(found, true) and "." or ": the sound did not play (sound effects off, or the file is missing)."))
+      else
+        say("/godslayer hype test sig <spell>, one of: " .. table.concat(spells, ", "))
+      end
+    else
+      local kinds = {}
+      for kind in pairs(STREAKS) do kinds[#kinds + 1] = kind end
+      table.sort(kinds)
+      if STREAKS[what or ""] then
+        local voice, heard = lastStreakVoice, streakHeard
+        streakLog["Test Torchman"], streakHeard = nil, {}
+        Hype.AllyStreak("Test Torchman", what, true)
+        streakLog["Test Torchman"], lastStreakVoice, streakHeard = nil, voice, heard
+      else
+        say("/godslayer hype test streak " .. table.concat(kinds, " | "))
+      end
+    end
   elseif word == "test" and hunt and not hunt.pretend and value ~= "duel" and value ~= "duel lost" and value ~= "spot" and value ~= "king spot" then
     say("You are in a real hunt. Previews wait until it is over, so they cannot add to it or end it.")
+  elseif word == "test" and value:match("^engage") then
+    -- the fight starting, heard and seen; nothing is held afterwards
+    if fight then say("You are in a fight. Previews wait until it is over.") return end
+    local olympian = value:match("god") or value:match("olymp")
+    local show, voice, god = lastEngageShow, lastEngageVoice, lastEngageGod
+    Hype.Engage(olympian and { name = "Test Olympian", guild = "OLYMPUS", tier = "original" } or { name = "Test Dummy" }, true)
+    lastEngageShow, lastEngageVoice, lastEngageGod = show, voice, god
+    -- the song plays on as it would after a real fight, then lets go
+    Hype.Disengage()
+    say(("A fight starting. The song plays until %d seconds after it, as it would out of combat. /godslayer hype stop ends it now."):format(GRACE))
+  elseif word == "test" and value:match("^finisher") then
+    local key = value:match("^finisher%s+(%S+)$")
+    local tag = key and ns.Fight and ns.Fight.TAGS[key]
+    if tag then
+      local before, mode = o.on, o.mode
+      o.on, o.mode = true, "all"
+      -- a pretend kill finds no history, so the finisher is handed to it
+      forced = { tag = tag, clip = "fin_" .. key, size = 3, finisher = key }
+      testKills = testKills + 1
+      Hype.Kill("Test Dummy", true, "test#" .. testKills, true)
+      o.on, o.mode = before, mode
+    else
+      local keys = {}
+      for k in pairs(ns.Fight and ns.Fight.TAGS or {}) do keys[#keys + 1] = k end
+      table.sort(keys)
+      say("/godslayer hype test finisher " .. table.concat(keys, " | "))
+    end
   elseif word == "test" and (value:match("^moment") or value == "duel" or value == "duel lost" or value == "denied" or value == "card") then
     -- previews: nothing is scored and nothing is remembered
     local before = o.on
@@ -1277,15 +1566,19 @@ function Hype.Command(rest)
     o.on, o.mode = before, mode
     say(("Test kill %d, called by %s. Again inside %d seconds for a double kill, inside %d to climb. Try test olympus, test king, test spot. /godslayer hype stop ends it."):format(
       Hype.Kills(), ns.VOICE and ns.VOICE[currentPack()] and ns.VOICE[currentPack()].label or "nobody", MULTI_WINDOW, o.window))
-    if hunt and not hunt.music and o.music then
+    if hunt and not track and o.music then
       print("  No song found. Put kill.mp3 in Interface\\AddOns\\GodslayerMusic and restart the game.")
-    elseif hunt and hunt.theme then
+    elseif hunt and track and track.theme then
       print("  That is the hunt theme. For a song of your own, put kill.mp3 in Interface\\AddOns\\GodslayerMusic and restart the game.")
     end
   elseif word == "stop" then
     waiting = {}
     auditionTurn = auditionTurn + 1
+    -- still in combat, the fight would be found again a second later: it stays off until combat ends
+    hushed = (ns.Fight and ns.Fight.InCombat and ns.Fight.InCombat()) and true or false
+    fight = nil
     endHunt("stop")
+    settle()
     say("Hunt ended.")
   else
     local pack = ns.VOICE and ns.VOICE[o.pack]
@@ -1299,12 +1592,15 @@ function Hype.Command(rest)
     print(("  Banner light %s, fuse %s, music steps back under the voice %s, screenshots of big moments %s, channel %s."):format(
       onOff(o.fx), onOff(o.fuse), onOff(o.duck), onOff(o.photo), o.channel))
     print(("  Clip mark for a recorder %s. /godslayer clip marks one by hand."):format(onOff(o.clip)))
+    print(("  Song starts with the fight %s, your class's sounds %s, finishers %s, guild big moments %s, groupmates' chat wheel %s."):format(
+      onOff(o.engage), onOff(o.class), onOff(o.finishers), onOff(o.streaks), onOff(o.wheel)))
     print(("  Kills within %d seconds of each other: DOUBLE KILL, TRIPLE KILL, QUAD KILL, RAMPAGE (%s)."):format(MULTI_WINDOW, onOff(o.multi)))
     print("  Olympus kills have their own calls, and the points are read out. /godslayer hype test olympus plays one.")
     print(("  Sound effects %s, Olympian spotter %s, remarks %s, hunt theme %s."):format(onOff(o.sfx), onOff(o.spot), onOff(o.asides), onOff(o.theme)))
     print("  Your song: a file named kill.mp3 or kill.ogg in Interface\\AddOns\\GodslayerMusic. Restart the game after adding it.")
     print("  /godslayer hype pack | mix | audition [name] | say <line> | stop | on | off | window <seconds> | blows | all | channel <name> | probe")
-    print("  /godslayer hype test [olympus | king | spot | king spot | moment <name> | duel | duel lost | denied | card]")
-    print("  /godslayer hype music | voice | guild | sfx | spot | multi | asides | theme | fx | fuse | moments | barks | duck | deny | duels | photo | clip  on|off")
+    print("  /godslayer hype test [olympus | king | spot | king spot | moment <name> | duel | duel lost | denied | card | engage | engage god | finisher <kind> | sig <spell> | streak <kind>]")
+    print("  /godslayer hype music | voice | guild | sfx | spot | multi | asides | theme | fx | fuse | moments | barks | duck | deny | duels | photo | clip | engage | class | finishers | streaks | wheel  on|off")
+    print("  /godslayer wheel: the chat wheel. Bind a key to it in Key Bindings, AddOns, Godslayer.")
   end
 end

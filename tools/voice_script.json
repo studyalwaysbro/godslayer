@@ -686,6 +686,136 @@
     "denied_2",
     "points",
     "SILENCED!"
+   ],
+   [
+    "engage_1",
+    "points",
+    "Blood in the water!"
+   ],
+   [
+    "engage_2",
+    "points",
+    "Prey in sight! Hunt!"
+   ],
+   [
+    "engage_3",
+    "points",
+    "To battle!"
+   ],
+   [
+    "engage_god_1",
+    "points",
+    "An Olympian! Make it count!"
+   ],
+   [
+    "engage_god_2",
+    "points",
+    "A false god stands before you! Bring it down!"
+   ],
+   [
+    "fin_execute",
+    "points",
+    "EXECUTED!"
+   ],
+   [
+    "fin_pyro",
+    "points",
+    "PYROBLASTED!"
+   ],
+   [
+    "fin_fire",
+    "points",
+    "INCINERATED!"
+   ],
+   [
+    "fin_shatter",
+    "points",
+    "SHATTERED!"
+   ],
+   [
+    "fin_arcane",
+    "points",
+    "ERASED!"
+   ],
+   [
+    "fin_evisc",
+    "points",
+    "EVISCERATED!"
+   ],
+   [
+    "fin_back",
+    "points",
+    "IN THE BACK!"
+   ],
+   [
+    "fin_wand",
+    "points",
+    "DEATH BY WAND! The shame!"
+   ],
+   [
+    "fin_judged",
+    "points",
+    "JUDGED!"
+   ],
+   [
+    "fin_smite",
+    "points",
+    "SMITED!"
+   ],
+   [
+    "fin_mind",
+    "points",
+    "MIND BLOWN!"
+   ],
+   [
+    "fin_soul",
+    "points",
+    "SOUL TAKEN!"
+   ],
+   [
+    "fin_thunder",
+    "points",
+    "THUNDERSTRUCK!"
+   ],
+   [
+    "fin_shock",
+    "points",
+    "SHOCKED!"
+   ],
+   [
+    "fin_sniped",
+    "points",
+    "SNIPED!"
+   ],
+   [
+    "fin_moon",
+    "points",
+    "MOONSTRUCK!"
+   ],
+   [
+    "fin_mauled",
+    "points",
+    "MAULED!"
+   ],
+   [
+    "ally_godlike",
+    "points",
+    "A Torchman is GODLIKE!"
+   ],
+   [
+    "ally_rampage",
+    "points",
+    "A Torchman is on a RAMPAGE!"
+   ],
+   [
+    "ally_godslayer",
+    "points",
+    "A Torchman has become a GODSLAYER!"
+   ],
+   [
+    "ally_regicide",
+    "points",
+    "A Torchman has slain the King!"
    ]
   ],
   "valkyrie": [
@@ -1193,6 +1323,136 @@
     "denied_2",
     "points",
     "Silence!"
+   ],
+   [
+    "engage_1",
+    "points",
+    "Shields up! Spears out!"
+   ],
+   [
+    "engage_2",
+    "points",
+    "The slain are waiting! Fight!"
+   ],
+   [
+    "engage_3",
+    "points",
+    "Battle! At last!"
+   ],
+   [
+    "engage_god_1",
+    "points",
+    "An Olympian! Give me its name!"
+   ],
+   [
+    "engage_god_2",
+    "points",
+    "A false god! Valhalla wants it!"
+   ],
+   [
+    "fin_execute",
+    "points",
+    "EXECUTED! A clean end!"
+   ],
+   [
+    "fin_pyro",
+    "points",
+    "PYROBLASTED! A funeral pyre!"
+   ],
+   [
+    "fin_fire",
+    "points",
+    "INCINERATED! Burned like a longship!"
+   ],
+   [
+    "fin_shatter",
+    "points",
+    "SHATTERED! Like a cheap shield!"
+   ],
+   [
+    "fin_arcane",
+    "points",
+    "ERASED! Not even ash!"
+   ],
+   [
+    "fin_evisc",
+    "points",
+    "EVISCERATED!"
+   ],
+   [
+    "fin_back",
+    "points",
+    "IN THE BACK! I saw nothing."
+   ],
+   [
+    "fin_wand",
+    "points",
+    "DEATH BY WAND! I will not sing of this!"
+   ],
+   [
+    "fin_judged",
+    "points",
+    "JUDGED! And found wanting!"
+   ],
+   [
+    "fin_smite",
+    "points",
+    "SMITED! The heavens agree!"
+   ],
+   [
+    "fin_mind",
+    "points",
+    "MIND BLOWN!"
+   ],
+   [
+    "fin_soul",
+    "points",
+    "SOUL TAKEN! I wanted that one!"
+   ],
+   [
+    "fin_thunder",
+    "points",
+    "THUNDERSTRUCK! Thor is jealous!"
+   ],
+   [
+    "fin_shock",
+    "points",
+    "SHOCKED!"
+   ],
+   [
+    "fin_sniped",
+    "points",
+    "SNIPED! A true arrow!"
+   ],
+   [
+    "fin_moon",
+    "points",
+    "MOONSTRUCK!"
+   ],
+   [
+    "fin_mauled",
+    "points",
+    "MAULED! By a beast!"
+   ],
+   [
+    "ally_godlike",
+    "points",
+    "A Torchman is GODLIKE! The hall stirs!"
+   ],
+   [
+    "ally_rampage",
+    "points",
+    "A Torchman is on a RAMPAGE!"
+   ],
+   [
+    "ally_godslayer",
+    "points",
+    "A Torchman is a GODSLAYER! Sing it!"
+   ],
+   [
+    "ally_regicide",
+    "points",
+    "A Torchman has slain the King! Hail!"
    ]
   ],
   "frost": [
@@ -1705,6 +1965,136 @@
     "denied_2",
     "points",
     "Shh! Not a word!"
+   ],
+   [
+    "engage_1",
+    "points",
+    "Ooh, a fight! Finally!"
+   ],
+   [
+    "engage_2",
+    "points",
+    "Somebody wants to play!"
+   ],
+   [
+    "engage_3",
+    "points",
+    "Let's make some ice cubes!"
+   ],
+   [
+    "engage_god_1",
+    "points",
+    "An Olympian! A fresh one! Get it!"
+   ],
+   [
+    "engage_god_2",
+    "points",
+    "Ooh, a god! Let's see if it melts!"
+   ],
+   [
+    "fin_execute",
+    "points",
+    "EXECUTED! Clean cut!"
+   ],
+   [
+    "fin_pyro",
+    "points",
+    "PYROBLASTED! Ew, warm!"
+   ],
+   [
+    "fin_fire",
+    "points",
+    "INCINERATED! Too hot for me!"
+   ],
+   [
+    "fin_shatter",
+    "points",
+    "SHATTERED! My favourite!"
+   ],
+   [
+    "fin_arcane",
+    "points",
+    "ERASED! Poof!"
+   ],
+   [
+    "fin_evisc",
+    "points",
+    "EVISCERATED! Ooh, messy!"
+   ],
+   [
+    "fin_back",
+    "points",
+    "IN THE BACK! Sneaky!"
+   ],
+   [
+    "fin_wand",
+    "points",
+    "DEATH BY WAND! Adorable!"
+   ],
+   [
+    "fin_judged",
+    "points",
+    "JUDGED! Guilty!"
+   ],
+   [
+    "fin_smite",
+    "points",
+    "SMITED! Very holy!"
+   ],
+   [
+    "fin_mind",
+    "points",
+    "MIND BLOWN! Pop!"
+   ],
+   [
+    "fin_soul",
+    "points",
+    "SOUL TAKEN! Can I keep it?"
+   ],
+   [
+    "fin_thunder",
+    "points",
+    "THUNDERSTRUCK! Crackly!"
+   ],
+   [
+    "fin_shock",
+    "points",
+    "SHOCKED! Zap!"
+   ],
+   [
+    "fin_sniped",
+    "points",
+    "SNIPED! Bullseye!"
+   ],
+   [
+    "fin_moon",
+    "points",
+    "MOONSTRUCK! So pretty!"
+   ],
+   [
+    "fin_mauled",
+    "points",
+    "MAULED! Bad kitty!"
+   ],
+   [
+    "ally_godlike",
+    "points",
+    "A Torchman is GODLIKE! Ooh!"
+   ],
+   [
+    "ally_rampage",
+    "points",
+    "A Torchman is on a RAMPAGE! Brr!"
+   ],
+   [
+    "ally_godslayer",
+    "points",
+    "A Torchman is a GODSLAYER! Jealous!"
+   ],
+   [
+    "ally_regicide",
+    "points",
+    "A Torchman killed the King! Without me!"
    ]
   ],
   "naturalist": [
@@ -2222,6 +2612,136 @@
     "denied_2",
     "points",
     "Interrupted. How rude. How effective."
+   ],
+   [
+    "engage_1",
+    "points",
+    "And here, the hunt begins."
+   ],
+   [
+    "engage_2",
+    "points",
+    "The predator has spotted its prey."
+   ],
+   [
+    "engage_3",
+    "points",
+    "Contact. Stay very still."
+   ],
+   [
+    "engage_god_1",
+    "points",
+    "An Olympian. Our patience is rewarded."
+   ],
+   [
+    "engage_god_2",
+    "points",
+    "A false god. The rarest prey of all."
+   ],
+   [
+    "fin_execute",
+    "points",
+    "Executed. Swift, and final."
+   ],
+   [
+    "fin_pyro",
+    "points",
+    "Pyroblasted. A forest fire, in miniature."
+   ],
+   [
+    "fin_fire",
+    "points",
+    "Incinerated. Rather thorough."
+   ],
+   [
+    "fin_shatter",
+    "points",
+    "Shattered. The cold claims another."
+   ],
+   [
+    "fin_arcane",
+    "points",
+    "Erased. Science has no explanation."
+   ],
+   [
+    "fin_evisc",
+    "points",
+    "Eviscerated. We shall not show that."
+   ],
+   [
+    "fin_back",
+    "points",
+    "In the back. Classic ambush behaviour."
+   ],
+   [
+    "fin_wand",
+    "points",
+    "Death by wand. Extraordinarily rare."
+   ],
+   [
+    "fin_judged",
+    "points",
+    "Judged. The verdict was swift."
+   ],
+   [
+    "fin_smite",
+    "points",
+    "Smited. From above, naturally."
+   ],
+   [
+    "fin_mind",
+    "points",
+    "Mind blown. Quite literally."
+   ],
+   [
+    "fin_soul",
+    "points",
+    "Soul taken. The crew is uneasy."
+   ],
+   [
+    "fin_thunder",
+    "points",
+    "Thunderstruck. Weather, as a weapon."
+   ],
+   [
+    "fin_shock",
+    "points",
+    "Shocked. The current runs both ways."
+   ],
+   [
+    "fin_sniped",
+    "points",
+    "Sniped. It never heard the shot."
+   ],
+   [
+    "fin_moon",
+    "points",
+    "Moonstruck. Nocturnal, and lethal."
+   ],
+   [
+    "fin_mauled",
+    "points",
+    "Mauled. Nature is not kind."
+   ],
+   [
+    "ally_godlike",
+    "points",
+    "Elsewhere, a Torchman has become godlike."
+   ],
+   [
+    "ally_rampage",
+    "points",
+    "Elsewhere, a Torchman is on a rampage."
+   ],
+   [
+    "ally_godslayer",
+    "points",
+    "Elsewhere, a Torchman has become a godslayer."
+   ],
+   [
+    "ally_regicide",
+    "points",
+    "Elsewhere, a Torchman has slain the King."
    ]
   ],
   "sable": [
@@ -2729,6 +3249,136 @@
     "denied_2",
     "points",
     "Nope! Not today!"
+   ],
+   [
+    "engage_1",
+    "points",
+    "Ooh, a fight! I'm watching!"
+   ],
+   [
+    "engage_2",
+    "points",
+    "Okay, someone's brave."
+   ],
+   [
+    "engage_3",
+    "points",
+    "Fight! Finally, content!"
+   ],
+   [
+    "engage_god_1",
+    "points",
+    "An Olympian! Don't choke!"
+   ],
+   [
+    "engage_god_2",
+    "points",
+    "A god? Okay, make it count!"
+   ],
+   [
+    "fin_execute",
+    "points",
+    "EXECUTED! Rude!"
+   ],
+   [
+    "fin_pyro",
+    "points",
+    "PYROBLASTED! Crispy!"
+   ],
+   [
+    "fin_fire",
+    "points",
+    "INCINERATED! Toasty!"
+   ],
+   [
+    "fin_shatter",
+    "points",
+    "SHATTERED! Into tiny pieces!"
+   ],
+   [
+    "fin_arcane",
+    "points",
+    "ERASED! Deleted!"
+   ],
+   [
+    "fin_evisc",
+    "points",
+    "EVISCERATED! Yikes!"
+   ],
+   [
+    "fin_back",
+    "points",
+    "IN THE BACK! Coward. Love it."
+   ],
+   [
+    "fin_wand",
+    "points",
+    "DEATH BY WAND! I'm screaming!"
+   ],
+   [
+    "fin_judged",
+    "points",
+    "JUDGED! Harshly!"
+   ],
+   [
+    "fin_smite",
+    "points",
+    "SMITED! Blessed!"
+   ],
+   [
+    "fin_mind",
+    "points",
+    "MIND BLOWN! Mine too!"
+   ],
+   [
+    "fin_soul",
+    "points",
+    "SOUL TAKEN! Ew!"
+   ],
+   [
+    "fin_thunder",
+    "points",
+    "THUNDERSTRUCK! Loud!"
+   ],
+   [
+    "fin_shock",
+    "points",
+    "SHOCKED! Same!"
+   ],
+   [
+    "fin_sniped",
+    "points",
+    "SNIPED! From where?"
+   ],
+   [
+    "fin_moon",
+    "points",
+    "MOONSTRUCK! Witchy!"
+   ],
+   [
+    "fin_mauled",
+    "points",
+    "MAULED! By a kitty!"
+   ],
+   [
+    "ally_godlike",
+    "points",
+    "A Torchman is GODLIKE! Not you, though."
+   ],
+   [
+    "ally_rampage",
+    "points",
+    "A Torchman is on a RAMPAGE!"
+   ],
+   [
+    "ally_godslayer",
+    "points",
+    "A Torchman is a GODSLAYER! Show off!"
+   ],
+   [
+    "ally_regicide",
+    "points",
+    "A Torchman killed the King! Clip it!"
    ]
   ]
  },
@@ -2814,6 +3464,342 @@
    "seconds": 1.0,
    "loudness": -15,
    "fade": 0.2
+  },
+  "sig_sheep": {
+   "prompt": "a comic sheep bleat with a sparkling magic poof, short, clean ending, no music, no voice",
+   "seconds": 1.4,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_iceblock": {
+   "prompt": "ice rapidly encasing something with a deep frozen crack, short, clean ending, no music, no voice",
+   "seconds": 1.5,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_blink": {
+   "prompt": "a sharp arcane teleport zap and whoosh, short, clean ending, no music, no voice",
+   "seconds": 0.9,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_nova": {
+   "prompt": "a burst of frost exploding outward and shattering, short, clean ending, no music, no voice",
+   "seconds": 1.2,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_pyro": {
+   "prompt": "a huge fireball roaring as it launches, short, clean ending, no music, no voice",
+   "seconds": 1.8,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_combust": {
+   "prompt": "fire igniting with a deep whoomph, short, clean ending, no music, no voice",
+   "seconds": 1.2,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_surge": {
+   "prompt": "an arcane power-up energy swell rising, short, clean ending, no music, no voice",
+   "seconds": 1.6,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_reset": {
+   "prompt": "a clock ticking twice then a bright reset chime, short, clean ending, no music, no voice",
+   "seconds": 1.4,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_bubble": {
+   "prompt": "a short heavenly choir chord with a small bell, short, clean ending, no music, no voice",
+   "seconds": 1.8,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_bonk": {
+   "prompt": "a heavy hammer bonking a helmet, a little comic, short, clean ending, no music, no voice",
+   "seconds": 0.9,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_angel": {
+   "prompt": "an angelic choir swelling up, warm and bright, short, clean ending, no music, no voice",
+   "seconds": 2.2,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_freedom": {
+   "prompt": "iron chains shattering then an eagle screeching, short, clean ending, no music, no voice",
+   "seconds": 2.0,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_wings": {
+   "prompt": "huge wings unfurling with a holy shimmer, short, clean ending, no music, no voice",
+   "seconds": 1.8,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_repent": {
+   "prompt": "a single church bell toll, deep, ringing out, short, clean ending, no music, no voice",
+   "seconds": 2.4,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_charge": {
+   "prompt": "thundering hoofbeats rushing in and a heavy impact, short, clean ending, no music, no voice",
+   "seconds": 1.5,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_roar": {
+   "prompt": "a savage beast roar, short, clean ending, no music, no voice",
+   "seconds": 1.4,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_wall": {
+   "prompt": "a heavy metal shield slamming down with a clang, short, clean ending, no music, no voice",
+   "seconds": 1.0,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_shout": {
+   "prompt": "a huge reverberating wordless war bellow shockwave, short, clean ending, no music, no voice",
+   "seconds": 1.6,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_quake": {
+   "prompt": "a ground slam with a rumbling quake, short, clean ending, no music, no voice",
+   "seconds": 1.4,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_vanish": {
+   "prompt": "a smoke bomb going off with a soft puff, short, clean ending, no music, no voice",
+   "seconds": 0.9,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_blind": {
+   "prompt": "powder thrown in the air with a puff and a small cough, short, clean ending, no music, no voice",
+   "seconds": 1.0,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_kidney": {
+   "prompt": "a hard body punch thud, short, clean ending, no music, no voice",
+   "seconds": 0.8,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_sap": {
+   "prompt": "a wooden club bonking a head, short, clean ending, no music, no voice",
+   "seconds": 0.8,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_sprint": {
+   "prompt": "fast running footsteps with a whoosh, short, clean ending, no music, no voice",
+   "seconds": 1.2,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_rush": {
+   "prompt": "a heartbeat quickly speeding up, short, clean ending, no music, no voice",
+   "seconds": 1.6,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_feign": {
+   "prompt": "a dramatic body collapsing with a thud and one sad short flute note, short, clean ending, no music, no voice",
+   "seconds": 1.8,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_trap": {
+   "prompt": "a steel bear trap snapping shut with ice crackling, short, clean ending, no music, no voice",
+   "seconds": 1.0,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_scatter": {
+   "prompt": "a scatter blast like a shotgun, short, short, clean ending, no music, no voice",
+   "seconds": 0.8,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_aimed": {
+   "prompt": "a bowstring creaking tight then a whistling arrow, short, clean ending, no music, no voice",
+   "seconds": 1.5,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_leap": {
+   "prompt": "a quick leap whoosh backwards, short, clean ending, no music, no voice",
+   "seconds": 0.8,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_scream": {
+   "prompt": "a ghostly terrified scream echoing, short, clean ending, no music, no voice",
+   "seconds": 1.6,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_shield": {
+   "prompt": "a glassy holy shield shimmering into place, short, clean ending, no music, no voice",
+   "seconds": 1.2,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_mc": {
+   "prompt": "an eerie whispering hum, mind control, unsettling, short, clean ending, no music, no voice",
+   "seconds": 2.0,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_shadow": {
+   "prompt": "a dark shadowy transformation whoosh, short, clean ending, no music, no voice",
+   "seconds": 1.4,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_hush": {
+   "prompt": "a sharp shush and a snap into silence, short, clean ending, no music, no voice",
+   "seconds": 0.9,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_fear": {
+   "prompt": "a spooky ghost wail, short, clean ending, no music, no voice",
+   "seconds": 1.6,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_coil": {
+   "prompt": "a demonic screech, short, clean ending, no music, no voice",
+   "seconds": 1.2,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_howl": {
+   "prompt": "a horrific inhuman howl, short, clean ending, no music, no voice",
+   "seconds": 1.8,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_chaos": {
+   "prompt": "a chaotic infernal fire blast, short, clean ending, no music, no voice",
+   "seconds": 1.5,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_meta": {
+   "prompt": "a monstrous demon transformation roar, short, clean ending, no music, no voice",
+   "seconds": 2.0,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_chain": {
+   "prompt": "a crackling chain lightning strike, short, clean ending, no music, no voice",
+   "seconds": 1.2,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_lava": {
+   "prompt": "a molten lava burst, short, clean ending, no music, no voice",
+   "seconds": 1.2,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_wolf": {
+   "prompt": "a single wolf howl, short, clean ending, no music, no voice",
+   "seconds": 1.8,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_ground": {
+   "prompt": "an electric zap absorbed by a wooden totem, short, clean ending, no music, no voice",
+   "seconds": 0.9,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_swift": {
+   "prompt": "a quick bright nature chime with rustling leaves, short, clean ending, no music, no voice",
+   "seconds": 1.0,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_bear": {
+   "prompt": "a big bear roar, short, clean ending, no music, no voice",
+   "seconds": 1.4,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_cat": {
+   "prompt": "a big cat snarl, short, clean ending, no music, no voice",
+   "seconds": 1.0,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_owl": {
+   "prompt": "a single owl hoot, a little silly, short, clean ending, no music, no voice",
+   "seconds": 0.9,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_innervate": {
+   "prompt": "a sparkling magical mana restore shimmer, short, clean ending, no music, no voice",
+   "seconds": 1.4,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_roots": {
+   "prompt": "creaking vines erupting from the ground, short, clean ending, no music, no voice",
+   "seconds": 1.3,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_bark": {
+   "prompt": "thick tree bark creaking, short, clean ending, no music, no voice",
+   "seconds": 1.0,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_starfall": {
+   "prompt": "shimmering stars falling and twinkling, short, clean ending, no music, no voice",
+   "seconds": 2.0,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_stomp": {
+   "prompt": "a heavy hoof stomp with a shockwave, short, clean ending, no music, no voice",
+   "seconds": 1.2,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "sig_forsaken": {
+   "prompt": "a ghostly gasp breaking free of a spell, short, clean ending, no music, no voice",
+   "seconds": 1.2,
+   "loudness": -19,
+   "fade": 0.2
+  },
+  "engage": {
+   "prompt": "two heavy war drum hits and a short rising brass stab, the start of a battle, cinematic, clean ending, no voice",
+   "seconds": 2.0,
+   "loudness": -17,
+   "fade": 0.3
+  },
+  "ally": {
+   "prompt": "a war horn calling from very far away, short, distant, no music, no voice",
+   "seconds": 1.5,
+   "loudness": -19,
+   "fade": 0.4
   }
  },
  "music": {
@@ -2824,6 +3810,121 @@
   "hunt2": {
    "prompt": "Instrumental only, no vocals. The second, bigger phase of a dark epic hunt theme for a player on an unstoppable kill streak: faster pounding war drums and taiko at 120 BPM, soaring heroic brass melody over a low brass ostinato, full choir chanting wordless syllables, racing staccato strings, a heavy hybrid trap bass. Triumphant and overwhelming, starts at full intensity from the first second with no intro, stays relentless, ends on the same groove so it loops cleanly.",
    "seconds": 75
+  }
+ },
+ "wheel": {
+  "_about": "The chat wheel: lines you send on purpose, heard by you and by party members who run Godslayer. One voice for all of them, not an announcer pack. label is the word on the wheel button.",
+  "voice": "nPczCjzI2devNBz1zQrb",
+  "pitch": 1.0,
+  "speed": 1.0,
+  "hall": "dry",
+  "lines": [
+   [
+    "wheel_1",
+    "points",
+    "Well played!",
+    "Well played"
+   ],
+   [
+    "wheel_2",
+    "aside",
+    "[smug] Easiest honor of my life.",
+    "Easy honor"
+   ],
+   [
+    "wheel_3",
+    "points",
+    "Cruel. Clean. Done.",
+    "Cruel. Clean."
+   ],
+   [
+    "wheel_4",
+    "aside",
+    "[panicking] Oh no. Oh no no no.",
+    "Oh no"
+   ],
+   [
+    "wheel_5",
+    "aside",
+    "[smug, slow] Patience. Patience.",
+    "Patience"
+   ],
+   [
+    "wheel_6",
+    "aside",
+    "[baffled] What just happened?",
+    "What happened"
+   ],
+   [
+    "wheel_7",
+    "points",
+    "Ring the bell! Ring it!",
+    "Ring the bell"
+   ],
+   [
+    "wheel_8",
+    "points",
+    "Look at them run!",
+    "They run"
+   ],
+   [
+    "wheel_9",
+    "points",
+    "Behind you!",
+    "Behind you"
+   ],
+   [
+    "wheel_10",
+    "points",
+    "Focus the healer!",
+    "Kill healer"
+   ],
+   [
+    "wheel_11",
+    "points",
+    "Incoming!",
+    "Incoming"
+   ],
+   [
+    "wheel_12",
+    "points",
+    "Run! Get out!",
+    "Run"
+   ],
+   [
+    "wheel_13",
+    "points",
+    "Group up! On me!",
+    "Group up"
+   ],
+   [
+    "wheel_14",
+    "points",
+    "Help me!",
+    "Help me"
+   ],
+   [
+    "wheel_15",
+    "points",
+    "On my target!",
+    "My target"
+   ],
+   [
+    "wheel_16",
+    "points",
+    "Rogue in stealth! Watch out!",
+    "Stealth rogue"
+   ]
+  ],
+  "delivery": {
+   "points": {
+    "tag": "[energetic] ",
+    "stability": 0.5
+   },
+   "aside": {
+    "tag": "",
+    "stability": 0.5
+   }
   }
  }
 }

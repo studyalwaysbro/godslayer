@@ -2,7 +2,7 @@
 
 Every clip, the take that was kept, and what the transcription heard. `match` is how closely the words
 heard match the script (1.00 is exact). `bite` is how much edge the voice has (higher is fiercer).
-673 clips. Worth a listen: none flagged.
+845 clips. Worth a listen: none flagged.
 
 
 ## Titan (titan)
@@ -120,6 +120,32 @@ heard match the script (1.00 is exact). `bite` is how much edge the voice has (h
 | duel_loss | Defeated. The arena is silent. | Defeated. The arena is silent | 1.00 | 0 | 1 of 1 | 3.7 | -9.0 |  |
 | denied_1 | DENIED! | Denied | 1.00 | 0 | 1 of 1 | 2.0 | -8.0 |  |
 | denied_2 | SILENCED! | Silenced | 1.00 | 0 | 1 of 1 | 2.1 | -5.0 |  |
+| engage_1 | Blood in the water! | Blood in the water | 1.00 | 0 | 1 of 1 | 2.3 | -8.8 |  |
+| engage_2 | Prey in sight! Hunt! | Prey in sight. Hunt | 1.00 | 0 | 1 of 1 | 3.6 | -9.0 |  |
+| engage_3 | To battle! | To battle | 1.00 | 0 | 1 of 1 | 2.0 | -7.9 |  |
+| engage_god_1 | An Olympian! Make it count! | An Olympian. Make it count | 1.00 | 0 | 1 of 1 | 3.7 | -10.6 |  |
+| engage_god_2 | A false god stands before you! Bring it down! | A false god stands before you. Bring it down | 1.00 | 0 | 1 of 1 | 4.6 | -9.4 |  |
+| fin_execute | EXECUTED! | Executed | 1.00 | 0 | 1 of 1 | 2.2 | -6.0 |  |
+| fin_pyro | PYROBLASTED! | Pyro blasted | 0.96 | 0 | 1 of 1 | 2.8 | -6.3 |  |
+| fin_fire | INCINERATED! | Incinerated | 1.00 | 0 | 1 of 1 | 3.0 | -7.8 |  |
+| fin_shatter | SHATTERED! | Shattered | 1.00 | 0 | 1 of 1 | 1.9 | -6.9 |  |
+| fin_arcane | ERASED! | Erased | 1.00 | 0 | 1 of 1 | 2.0 | -8.1 |  |
+| fin_evisc | EVISCERATED! | Eviscerated | 1.00 | 0 | 1 of 1 | 2.8 | -8.0 |  |
+| fin_back | IN THE BACK! | In the back | 1.00 | 0 | 1 of 1 | 2.2 | -8.5 |  |
+| fin_wand | DEATH BY WAND! The shame! | Death by wand. The shame | 1.00 | 0 | 1 of 1 | 4.5 | -9.3 |  |
+| fin_judged | JUDGED! | Judged | 1.00 | 0 | 1 of 1 | 2.5 | -8.3 |  |
+| fin_smite | SMITED! | Smited | 1.00 | 0 | 1 of 1 | 2.1 | -9.7 |  |
+| fin_mind | MIND BLOWN! | Mind blown | 1.00 | 0 | 1 of 1 | 2.4 | -10.4 |  |
+| fin_soul | SOUL TAKEN! | Soul taken | 1.00 | 0 | 1 of 1 | 3.0 | -8.1 |  |
+| fin_thunder | THUNDERSTRUCK! | Thunderstruck | 1.00 | 0 | 1 of 1 | 2.2 | -8.5 |  |
+| fin_shock | SHOCKED! | Shocked | 1.00 | 0 | 1 of 1 | 1.9 | -5.8 |  |
+| fin_sniped | SNIPED! | Sniped | 1.00 | 0 | 1 of 1 | 1.9 | -8.3 |  |
+| fin_moon | MOONSTRUCK! | Moonstruck | 1.00 | 0 | 1 of 1 | 2.3 | -11.8 |  |
+| fin_mauled | MAULED! | Mauled | 1.00 | 0 | 1 of 1 | 2.0 | -11.2 |  |
+| ally_godlike | A Torchman is GODLIKE! | A torch man is godlike | 0.98 | 0 | 1 of 1 | 3.0 | -10.5 |  |
+| ally_rampage | A Torchman is on a RAMPAGE! | A torch man is on a rampage | 0.98 | 0 | 1 of 1 | 3.9 | -8.8 |  |
+| ally_godslayer | A Torchman has become a GODSLAYER! | A torch man has become a god slayer | 0.97 | 0 | 1 of 1 | 4.0 | -10.3 |  |
+| ally_regicide | A Torchman has slain the King! | A torchman has slain the king | 1.00 | 0 | 1 of 1 | 3.5 | -9.6 |  |
 
 ## Herald (herald)
 
@@ -236,6 +262,32 @@ heard match the script (1.00 is exact). `bite` is how much edge the voice has (h
 | duel_loss | Defeated. The arena is silent. | Defeated. The arena is silent | 1.00 | 0 | 1 of 1 | 3.2 | -11.7 |  |
 | denied_1 | DENIED! | Denied | 1.00 | 0 | 1 of 1 | 1.7 | -10.3 |  |
 | denied_2 | SILENCED! | Silenced! | 1.00 | 0 | 1 of 1 | 1.7 | -7.4 |  |
+| engage_1 | Blood in the water! | Blood in the water | 1.00 | 0 | 1 of 1 | 2.3 | -11.2 |  |
+| engage_2 | Prey in sight! Hunt! | Prey in sight. Hunt | 1.00 | 0 | 1 of 1 | 2.4 | -8.9 |  |
+| engage_3 | To battle! | To battle! | 1.00 | 0 | 1 of 1 | 1.6 | -9.0 |  |
+| engage_god_1 | An Olympian! Make it count! | An Olympian. Make it count | 1.00 | 0 | 1 of 1 | 3.0 | -11.1 |  |
+| engage_god_2 | A false god stands before you! Bring it down! | A false god stands before you. Bring it down | 1.00 | 0 | 1 of 1 | 4.0 | -9.9 |  |
+| fin_execute | EXECUTED! | Executed | 1.00 | 0 | 1 of 1 | 2.4 | -7.6 |  |
+| fin_pyro | PYROBLASTED! | Pyro blasted | 0.96 | 0 | 1 of 1 | 2.0 | -10.8 |  |
+| fin_fire | INCINERATED! | Incinerated | 1.00 | 0 | 1 of 1 | 2.1 | -6.7 |  |
+| fin_shatter | SHATTERED! | Shattered | 1.00 | 0 | 1 of 1 | 2.0 | -8.4 |  |
+| fin_arcane | ERASED! | Erased! | 1.00 | 0 | 1 of 1 | 1.6 | -8.7 |  |
+| fin_evisc | EVISCERATED! | Eviscerated! | 1.00 | 0 | 1 of 1 | 2.1 | -8.7 |  |
+| fin_back | IN THE BACK! | In the back | 1.00 | 0 | 1 of 1 | 1.6 | -10.1 |  |
+| fin_wand | DEATH BY WAND! The shame! | Death by wand! The shame | 1.00 | 0 | 1 of 1 | 4.1 | -11.5 |  |
+| fin_judged | JUDGED! | Judged | 1.00 | 1 | 1 of 2 | 1.5 | -6.8 |  |
+| fin_smite | SMITED! | Smited | 1.00 | 0 | 1 of 1 | 1.6 | -8.4 |  |
+| fin_mind | MIND BLOWN! | Mind blown! | 1.00 | 0 | 1 of 1 | 2.6 | -16.0 |  |
+| fin_soul | SOUL TAKEN! | Soul taken | 1.00 | 0 | 1 of 1 | 3.1 | -9.2 |  |
+| fin_thunder | THUNDERSTRUCK! | Thunderstruck | 1.00 | 2 | 1 of 3 | 2.2 | -9.5 |  |
+| fin_shock | SHOCKED! | Shocked | 1.00 | 0 | 1 of 1 | 1.4 | -10.2 |  |
+| fin_sniped | SNIPED! | Sniped! | 1.00 | 2 | 1 of 3 | 2.2 | -6.0 |  |
+| fin_moon | MOONSTRUCK! | Moonstruck | 1.00 | 0 | 1 of 1 | 2.0 | -11.7 |  |
+| fin_mauled | MAULED! | Mauled! | 1.00 | 4 | 1 of 5 | 1.6 | -12.9 |  |
+| ally_godlike | A Torchman is GODLIKE! | A torch man is godlike | 0.98 | 0 | 1 of 1 | 3.0 | -11.1 |  |
+| ally_rampage | A Torchman is on a RAMPAGE! | A torch man is on a rampage | 0.98 | 0 | 1 of 1 | 2.9 | -10.9 |  |
+| ally_godslayer | A Torchman has become a GODSLAYER! | A torch man has become a god slayer | 0.97 | 0 | 1 of 1 | 4.4 | -12.3 |  |
+| ally_regicide | A Torchman has slain the King! | A torch man has slain the king! | 0.98 | 0 | 1 of 1 | 2.6 | -10.2 |  |
 
 ## Valkyrie (valkyrie)
 
@@ -353,6 +405,32 @@ heard match the script (1.00 is exact). `bite` is how much edge the voice has (h
 | duel_loss | You fell with honour. Stand up. | You fell with honor. Stand up | 0.98 | 0 | 1 of 1 | 3.8 | -10.9 |  |
 | denied_1 | DENIED! | Denied | 1.00 | 0 | 1 of 1 | 1.9 | -10.0 |  |
 | denied_2 | Silence! | Silence! | 1.00 | 0 | 1 of 1 | 1.9 | -7.7 |  |
+| engage_1 | Shields up! Spears out! | Shields up, spears out | 1.00 | 0 | 1 of 1 | 3.2 | -9.6 |  |
+| engage_2 | The slain are waiting! Fight! | The slain are waiting. Fight | 1.00 | 0 | 1 of 1 | 3.5 | -9.9 |  |
+| engage_3 | Battle! At last! | Bacle at last | 0.89 | 0 | 1 of 1 | 3.0 | -10.1 |  |
+| engage_god_1 | An Olympian! Give me its name! | An Olympian. Give me its name | 1.00 | 0 | 1 of 1 | 3.4 | -9.6 |  |
+| engage_god_2 | A false god! Valhalla wants it! | A false god. Valhalla wants it | 1.00 | 0 | 1 of 1 | 3.8 | -12.3 |  |
+| fin_execute | EXECUTED! A clean end! | Executed. A clean end | 1.00 | 0 | 1 of 1 | 4.5 | -8.5 |  |
+| fin_pyro | PYROBLASTED! A funeral pyre! | Pyroblasted! A funeral pyre | 1.00 | 0 | 1 of 1 | 3.8 | -12.0 |  |
+| fin_fire | INCINERATED! Burned like a longship! | Incinerated! Burned like a longship | 1.00 | 0 | 1 of 1 | 4.5 | -8.7 |  |
+| fin_shatter | SHATTERED! Like a cheap shield! | Shattered like a cheap shield | 1.00 | 0 | 1 of 1 | 3.7 | -7.3 |  |
+| fin_arcane | ERASED! Not even ash! | Erased. Not even ash | 1.00 | 0 | 1 of 1 | 3.7 | -9.8 |  |
+| fin_evisc | EVISCERATED! | Eviscerated | 1.00 | 0 | 1 of 1 | 2.5 | -6.1 |  |
+| fin_back | IN THE BACK! I saw nothing. | In the back. I saw nothing | 1.00 | 0 | 1 of 1 | 4.2 | -8.9 |  |
+| fin_wand | DEATH BY WAND! I will not sing of this! | Death by wand. I will not sing of this | 1.00 | 0 | 1 of 1 | 4.6 | -11.2 |  |
+| fin_judged | JUDGED! And found wanting! | Judged and found wanting | 1.00 | 0 | 1 of 1 | 3.4 | -10.1 |  |
+| fin_smite | SMITED! The heavens agree! | Smited! The heavens agree | 1.00 | 0 | 1 of 1 | 3.7 | -9.1 |  |
+| fin_mind | MIND BLOWN! | Mind blown | 1.00 | 0 | 1 of 1 | 2.9 | -13.0 |  |
+| fin_soul | SOUL TAKEN! I wanted that one! | Soul taken. I wanted that one | 1.00 | 0 | 1 of 1 | 3.2 | -12.0 |  |
+| fin_thunder | THUNDERSTRUCK! Thor is jealous! | Thunderstruck. Thor is jealous | 1.00 | 0 | 1 of 1 | 4.2 | -10.2 |  |
+| fin_shock | SHOCKED! | Shocked | 1.00 | 0 | 1 of 1 | 2.2 | -10.3 |  |
+| fin_sniped | SNIPED! A true arrow! | Sniped. A true arrow | 1.00 | 0 | 1 of 1 | 3.0 | -9.6 |  |
+| fin_moon | MOONSTRUCK! | Moonstruck | 1.00 | 0 | 1 of 1 | 2.6 | -9.5 |  |
+| fin_mauled | MAULED! By a beast! | Mauled by a beast | 1.00 | 0 | 1 of 1 | 2.9 | -12.3 |  |
+| ally_godlike | A Torchman is GODLIKE! The hall stirs! | A torch man is godlike. The hall stirs | 0.99 | 0 | 1 of 1 | 5.2 | -11.9 |  |
+| ally_rampage | A Torchman is on a RAMPAGE! | A torch man is on a rampage | 0.98 | 0 | 1 of 1 | 3.4 | -10.1 |  |
+| ally_godslayer | A Torchman is a GODSLAYER! Sing it! | A torchman is a god slayer. Sing it | 0.99 | 0 | 1 of 1 | 4.8 | -11.8 |  |
+| ally_regicide | A Torchman has slain the King! Hail! | A torch man has slain the king. Hail | 0.99 | 0 | 1 of 1 | 4.2 | -8.9 |  |
 
 ## Frostbite (frost)
 
@@ -471,6 +549,32 @@ heard match the script (1.00 is exact). `bite` is how much edge the voice has (h
 | duel_loss | Aww. You lost. Rematch! | Aw, you lost? Rematch | 0.97 | 0 | 1 of 1 | 3.7 | -8.7 |  |
 | denied_1 | Denied! No spell for you! | Denied. No spell for you | 1.00 | 0 | 1 of 1 | 2.9 | -8.8 |  |
 | denied_2 | Shh! Not a word! | Shh, not a word | 1.00 | 0 | 1 of 1 | 2.6 | -3.3 |  |
+| engage_1 | Ooh, a fight! Finally! | Ooh, a fight. Finally | 1.00 | 0 | 1 of 1 | 2.7 | -10.7 |  |
+| engage_2 | Somebody wants to play! | Somebody wants to play | 1.00 | 0 | 1 of 1 | 2.3 | -10.2 |  |
+| engage_3 | Let's make some ice cubes! | Let's make some ice cubes | 1.00 | 0 | 1 of 1 | 2.5 | -6.3 |  |
+| engage_god_1 | An Olympian! A fresh one! Get it! | An Olympian, a fresh one. Get it | 1.00 | 0 | 1 of 1 | 3.7 | -8.8 |  |
+| engage_god_2 | Ooh, a god! Let's see if it melts! | Ooh, a god! Let's see if it melts | 1.00 | 0 | 1 of 1 | 3.3 | -11.7 |  |
+| fin_execute | EXECUTED! Clean cut! | Executed. Clean cut | 1.00 | 0 | 1 of 1 | 2.6 | -7.5 |  |
+| fin_pyro | PYROBLASTED! Ew, warm! | Pyroblasted. Ew, warm | 1.00 | 2 | 1 of 3 | 3.7 | -9.7 |  |
+| fin_fire | INCINERATED! Too hot for me! | Incinerated. Too hot for me | 1.00 | 0 | 1 of 1 | 4.4 | -7.8 |  |
+| fin_shatter | SHATTERED! My favourite! | Shattered. My favorite | 0.98 | 0 | 1 of 1 | 3.1 | -6.7 |  |
+| fin_arcane | ERASED! Poof! | Erased poof | 1.00 | 0 | 1 of 1 | 2.3 | -10.8 |  |
+| fin_evisc | EVISCERATED! Ooh, messy! | Eviscerated! Ooh, messy | 1.00 | 0 | 1 of 1 | 3.8 | -8.1 |  |
+| fin_back | IN THE BACK! Sneaky! | In the back. Sneaky | 1.00 | 0 | 1 of 1 | 3.1 | -9.3 |  |
+| fin_wand | DEATH BY WAND! Adorable! | Death by wand. Adorable | 1.00 | 0 | 1 of 1 | 3.5 | -10.7 |  |
+| fin_judged | JUDGED! Guilty! | Judged guilty | 1.00 | 0 | 1 of 1 | 2.5 | -7.3 |  |
+| fin_smite | SMITED! Very holy! | Smited. Very holy | 1.00 | 0 | 1 of 1 | 3.1 | -9.5 |  |
+| fin_mind | MIND BLOWN! Pop! | Mind blown. Pop | 1.00 | 0 | 1 of 1 | 3.9 | -12.3 |  |
+| fin_soul | SOUL TAKEN! Can I keep it? | Soul taken. Can I keep it? | 1.00 | 0 | 1 of 1 | 3.1 | -7.8 |  |
+| fin_thunder | THUNDERSTRUCK! Crackly! | Thunderstruck, crackly | 1.00 | 0 | 1 of 1 | 2.6 | -9.4 |  |
+| fin_shock | SHOCKED! Zap! | Shocked. Zap | 1.00 | 0 | 1 of 1 | 3.2 | -5.5 |  |
+| fin_sniped | SNIPED! Bullseye! | Sniped. Bullseye | 1.00 | 0 | 1 of 1 | 2.9 | -9.2 |  |
+| fin_moon | MOONSTRUCK! So pretty! | Moonstruck! So pretty | 1.00 | 0 | 1 of 1 | 3.4 | -8.2 |  |
+| fin_mauled | MAULED! Bad kitty! | Mold. Bad kitty | 0.87 | 0 | 1 of 1 | 2.4 | -11.0 |  |
+| ally_godlike | A Torchman is GODLIKE! Ooh! | A torch man is godlike. Ooh | 0.98 | 0 | 1 of 1 | 4.4 | -11.5 |  |
+| ally_rampage | A Torchman is on a RAMPAGE! Brr! | A torch man is on a rampage. Brr | 0.98 | 0 | 1 of 1 | 4.6 | -8.7 |  |
+| ally_godslayer | A Torchman is a GODSLAYER! Jealous! | A torch man is a god slayer. Jealous | 0.97 | 0 | 1 of 1 | 4.1 | -7.6 |  |
+| ally_regicide | A Torchman killed the King! Without me! | A torch man killed the king without me | 0.99 | 0 | 1 of 1 | 3.4 | -8.5 |  |
 
 ## The Naturalist (naturalist)
 
@@ -590,6 +694,32 @@ heard match the script (1.00 is exact). `bite` is how much edge the voice has (h
 | duel_loss | The duel is lost. It happens to the best animals. | The duel is lost. It happens to the best animals | 1.00 | 0 | 1 of 1 | 3.8 | -11.3 |  |
 | denied_1 | Denied. The spell dies in the throat. | Denied. The spell dies in the throat | 1.00 | 0 | 1 of 1 | 3.4 | -14.0 |  |
 | denied_2 | Interrupted. How rude. How effective. | Interrupted. How rude. How effective | 1.00 | 0 | 1 of 1 | 4.1 | -13.5 |  |
+| engage_1 | And here, the hunt begins. | And here the hunt begins | 1.00 | 0 | 1 of 1 | 2.4 | -15.2 |  |
+| engage_2 | The predator has spotted its prey. | The predator has spotted its prey | 1.00 | 0 | 1 of 1 | 2.4 | -13.6 |  |
+| engage_3 | Contact. Stay very still. | Contact. Stay very still | 1.00 | 0 | 1 of 1 | 2.9 | -13.2 |  |
+| engage_god_1 | An Olympian. Our patience is rewarded. | An Olympian? Our patience is rewarded | 1.00 | 0 | 1 of 1 | 3.6 | -13.4 |  |
+| engage_god_2 | A false god. The rarest prey of all. | A false god. The rarest prey of all | 1.00 | 0 | 1 of 1 | 3.5 | -15.3 |  |
+| fin_execute | Executed. Swift, and final. | Executed. Swift and final | 1.00 | 0 | 1 of 1 | 2.8 | -11.9 |  |
+| fin_pyro | Pyroblasted. A forest fire, in miniature. | Pyroblasted. A forest fire in miniature | 1.00 | 0 | 1 of 1 | 3.9 | -15.0 |  |
+| fin_fire | Incinerated. Rather thorough. | Incinerated? Rather thorough | 1.00 | 0 | 1 of 1 | 3.0 | -12.6 |  |
+| fin_shatter | Shattered. The cold claims another. | Shattered. The cold claims another | 1.00 | 0 | 1 of 1 | 3.1 | -12.7 |  |
+| fin_arcane | Erased. Science has no explanation. | Erased. Science has no explanation | 1.00 | 0 | 1 of 1 | 3.4 | -15.2 |  |
+| fin_evisc | Eviscerated. We shall not show that. | Eviscerated? We shall not show that | 1.00 | 0 | 1 of 1 | 3.2 | -9.3 |  |
+| fin_back | In the back. Classic ambush behaviour. | In the back. Classic ambush behavior | 0.99 | 0 | 1 of 1 | 3.4 | -13.5 |  |
+| fin_wand | Death by wand. Extraordinarily rare. | Death by wand. Extraordinarily rare | 1.00 | 0 | 1 of 1 | 3.4 | -14.5 |  |
+| fin_judged | Judged. The verdict was swift. | judged. The verdict was swift | 1.00 | 0 | 1 of 1 | 2.9 | -11.9 |  |
+| fin_smite | Smited. From above, naturally. | Smited from above, naturally | 1.00 | 0 | 1 of 1 | 3.0 | -13.6 |  |
+| fin_mind | Mind blown. Quite literally. | Mind blown. Quite literally | 1.00 | 0 | 1 of 1 | 3.0 | -14.9 |  |
+| fin_soul | Soul taken. The crew is uneasy. | Soul taken. The crew is uneasy | 1.00 | 0 | 1 of 1 | 3.2 | -14.1 |  |
+| fin_thunder | Thunderstruck. Weather, as a weapon. | Thunderstruck: Weather as a Weapon | 1.00 | 0 | 1 of 1 | 3.3 | -13.5 |  |
+| fin_shock | Shocked. The current runs both ways. | Shocked. The current runs both ways | 1.00 | 0 | 1 of 1 | 3.1 | -12.7 |  |
+| fin_sniped | Sniped. It never heard the shot. | Sniped. It never heard the shot | 1.00 | 0 | 1 of 1 | 2.7 | -12.6 |  |
+| fin_moon | Moonstruck. Nocturnal, and lethal. | Moonstruck, nocturnal, and lethal | 1.00 | 0 | 1 of 1 | 3.6 | -12.6 |  |
+| fin_mauled | Mauled. Nature is not kind. | Mauled. Nature is not kind | 1.00 | 0 | 1 of 1 | 3.3 | -14.8 |  |
+| ally_godlike | Elsewhere, a Torchman has become godlike. | Elsewhere, a torch man has become godlike | 0.99 | 0 | 1 of 1 | 3.2 | -13.6 |  |
+| ally_rampage | Elsewhere, a Torchman is on a rampage. | Elsewhere, a torch man is on a rampage | 0.99 | 0 | 1 of 1 | 3.0 | -12.2 |  |
+| ally_godslayer | Elsewhere, a Torchman has become a godslayer. | Elsewhere, a torch man has become a god slayer | 0.98 | 0 | 1 of 1 | 3.6 | -11.4 |  |
+| ally_regicide | Elsewhere, a Torchman has slain the King. | Elsewhere, a torchman has slain the king | 1.00 | 0 | 1 of 1 | 3.0 | -13.0 |  |
 
 ## Sable (sable)
 
@@ -707,3 +837,50 @@ heard match the script (1.00 is exact). `bite` is how much edge the voice has (h
 | duel_loss | You lost the duel. We don't have to tell anyone. | You lost the duel. We don't have to tell anyone | 1.00 | 0 | 1 of 1 | 3.6 | -11.7 |  |
 | denied_1 | Denied! Sit down! | Denied. Sit down | 1.00 | 0 | 1 of 1 | 2.2 | -6.2 |  |
 | denied_2 | Nope! Not today! | Nope, not today | 1.00 | 0 | 1 of 1 | 2.1 | -6.6 |  |
+| engage_1 | Ooh, a fight! I'm watching! | Ooh, a fight. I'm watching | 1.00 | 0 | 1 of 1 | 2.7 | -9.4 |  |
+| engage_2 | Okay, someone's brave. | Okay, someone's brave | 1.00 | 0 | 1 of 1 | 2.5 | -8.6 |  |
+| engage_3 | Fight! Finally, content! | Fight. Finally, content | 1.00 | 0 | 1 of 1 | 2.8 | -9.3 |  |
+| engage_god_1 | An Olympian! Don't choke! | An Olympian. Don't choke | 1.00 | 0 | 1 of 1 | 2.8 | -9.8 |  |
+| engage_god_2 | A god? Okay, make it count! | A god? Okay, make it count | 1.00 | 0 | 1 of 1 | 3.2 | -7.6 |  |
+| fin_execute | EXECUTED! Rude! | Executed. Rude | 1.00 | 0 | 1 of 1 | 2.7 | -5.3 |  |
+| fin_pyro | PYROBLASTED! Crispy! | Pyro blasted. Crispy | 0.97 | 0 | 1 of 1 | 2.6 | -7.5 |  |
+| fin_fire | INCINERATED! Toasty! | Incinerated. Toasty | 1.00 | 0 | 1 of 1 | 2.6 | -6.8 |  |
+| fin_shatter | SHATTERED! Into tiny pieces! | Shattered into tiny pieces | 1.00 | 0 | 1 of 1 | 3.1 | -6.7 |  |
+| fin_arcane | ERASED! Deleted! | Erased. Deleted. | 1.00 | 0 | 1 of 1 | 2.6 | -7.7 |  |
+| fin_evisc | EVISCERATED! Yikes! | Eviscerated yikes | 1.00 | 0 | 1 of 1 | 3.2 | -6.4 |  |
+| fin_back | IN THE BACK! Coward. Love it. | In the back. Coward. Love it | 1.00 | 0 | 1 of 1 | 3.6 | -8.8 |  |
+| fin_wand | DEATH BY WAND! I'm screaming! | Death by wand. I'm screaming | 1.00 | 0 | 1 of 1 | 3.3 | -6.6 |  |
+| fin_judged | JUDGED! Harshly! | Judged harshly | 1.00 | 0 | 1 of 1 | 2.1 | -7.9 |  |
+| fin_smite | SMITED! Blessed! | Smited. Blessed | 1.00 | 0 | 1 of 1 | 2.7 | -8.9 |  |
+| fin_mind | MIND BLOWN! Mine too! | Mind blown. Mine too | 1.00 | 0 | 1 of 1 | 3.1 | -11.7 |  |
+| fin_soul | SOUL TAKEN! Ew! | Soul taken. Ew | 1.00 | 0 | 1 of 1 | 2.8 | -10.3 |  |
+| fin_thunder | THUNDERSTRUCK! Loud! | Thunderstruck. Loud | 1.00 | 0 | 1 of 1 | 2.6 | -8.2 |  |
+| fin_shock | SHOCKED! Same! | Shocked? Same | 1.00 | 0 | 1 of 1 | 2.2 | -7.8 |  |
+| fin_sniped | SNIPED! From where? | Sniped? From where? | 1.00 | 0 | 1 of 1 | 2.2 | -7.5 |  |
+| fin_moon | MOONSTRUCK! Witchy! | Moonstruck, witchy | 1.00 | 0 | 1 of 1 | 2.6 | -7.7 |  |
+| fin_mauled | MAULED! By a kitty! | Mauled by a kitty | 1.00 | 0 | 1 of 1 | 2.3 | -8.9 |  |
+| ally_godlike | A Torchman is GODLIKE! Not you, though. | A torch man is godlike. Not you though | 0.99 | 0 | 1 of 1 | 4.3 | -9.2 |  |
+| ally_rampage | A Torchman is on a RAMPAGE! | A torch man is on a rampage | 0.98 | 0 | 1 of 1 | 3.2 | -8.2 |  |
+| ally_godslayer | A Torchman is a GODSLAYER! Show off! | A torch man is a god slayer. Show off | 0.97 | 0 | 1 of 1 | 3.8 | -8.3 |  |
+| ally_regicide | A Torchman killed the King! Clip it! | A torch man killed the king. Clip it | 0.99 | 0 | 1 of 1 | 2.8 | -7.6 |  |
+
+## Chat wheel (wheel)
+
+| clip | says | heard | match | take | good takes | seconds | bite | check |
+|---|---|---|---|---|---|---|---|---|
+| wheel_1 | Well played! | Well played | 1.00 | 0 | 1 of 1 | 1.6 | -12.3 |  |
+| wheel_2 | Easiest honor of my life. | Easiest honor of my life | 1.00 | 0 | 1 of 1 | 2.1 | -10.2 |  |
+| wheel_3 | Cruel. Clean. Done. | Cruel. Clean. Done | 1.00 | 0 | 1 of 1 | 2.8 | -11.5 |  |
+| wheel_4 | Oh no. Oh no no no. | Oh no. Oh no, no, no | 1.00 | 0 | 1 of 1 | 2.9 | -14.6 |  |
+| wheel_5 | Patience. Patience. | Patience, patience | 1.00 | 0 | 1 of 1 | 2.6 | -8.2 |  |
+| wheel_6 | What just happened? | What just happened? | 1.00 | 0 | 1 of 1 | 2.3 | -9.9 |  |
+| wheel_7 | Ring the bell! Ring it! | Ring the bell. Ring it | 1.00 | 0 | 1 of 1 | 2.5 | -8.4 |  |
+| wheel_8 | Look at them run! | Look at them run | 1.00 | 0 | 1 of 1 | 1.7 | -12.2 |  |
+| wheel_9 | Behind you! | Behind you! | 1.00 | 0 | 1 of 1 | 1.5 | -8.1 |  |
+| wheel_10 | Focus the healer! | Focus the Healer | 1.00 | 0 | 1 of 1 | 1.8 | -7.0 |  |
+| wheel_11 | Incoming! | Incoming! | 1.00 | 0 | 1 of 1 | 1.7 | -10.8 |  |
+| wheel_12 | Run! Get out! | Run! Get out! | 1.00 | 0 | 1 of 1 | 2.0 | -8.8 |  |
+| wheel_13 | Group up! On me! | Group up on me | 1.00 | 0 | 1 of 1 | 2.2 | -10.9 |  |
+| wheel_14 | Help me! | Help me | 1.00 | 0 | 1 of 1 | 2.1 | -6.9 |  |
+| wheel_15 | On my target! | On my target | 1.00 | 0 | 1 of 1 | 1.7 | -12.8 |  |
+| wheel_16 | Rogue in stealth! Watch out! | Rogue and stealth, watch out | 0.94 | 0 | 1 of 1 | 2.5 | -9.5 |  |

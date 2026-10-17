@@ -3,3 +3,4 @@ logs/
 tools/.voice_cache/
 __pycache__/
 backups/
+.grok/

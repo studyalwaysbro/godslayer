@@ -52,6 +52,16 @@ function Screenshot() M.shots = M.shots + 1 end
 function UnitHealth(t) if M.secretHealth then return M.secret() end return t == "player" and (M.myHealth or 100) or 100 end
 function UnitHealthMax(t) return 100 end
 function GetNumGroupMembers() return M.groupSize or 0 end
+function IsInRaid() return (M.groupSize or 0) > 5 end
+-- combat: M.inCombat for you, u.combat for anyone else (true, false, or "secret")
+function UnitAffectingCombat(t)
+  if t == "player" then return M.inCombat == true end
+  local u = M.units[t]
+  if not u then return false end
+  if u.combat == "secret" then return M.secret() end
+  return u.combat == true
+end
+function InCombatLockdown() return M.inCombat == true end
 function UnitIsUnit(a, b) if M.secretTargets then return M.secret() end local x, y = M.units[a], M.units[b] if b == "player" then return x ~= nil and x.isMe == true end return x ~= nil and x == y end
 C_Spell = { GetSpellName = function(id) return M.spells and M.spells[id] end }
 function UIFrameFadeOut(frame, seconds, from, to) frame.__fading = true end
@@ -140,6 +150,7 @@ local frameMT = {}
 frameMT.__index = function(self, key)
   local known = {
     RegisterEvent = function(f, e) f.__events[e] = true end,
+    RegisterUnitEvent = function(f, e) f.__events[e] = true end,
     UnregisterEvent = function(f, e) f.__events[e] = nil end,
     SetScript = function(f, name, fn) f.__scripts[name] = fn end,
     GetScript = function(f, name) return f.__scripts[name] end,

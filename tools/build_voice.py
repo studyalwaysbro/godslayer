@@ -276,6 +276,9 @@ def finish(raw, dst, loudness, quality=4, fade_in=0.01, fade_out=0.25, trim=True
 
 
 def script_for(script, pack):
+    if pack.get("own_lines"):
+        # the chat wheel: its own lines, no titles
+        return [list(entry[:3]) for entry in pack["own_lines"]]
     lines = [list(entry) for entry in script["scripts"][pack["script"]]]
     at = next((i for i, entry in enumerate(lines) if entry[0] == "new_title"), len(lines) - 1) + 1
     lines[at:at] = [["title_%d" % (i + 2), "title", name + "."] for i, name in enumerate(script["titles"])]
@@ -298,8 +301,14 @@ def main():
     state_file = os.path.join(CACHE, "built.json")
     built = json.load(open(state_file)) if os.path.exists(state_file) else {}
     lengths, report, work = {}, {}, []
+    # the chat wheel is built like an announcer, into its own folder, and is never one of them
+    builds = dict(script["packs"])
+    if script.get("wheel"):
+        wheel = dict(script["wheel"])
+        wheel.update(own_lines=wheel["lines"], label="Chat wheel", about="the chat wheel")
+        builds["wheel"] = wheel
 
-    for pack_id, pack in script["packs"].items():
+    for pack_id, pack in builds.items():
         pack["id"] = pack_id
         pack["lines"] = script_for(script, pack)
         lengths[pack_id], report[pack_id] = {}, {}
@@ -411,7 +420,17 @@ def main():
             if clip in lengths[pack_id]:
                 lines.append("    %s = %s," % (clip, lua_string(spoken(text))))
         lines.append("  } },")
-    lines += ["}", "", "-- sounds under the voice, and the hunt theme for anyone without a song of their own",
+    lines.append("}")
+    if "wheel" in builds:
+        wheel = builds["wheel"]
+        lines += ["", "-- the chat wheel: each line's length, its words, and the word on its button", "ns.WHEEL = { clips = {"]
+        lines += ["  %s = %.2f," % (clip, lengths["wheel"][clip]) for clip, _, _ in wheel["lines"] if clip in lengths["wheel"]]
+        lines.append("}, text = {")
+        lines += ["  %s = %s," % (clip, lua_string(spoken(text))) for clip, _, text in wheel["lines"] if clip in lengths["wheel"]]
+        lines.append("}, label = {")
+        lines += ["  %s = %s," % (entry[0], lua_string(entry[3] if len(entry) > 3 else spoken(entry[2]))) for entry in wheel["own_lines"] if entry[0] in lengths["wheel"]]
+        lines.append("} }")
+    lines += ["", "-- sounds under the voice, and the hunt theme for anyone without a song of their own",
               "ns.SFX = { %s }" % ", ".join("%s = %.2f" % item for item in sorted(sfx.items())),
               "ns.MUSIC = { %s }" % ", ".join("%s = %.2f" % item for item in sorted(music.items())), ""]
     with open(os.path.join(ROOT, "Godslayer", "Voice.lua"), "w") as f:
@@ -422,7 +441,7 @@ def main():
     out = ["# Announcer build report", "",
            "Every clip, the take that was kept, and what the transcription heard. `match` is how closely the words",
            "heard match the script (1.00 is exact). `bite` is how much edge the voice has (higher is fiercer).", ""]
-    for pack_id, pack in script["packs"].items():
+    for pack_id, pack in builds.items():
         out += ["## %s (%s)" % (pack["label"], pack_id), "", "| clip | says | heard | match | take | good takes | seconds | bite | check |", "|---|---|---|---|---|---|---|---|---|"]
         for clip, kind, text in pack["lines"]:
             e = report[pack_id].get(clip)
@@ -443,7 +462,7 @@ def main():
             "button:hover{border-color:#ffd100}small{color:#8d8a99}.flag{border-color:#ff7c0a}p{color:#b9b6c6}</style>",
             "<h1>Godslayer announcers</h1><p>Click a line to hear it. Orange border: the build flagged it for a listen. Open this file from the tools folder so it can find the sounds.</p>",
             "<script>let a;function p(f){if(a)a.pause();a=new Audio('../Godslayer/Sounds/'+f+'.ogg');a.play()}</script>"]
-    for pack_id, pack in script["packs"].items():
+    for pack_id, pack in builds.items():
         page.append("<h2>%s</h2><p>%s</p>" % (html.escape(pack["label"]), html.escape(pack["about"])))
         for clip, kind, text in pack["lines"]:
             if clip in lengths[pack_id]:
