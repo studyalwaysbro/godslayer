@@ -41,6 +41,7 @@ local SIGNATURES = {
   -- paladin
   ["Divine Shield"] = "bubble", ["Divine Protection"] = "bubble", ["Hammer of Justice"] = "bonk", ["Lay on Hands"] = "angel",
   ["Blessing of Protection"] = "shield", ["Blessing of Freedom"] = "freedom", ["Avenging Wrath"] = "wings", Repentance = "repent",
+  ["Templar's Bulwark"] = "wall", ["Swift Judgement"] = "reset",
   -- warrior
   Charge = "charge", Intercept = "charge", Recklessness = "roar", ["Death Wish"] = "roar", ["Shield Wall"] = "wall",
   ["Last Stand"] = "wall", ["Intimidating Shout"] = "shout", Shockwave = "quake",
@@ -53,14 +54,15 @@ local SIGNATURES = {
   -- priest
   ["Psychic Scream"] = "scream", ["Power Word: Shield"] = "shield", ["Mind Control"] = "mc", Shadowform = "shadow", Silence = "hush",
   Dispersion = "shadow", ["Power Infusion"] = "surge", ["Pain Suppression"] = "shield",
+  ["Confounding Flash"] = "blind", ["Contingency Plan"] = "shield", ["Divine Grace"] = "angel",
   -- warlock
   Fear = "fear", ["Death Coil"] = "coil", ["Howl of Terror"] = "howl", ["Chaos Bolt"] = "chaos", Metamorphosis = "meta",
   -- shaman
   ["Chain Lightning"] = "chain", ["Lava Burst"] = "lava", ["Ghost Wolf"] = "wolf", ["Grounding Totem"] = "ground",
-  ["Nature's Swiftness"] = "swift", ["Elemental Mastery"] = "surge",
+  ["Nature's Swiftness"] = "swift", ["Elemental Mastery"] = "surge", ["Rage of the Farseer"] = "roar", ["Water Shield"] = "shield",
   -- druid
   ["Bear Form"] = "bear", ["Dire Bear Form"] = "bear", ["Cat Form"] = "cat", ["Moonkin Form"] = "owl", Innervate = "innervate",
-  ["Entangling Roots"] = "roots", Barkskin = "bark", Starfall = "starfall", Berserk = "roar",
+  ["Entangling Roots"] = "roots", Barkskin = "bark", Starfall = "starfall", Berserk = "roar", ["Feral Charge"] = "charge",
   -- racials
   ["War Stomp"] = "stomp", ["Will of the Forsaken"] = "forsaken", Shadowmeld = "vanish", Stoneform = "wall",
 }
@@ -73,6 +75,7 @@ local OFTEN = {
   ["Moonkin Form"] = true, ["Ghost Wolf"] = true, Charge = true, Intercept = true, Blink = true, ["Frost Nova"] = true,
   ["Hammer of Justice"] = true, ["Kidney Shot"] = true, ["Cheap Shot"] = true, Sap = true, Blind = true, Silence = true,
   ["Ice Barrier"] = true, -- a mage reapplies the shield all fight
+  ["Water Shield"] = true, -- so does a shaman
 }
 
 -- spell -> the kind of death it deals, and the words for it on the banner
@@ -87,6 +90,9 @@ local FINISHERS = {
   ["Arcane Blast"] = "arcane", ["Arcane Wrath"] = "arcane",
   Eviscerate = "evisc", Backstab = "back", Ambush = "back", Mutilate = "back", Shoot = "wand",
   ["Hammer of Wrath"] = "judged", Judgement = "judged", Exorcism = "judged", ["Divine Storm"] = "judged", ["Hammer of the Righteous"] = "judged",
+  -- Forever's new strikes for the other classes; Holy Strike is every paladin's from level 6
+  ["Holy Strike"] = "judged", ["Victory Rush"] = "execute", ["Sniper Shot"] = "sniped", Lacerate = "mauled",
+  ["Primal Bite"] = "mauled", ["Fire Nova"] = "fire", Incinerate = "fire", Wrack = "soul", Chastise = "smite",
   Smite = "smite", ["Holy Fire"] = "smite", ["Holy Shock"] = "smite", ["Holy Nova"] = "smite", Penance = "smite",
   ["Mind Blast"] = "mind", ["Shadow Word: Death"] = "mind", ["Mind Flay"] = "mind",
   Shadowburn = "soul", ["Death Coil"] = "soul", ["Chaos Bolt"] = "soul", ["Shadow Bolt"] = "soul", ["Soul Fire"] = "soul", Conflagrate = "soul",
@@ -136,6 +142,13 @@ local SPELL_IDS = {
   -- the Forever mage kit, ids read from the client's own spell data on 2026-10-27
   ["Frost Blast"] = 1326053, ["Arcane Blast"] = 400574, ["Arcane Wrath"] = 1326079, ["Frostfire Bolt"] = 401502,
   ["Ice Barrier"] = 11426, Scorch = 2948, Flamestrike = 2120, Blizzard = 10, Evocation = 12051, Cannibalize = 20577,
+  -- Forever's additions to the other eight classes, ids read the same way on 2026-10-30.
+  -- Holy Strike is an ancient low id the client reuses, not a typo.
+  ["Victory Rush"] = 402927, ["Holy Strike"] = 679, ["Templar's Bulwark"] = 1311015, ["Swift Judgement"] = 1310994,
+  Chastise = 1277331, ["Confounding Flash"] = 1277455, ["Contingency Plan"] = 1277462, ["Divine Grace"] = 1277370,
+  ["Dark Sacrifice"] = 1277324, ["Sniper Shot"] = 1310687, Lacerate = 24118, ["Fire Nova"] = 408341,
+  ["Rage of the Farseer"] = 425336, ["Water Shield"] = 408510, Incinerate = 412758, Wrack = 1316697,
+  ["Primal Bite"] = 407995, ["Feral Charge"] = 1238122,
 }
 Fight.SPELL_IDS = SPELL_IDS
 local alias = {}

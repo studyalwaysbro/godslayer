@@ -734,6 +734,30 @@ end
 check(F.SIGNATURES["Will of the Forsaken"], "Will of the Forsaken keeps its sound")
 check(F.SPELL_IDS["Cannibalize"], "Cannibalize is nameable")
 
+-- The Forever kits of the other eight classes, so a guildmate on any class is heard too.
+-- Ids read from the client's own spell data (build 1.60.1.70685+) on 2026-10-30, verified by
+-- skill line and against the talent export, never by name alone.
+local FOREVER_CLASSES = {
+  ["Victory Rush"] = 402927, ["Holy Strike"] = 679, ["Templar's Bulwark"] = 1311015,
+  ["Swift Judgement"] = 1310994, Chastise = 1277331, ["Confounding Flash"] = 1277455,
+  ["Contingency Plan"] = 1277462, ["Divine Grace"] = 1277370, ["Dark Sacrifice"] = 1277324,
+  ["Sniper Shot"] = 1310687, Lacerate = 24118, ["Fire Nova"] = 408341,
+  ["Rage of the Farseer"] = 425336, ["Water Shield"] = 408510, Incinerate = 412758,
+  Wrack = 1316697, ["Primal Bite"] = 407995, ["Feral Charge"] = 1238122,
+}
+for spell, id in pairs(FOREVER_CLASSES) do
+  check(F.SPELL_IDS[spell] == id, spell .. " is known by the id the client uses (" .. tostring(F.SPELL_IDS[spell]) .. " should be " .. id .. ")")
+end
+for _, spell in ipairs({ "Victory Rush", "Holy Strike", "Chastise", "Sniper Shot", "Lacerate",
+                         "Fire Nova", "Incinerate", "Wrack", "Primal Bite" }) do
+  check(F.FINISHERS[spell], spell .. " ends a fight with words of its own")
+end
+for _, spell in ipairs({ "Templar's Bulwark", "Swift Judgement", "Confounding Flash", "Contingency Plan",
+                         "Divine Grace", "Rage of the Farseer", "Water Shield", "Feral Charge" }) do
+  check(F.SIGNATURES[spell], spell .. " has a sound when it goes off")
+end
+check(F.SPELL_IDS["Dark Sacrifice"], "Dark Sacrifice is nameable")
+
 math.random = realRandom
 M.realPrint(("%d passed, %d failed"):format(passed, failed))
 if failed > 0 then os.exit(1) end
