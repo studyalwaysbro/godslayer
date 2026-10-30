@@ -147,3 +147,70 @@ ns.PHRASES_ZERO = {
   "Godslayer installed, counter at 0. Olympus, I am inside your layer.",
   "No Olympus kills yet. Consider this a formal decree of intent.",
 }
+
+-- ---------------------------------------------------------------------------
+-- When Olympus is not on your realm
+-- ---------------------------------------------------------------------------
+-- Olympus is Asmongold's guild and it is Alliance, PvP ruleset. Horde Olympus guilds exist and
+-- run the same addon, but none of that is guaranteed to land on the realm we actually get on
+-- 11-04. Before this, Classify returned nil for every guild that was not Olympus, which means a
+-- realm without them left the addon inert: nothing scored, no title ever moved, no leaderboard.
+--
+-- So the hunt now has three widening rings, and the addon finds its own target if it has to:
+--
+--   original / network   Olympus, unchanged, 5 and 1 points
+--   rival                one guild you nominate, or the addon nominates for you
+--   any                  every other player kill: no points, but tracked, voiced and dossiered
+--
+-- The third ring is what keeps the addon alive on day one whatever realm we land on, and it is
+-- what the race and ability callouts below hang off. Points stay rationed on purpose: a kill on
+-- a random Alliance rogue should feel good and count for nothing.
+
+ns.RIVAL_POINTS = 3
+ns.ANY_POINTS = 0
+
+-- How the addon nominates a rival when it has seen no Olympus guild for a while. It picks the
+-- guild with the most blood between you, counting their kills on you double, because the guild
+-- that keeps killing you is the one you actually have a problem with.
+ns.RIVAL = {
+  quietSessions = 3,        -- sessions with no Olympus sighting before it starts looking
+  minEncounters = 8,        -- total kills either way before a guild can be nominated
+  theirKillWeight = 2,      -- a death to them counts double towards picking them
+  reviewAfter = 200,        -- encounters after which it re-checks whether a better rival exists
+}
+
+-- ---------------------------------------------------------------------------
+-- Races: the gnome problem
+-- ---------------------------------------------------------------------------
+-- GetPlayerInfoByGUID carries no secrecy annotation in the Forever API, unlike UnitRace and
+-- UnitClass which go secret when unit identity is restricted. So the victim's race is readable
+-- from the GUID alone, in the open world and in instances both. That is what makes this work.
+--
+-- Gnomes get their own counter, their own titles and their own voice. They are the smallest
+-- target in the game, they are almost always engineers, and something about killing one is
+-- funnier than it has any right to be.
+
+ns.RACE_TOKENS = { Human = true, Dwarf = true, Gnome = true, NightElf = true, Draenei = true,
+                   Orc = true, Scourge = true, Tauren = true, Troll = true, BloodElf = true,
+                   Goblin = true, Worgen = true, Pandaren = true }
+
+-- Kills on gnomes specifically. The joke escalates; the addon never explains it.
+ns.GNOME_RANKS = {
+  { 1, "Gnome Starter Kit" },
+  { 3, "Tinker Tamperer" },
+  { 7, "Machine Elf Whisperer" },
+  { 15, "Workshop Accident" },
+  { 25, "Small Hands, Big Problem" },
+  { 40, "Gnomeregan Second Draft" },
+  { 60, "Why Are They Always Engineers" },
+  { 100, "Local Myth Among The Short" },
+  { 150, "They Tell Stories About You In Tinkertown" },
+}
+
+-- The line a kill picks is keyed race-first, then class, then the spell that did it, and the
+-- announcer falls back outward until it finds something it has a clip for. Nothing here is
+-- required: a missing key is simply a quieter kill.
+ns.RACE_LINES = {
+  Gnome = "gnome", Dwarf = "dwarf", Human = "human", NightElf = "nightelf", Draenei = "draenei",
+  Worgen = "worgen", Pandaren = "pandaren",
+}

@@ -387,6 +387,14 @@ local function speak(lines)
 end
 
 function Hype.Speaking() return #queue > 0 or GetTime() < busyUntil end
+
+-- One line asked for by another part of the addon. A pack with no such clip stays silent,
+-- which is what lets a new call ship with its banner before its voice is built.
+function Hype.Say(clip, weight)
+  if type(clip) ~= "string" then return false end
+  speak({ { clip, tonumber(weight) or 2 } })
+  return true
+end
 function Hype.Queued()
   local names = {}
   for i, line in ipairs(queue) do names[i] = line[1] end

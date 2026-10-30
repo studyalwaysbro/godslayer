@@ -39,7 +39,7 @@ def main():
     matches = [v for v in get("/game/versions") if str(v.get("apiVersion", "")).strip() == interface]
     if not matches:
         sys.exit("CurseForge lists no game version for Interface %s." % interface)
-    meta = {"changelog": open(notes).read(), "changelogType": "markdown", "displayName": "Godslayer " + version,
+    meta = {"changelog": open(notes).read(), "changelogType": "markdown", "displayName": os.path.splitext(os.path.basename(toc))[0] + " " + version,
             "gameVersions": [v["id"] for v in matches], "releaseType": "release"}
     print("project %s, %s, game version %s" % (project, meta["displayName"], ", ".join(v["name"] for v in matches)))
     if "--dry" in sys.argv:

@@ -14,7 +14,7 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "2.2.0"
+ns.VERSION = "2.4.0"
 
 local DEDUPE_SECONDS = 10        -- the signals above can all describe the same death
 local MATCH_WINDOW = 8           -- honorable-kill credit and a seen death must be this close
@@ -141,7 +141,12 @@ function ns.Classify(guild)
 end
 
 function ns.PointsFor(tier)
-  return tier == "original" and ns.ORIGINAL_POINTS or ns.NETWORK_POINTS
+  if tier == "original" then return ns.ORIGINAL_POINTS end
+  if tier == "rival" then return ns.RIVAL_POINTS or 3 end
+  -- The open ring is deliberately worth nothing: a random Alliance rogue should feel good to
+  -- kill and move no number. It is tracked and voiced, not scored.
+  if tier == "any" then return ns.ANY_POINTS or 0 end
+  return ns.NETWORK_POINTS
 end
 
 -- Title for a point total: name, index, and the points the next title needs (nil at the top).
@@ -637,8 +642,9 @@ local function RegisterKill(id, name, kb, source, calledAs)
   end
 
   if guild then
-    local tier = ns.Classify(guild)
+    local tier = ns.ClassifyWide and ns.ClassifyWide(guild) or ns.Classify(guild)
     if tier then Score(id, name, guild, tier, rec, class) end
+    if ns.Rival then ns.Rival.NoteKill(id, guild, tier) end
     if source ~= "HK" and #credits > 0 then matchCredits() end
     return
   end
@@ -916,6 +922,19 @@ end
 
 function handlers.PLAYER_DEAD()
   if ns.Hype then hype("Died") end
+  -- Who killed you is not knowable: the combat log is closed to addons and an enemy's casts are
+  -- secret. So this is a heuristic and nothing more. If you died with a hostile player targeted
+  -- and we already know their guild, that guild is credited with the death, because it is almost
+  -- always the one you were fighting. When we cannot tell, nothing is recorded rather than a guess.
+  if ns.Rival then
+    local id = plain(try(UnitGUID, "target"))
+    if type(id) == "string" and id:sub(1, 7) == "Player-"
+       and plain(try(UnitIsPlayer, "target")) == true
+       and plain(try(UnitCanAttack, "player", "target")) == true then
+      local guild = select(1, lookup(id))
+      if guild then ns.Rival.NoteDeath(guild) end
+    end
+  end
   ns.session.runs, ns.session.life = {}, ns.session.life + 1
   if ns.session.streak > 0 then
     ns.session.streak = 0
@@ -933,6 +952,7 @@ function handlers.NAME_PLATE_UNIT_ADDED(unit)
 end
 
 function handlers.PLAYER_LOGIN()
+  if ns.Rival then ns.Rival.OnLogin() end
   initChar()
   buildHonorPatterns()
   pruneKnown()
@@ -946,17 +966,45 @@ function handlers.PLAYER_LOGIN()
   if ns.Hype then hype("Login") end
   if ns.Comm then ns.Comm.Init() end
   if ns.Fight then ns.Fight.Init() end
+  if ns.Aura then ns.Aura.Init() end
+  if ns.Ledger then ns.Ledger.Init() end
   if ns.UI then ns.UI.Init() end
 end
 
 local frame = CreateFrame("Frame")
 ns.frame = frame
 
+-- The order parts hear an event in. The fight first, so a fight starting is called before the
+-- spotter can call the same player; auras next, so a bubble is known about before anything wants
+-- to talk over it; the announcer last.
+--
+-- Built with a counter and never written as a literal with holes in it. A module that is absent
+-- leaves a nil in the middle, and both # and ipairs are undefined on a table with a gap: the
+-- first version of this counted the list with # and silently stopped dispatching at the gap,
+-- which cost ten assertions in tests/run.lua before anyone looked.
+local dispatch, dispatchMark
+local function dispatchTables()
+  local mark = (ns.Fight and 1 or 0) + (ns.Aura and 2 or 0) + (ns.Comm and 4 or 0) + (ns.Hype and 8 or 0)
+             + (ns.Ledger and 16 or 0)
+  if dispatch and dispatchMark == mark then return dispatch end
+  local parts = {}
+  local function add(t) if type(t) == "table" then parts[#parts + 1] = t end end
+  add(ns.Fight and ns.Fight.handlers)
+  add(ns.Aura and ns.Aura.handlers)
+  add(ns.Ledger and ns.Ledger.handlers)
+  add(handlers)
+  add(ns.Comm and ns.Comm.handlers)
+  add(ns.Hype and ns.Hype.handlers)
+  dispatch, dispatchMark = parts, mark
+  return parts
+end
+ns.DispatchTables = dispatchTables
+
 -- every part that listens for an event hears it; one failing does not keep it from the rest
 local function safeCall(event, ...)
   -- the fight first: a fight starting is called before the spotter can call the same player
-  local tables = { ns.Fight and ns.Fight.handlers, handlers, ns.Comm and ns.Comm.handlers, ns.Hype and ns.Hype.handlers }
-  for i = 1, 4 do
+  local tables = dispatchTables()
+  for i = 1, #tables do
     local h = tables[i] and tables[i][event]
     if h then
       local ok, err = pcall(h, ...)
@@ -998,6 +1046,10 @@ for _, event in ipairs({
 end
 -- hits on you only: the same event for everyone else in view would be most of what the frame hears
 if not (frame.RegisterUnitEvent and pcall(frame.RegisterUnitEvent, frame, "UNIT_COMBAT", "player")) then pcall(frame.RegisterEvent, frame, "UNIT_COMBAT") end
+-- Auras on you and on what you are fighting. RegisterUnitEvent takes two units, and those two
+-- are the ones every call is about; focus and nameplates are read on demand instead, because
+-- the unfiltered event in a battleground is thousands of fires an hour for nothing.
+if not (frame.RegisterUnitEvent and pcall(frame.RegisterUnitEvent, frame, "UNIT_AURA", "player", "target")) then pcall(frame.RegisterEvent, frame, "UNIT_AURA") end
 
 -- ---------------------------------------------------------------------------
 -- Maintenance used by the slash commands

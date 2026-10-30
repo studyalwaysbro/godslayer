@@ -26,7 +26,9 @@ local lastShare = -SHARE_GAP
 local function classColored(name, class)
   local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
   if c and c.r then
-    return ("|cff%02x%02x%02x%s|r"):format(c.r * 255, c.g * 255, c.b * 255, name)
+    -- floored on purpose: the game's Lua 5.1 coerces a float for %02x and any newer Lua
+    -- refuses it outright, which is what kept the test suite from running anywhere else
+    return ("|cff%02x%02x%02x%s|r"):format(math.floor(c.r * 255), math.floor(c.g * 255), math.floor(c.b * 255), name)
   end
   return name
 end
@@ -905,6 +907,16 @@ local function onUnitTooltip(tt)
   local _, unit = tt:GetUnit()
   unit = plain(unit)
   if type(unit) ~= "string" then return end
+
+  -- What they have left, for anyone you could attack. This sits above the Olympus gate on
+  -- purpose: the cooldown you want to know about belongs to whoever is in front of you, and
+  -- most of them will never be in an Olympus guild.
+  if ns.Ledger and plain(try(UnitIsPlayer, unit)) and plain(try(UnitCanAttack, "player", unit)) then
+    local guid = plain(try(UnitGUID, unit))
+    local line = guid and ns.Ledger.Line(guid)
+    if line then tt:AddLine("Spent: " .. line, 1, 0.55, 0.1) end
+  end
+
   local tier, _, id = ns.UnitTier(unit)
   if not tier then return end
   local pts = ns.PointsFor(tier)
@@ -951,6 +963,8 @@ local function printHelp()
   print("  /godslayer dossier <name>   everything on someone you killed (only you see it)")
   print("  /godslayer nemesis    who you have killed most   /godslayer hitlist   Olympians seen, not killed yet")
   print("  /godslayer hype       your kill song and the announcer: test, on, off, window <seconds>")
+  print("  /godslayer cds [name] what an enemy has spent and when it is back")
+  print("  /godslayer dr         this build's diminishing groups, and the curve measured so far")
   print("  /godslayer clip       mark this moment for your recorder")
   print("  /godslayer wheel      the chat wheel (or bind a key: Key Bindings, AddOns, Godslayer)   wheel list | wheel <number>")
   print("  /godslayer share      post a brag line to guild chat")
@@ -988,6 +1002,10 @@ local function slash(input)
     if ns.Hype then ns.Hype.Command(rest) else ns.Print("The hype part of the addon did not load. Quit the game fully and start it again.") end
   elseif cmd == "clip" then
     if ns.Clip then ns.Clip.Command() end
+  elseif cmd == "rival" then
+    if ns.Rival then ns.Rival.Command(rest) else ns.Print("The rival part of the addon did not load.") end
+  elseif cmd == "gnomes" or cmd == "gnome" then
+    if ns.Rival then ns.Rival.GnomeCommand() else ns.Print("The rival part of the addon did not load.") end
   elseif cmd == "wheel" then
     if ns.Wheel then ns.Wheel.Command(rest:lower()) end
   elseif cmd == "hitlist" then
@@ -998,6 +1016,65 @@ local function slash(input)
       print(("  %s <%s>%s  %s ago"):format(classColored(k.name, k.class), k.guild,
         k.level and (" level " .. k.level) or "", ago(k.t)))
     end
+  elseif cmd == "cds" or cmd == "cooldowns" then
+    if not ns.Ledger then ns.Print("The ledger did not load. Quit the game fully and start it again.") return end
+    local guid, who
+    if rest == "" then
+      if plain(try(UnitExists, "target")) and plain(try(UnitCanAttack, "player", "target")) then
+        guid, who = plain(try(UnitGUID, "target")), ns.FullName("target")
+      else
+        ns.Print("Target an enemy, or name one: /godslayer cds Bob")
+        return
+      end
+    else
+      local want = rest:lower()
+      for id, r in pairs(GodslayerDB.cds or {}) do
+        if type(r.n) == "string" and r.n:lower():find(want, 1, true) then guid, who = id, r.n break end
+      end
+      if not guid then ns.Print("Nothing on record for '" .. rest .. "'. The ledger only knows what it has watched.") return end
+    end
+    local card = ns.Ledger.Card(guid)
+    if #card.rows == 0 then
+      ns.Print((who or "They") .. " has not been seen to spend anything worth tracking.")
+      return
+    end
+    ns.Print((who or card.name or "They") .. ":")
+    for _, row in ipairs(card.rows) do
+      local when = row.ready and "|cff40d040up|r" or ("|cffff7d0a" .. ns.Ledger.Short(row.left) .. "|r")
+      local note = row.by and row.by ~= row.spell and ("  |cff9d9d9dspent by " .. row.by .. "|r") or ""
+      print(("  %-24s %s%s"):format(row.spell, when, note))
+    end
+
+  elseif cmd == "dr" then
+    if not ns.Aura then ns.Print("The aura part did not load. Quit the game fully and start it again.") return end
+    ns.Print("diminishing returns on this build (" .. tostring(ns.PVP_BUILD) .. "):")
+    print("  |cff9d9d9dgroups come from the client's own data; the curve is measured as you play|r")
+    for group, g in pairs(ns.DR_GROUPS or {}) do
+      print(("  group %-4d %-26s %d spells"):format(group, g.label, g.members))
+    end
+    local rows = ns.Aura.DRTable()
+    if #rows == 0 then
+      print("  |cff9d9d9dNothing measured yet. Land the same control twice on one player and it starts.|r")
+    else
+      print("  measured:")
+      for _, r in ipairs(rows) do
+        local parts = {}
+        for n = 1, 4 do
+          local s = r.steps[n]
+          if s then
+            parts[#parts + 1] = ("#%d %.1fs%s"):format(n, s.median,
+              s.share and (" (" .. math.floor(s.share * 100 + 0.5) .. "%)") or "")
+          end
+        end
+        print(("    %-26s %3d seen   %s"):format(r.label, r.total, table.concat(parts, "   ")))
+      end
+      local widest, fullAfter = ns.Aura.DRWindow()
+      if widest then
+        print(("    |cff9d9d9dshortened up to %.1fs apart%s|r"):format(widest,
+          fullAfter and (", full length again by %.1fs"):format(fullAfter) or ""))
+      end
+    end
+
   elseif cmd == "share" then
     UI.Share()
   elseif cmd == "top" then

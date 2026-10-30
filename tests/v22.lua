@@ -11,7 +11,7 @@ local function eq(a, b, label) check(a == b, label .. " (got " .. tostring(a) ..
 
 local ME = "Player-1-0000AAAA"
 M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", faction = "Horde", isMe = true })
-local FILES = { "Data.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Comm.lua", "Wheel.lua", "UI.lua" }
+local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
 local ns = M.load("Godslayer", FILES)
 M.fire("ADDON_LOADED", "Godslayer")
 M.fire("PLAYER_LOGIN")
@@ -714,6 +714,25 @@ for _, pack in ipairs(ns.VOICE_ORDER) do
   end
 end
 check(ns.SFX.engage and ns.SFX.ally, "the drums and the distant horn are built")
+
+-- The Forever mage kit. These are the spells the owner of this addon actually casts, and the
+-- client gained them after 2.2 shipped, so the addon said nothing when they landed a kill.
+-- Ids read from the client's own spell data, build 1.60.1.70634, on 2026-10-27.
+local FOREVER_MAGE = { ["Frost Blast"] = 1326053, ["Arcane Blast"] = 400574, ["Arcane Wrath"] = 1326079,
+                       ["Frostfire Bolt"] = 401502, ["Ice Barrier"] = 11426, Scorch = 2948,
+                       Flamestrike = 2120, Blizzard = 10, Evocation = 12051, Cannibalize = 20577 }
+for spell, id in pairs(FOREVER_MAGE) do
+  check(F.SPELL_IDS[spell] == id, spell .. " is known by the id the client uses (" .. tostring(F.SPELL_IDS[spell]) .. " should be " .. id .. ")")
+end
+for _, spell in ipairs({ "Frost Blast", "Arcane Blast", "Arcane Wrath", "Frostfire Bolt", "Scorch", "Flamestrike", "Blizzard" }) do
+  check(F.FINISHERS[spell], spell .. " ends a fight with words of its own")
+end
+for _, spell in ipairs({ "Ice Barrier", "Evocation" }) do
+  check(F.SIGNATURES[spell], spell .. " has a sound when it goes off")
+end
+-- the undead racials: one has a sound, and both must be nameable for a pt-BR guildmate
+check(F.SIGNATURES["Will of the Forsaken"], "Will of the Forsaken keeps its sound")
+check(F.SPELL_IDS["Cannibalize"], "Cannibalize is nameable")
 
 math.random = realRandom
 M.realPrint(("%d passed, %d failed"):format(passed, failed))

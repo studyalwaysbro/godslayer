@@ -45,12 +45,50 @@ Made by **The True Torchmen**. For the Horde.
 - **A hunt theme.** No song of your own? The addon comes with one, so the first kill starts music for everybody.
 - **The guild feed.** When a guildmate's score goes up, you get a line in chat and, now and then, the announcer mentions it.
 
+## What they have left
+
+The combat log is shut to addons on WoW: Forever, which is why no addon on this client tracks a
+duel. Auras and casts are not shut, and almost everything that decides a fight is one or the other.
+
+- **What is on you.** Crowd control landing on you is called by name, with who cast it and how long
+  you are gone for. The seconds you spent unable to act are counted, because that is the real cost
+  of a bad position.
+- **What is on them.** Their defence going up is called so you stop throwing a Pyroblast at a
+  bubble. Their offence going up is called loudest: it is the only one with a countdown on your
+  life. Everything they have is read before one thing is said, so a Shield Wall never talks over
+  the Recklessness about to kill you.
+- **What they have spent.** Every cooldown an enemy burns in front of you is written down, per
+  player, and kept for a month. Target someone you fought ten minutes ago and the addon knows their
+  Ice Block has two minutes left. Hover anyone you can attack and the tooltip says it.
+  `/godslayer cds` spells it out.
+
+**Shared cooldown groups are the part other addons get wrong.** The client sorts spells into
+cooldown groups and casting any spell in a group locks the whole group. Divine Shield, Divine
+Protection and Ice Block are one group, so a paladin who bubbles has spent Divine Protection too —
+and the addon will tell you so even though they never cast it. The three shocks are one 6s group,
+which is the shaman lockout, read out of the game's own data rather than remembered from 2006. The
+lock is the casting spell's own number, not the group's: Power Word: Shield locks its group for 4
+seconds and Lay on Hands locks the same group for 20 minutes.
+
+**Diminishing returns, from the client and then measured.** The groups are not guessed and not
+copied from vanilla: this build's own data says which effects diminish together, and four of them
+are not what you would assume. Kidney Shot does not share with Cheap Shot. Seduction diminishes
+with fears. Scatter Shot diminishes with Polymorph. Blind does not diminish at all.
+
+What the data does *not* contain is the curve, so the addon measures it. Land the same control
+twice on one player and it records how long the game actually gave it. `/godslayer dr` then prints
+what this server really does — the steps, and how long it takes to forget. It watches the
+no-diminish spells too, because a shortening there would mean the client's own table is wrong.
+
+Every number comes from `Godslayer/Pvp.lua`, generated from the installed client by
+`node tools/build_pvp_data.mjs`. `tools/pvp_report.md` is the readable version of it.
+
 ## Install
 
 1. Download **Godslayer-x.y.z.zip** from the [latest release](../../releases/latest).
 2. Unzip it. You get a folder called `Godslayer`.
-3. Move that folder into `World of Warcraft/_classic_beta_/Interface/AddOns/`
-   (after launch the folder may have a different name than `_classic_beta_`; use whichever one has your Forever `Interface` folder).
+3. Move that folder into `World of Warcraft/_forever_/Interface/AddOns/`
+   `_forever_` is the live client. `_classic_beta_` was the beta and is dead: an addon installed there will not load.
 4. Fully restart the game. On the character screen click **AddOns** and make sure **Godslayer** is ticked.
 5. In game, type `/godslayer`.
 
@@ -98,7 +136,7 @@ The addon cannot record anything, and it cannot talk to a program that does. Wha
 Setting it up:
 
 1. `flatpak install --user flathub com.dec05eba.gpu_screen_recorder`, and have `ffmpeg`, Python 3, Pillow and numpy.
-2. Write `~/.config/wow-clipper/config.json` with at least `{"wow_dir": "/path/to/World of Warcraft/_classic_beta_"}`. Every other setting and its default is at the top of `clipper/wow_clipper.py`: where clips go, the size cap (the oldest clips are deleted past it; anything moved with `keep` is never deleted), the free space floor, the buffer length, game sound only or everything you hear.
+2. Write `~/.config/wow-clipper/config.json` with at least `{"wow_dir": "/path/to/World of Warcraft/_forever_"}`. Every other setting and its default is at the top of `clipper/wow_clipper.py`: where clips go, the size cap (the oldest clips are deleted past it; anything moved with `keep` is never deleted), the free space floor, the buffer length, game sound only or everything you hear.
 3. `python3 clipper/wow_clipper.py setup` once, and pick the screen the game runs on.
 4. Copy `clipper/wow-clipper.service` to `~/.config/systemd/user/`, fix the path in it, then `systemctl --user enable --now wow-clipper`.
 
@@ -121,6 +159,8 @@ Every line is in `tools/voice_script.json`: six packs, five scripts, and the cha
 | `/godslayer dossier <name>` | Everything on someone you killed, only you see it |
 | `/godslayer nemesis` | The dossier of whoever you have killed most |
 | `/godslayer hitlist` | Olympians seen and not killed yet |
+| `/godslayer cds [name]` | What an enemy has spent, and when it comes back |
+| `/godslayer dr` | This build's diminishing groups, and the curve measured so far |
 | `/godslayer share` | Post a brag line to guild chat |
 | `/godslayer top` | Post the top 3 to guild chat |
 | `/godslayer demo` | Preview the kill banner |

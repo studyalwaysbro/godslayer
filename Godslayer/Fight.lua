@@ -37,6 +37,7 @@ local SIGNATURES = {
   -- mage
   Polymorph = "sheep", ["Ice Block"] = "iceblock", Blink = "blink", ["Frost Nova"] = "nova", Pyroblast = "pyro",
   Combustion = "combust", ["Arcane Power"] = "surge", ["Presence of Mind"] = "surge", ["Icy Veins"] = "surge", ["Cold Snap"] = "reset",
+  ["Ice Barrier"] = "shield", Evocation = "surge",
   -- paladin
   ["Divine Shield"] = "bubble", ["Divine Protection"] = "bubble", ["Hammer of Justice"] = "bonk", ["Lay on Hands"] = "angel",
   ["Blessing of Protection"] = "shield", ["Blessing of Freedom"] = "freedom", ["Avenging Wrath"] = "wings", Repentance = "repent",
@@ -71,14 +72,19 @@ local OFTEN = {
   ["Lava Burst"] = true, ["Aimed Shot"] = true, ["Bear Form"] = true, ["Dire Bear Form"] = true, ["Cat Form"] = true,
   ["Moonkin Form"] = true, ["Ghost Wolf"] = true, Charge = true, Intercept = true, Blink = true, ["Frost Nova"] = true,
   ["Hammer of Justice"] = true, ["Kidney Shot"] = true, ["Cheap Shot"] = true, Sap = true, Blind = true, Silence = true,
+  ["Ice Barrier"] = true, -- a mage reapplies the shield all fight
 }
 
 -- spell -> the kind of death it deals, and the words for it on the banner
 local FINISHERS = {
   Execute = "execute", Pyroblast = "pyro",
   Fireball = "fire", ["Fire Blast"] = "fire", ["Living Bomb"] = "fire", ["Blast Wave"] = "fire",
+  Scorch = "fire", Flamestrike = "fire", ["Frostfire Bolt"] = "fire",
   Frostbolt = "shatter", ["Ice Lance"] = "shatter", ["Cone of Cold"] = "shatter",
+  -- Forever's own additions to the mage: Frost Blast is the fast frost nuke, Arcane Wrath the big one
+  ["Frost Blast"] = "shatter", Blizzard = "shatter",
   ["Arcane Missiles"] = "arcane", ["Arcane Barrage"] = "arcane", ["Arcane Explosion"] = "arcane",
+  ["Arcane Blast"] = "arcane", ["Arcane Wrath"] = "arcane",
   Eviscerate = "evisc", Backstab = "back", Ambush = "back", Mutilate = "back", Shoot = "wand",
   ["Hammer of Wrath"] = "judged", Judgement = "judged", Exorcism = "judged", ["Divine Storm"] = "judged", ["Hammer of the Righteous"] = "judged",
   Smite = "smite", ["Holy Fire"] = "smite", ["Holy Shock"] = "smite", ["Holy Nova"] = "smite", Penance = "smite",
@@ -127,6 +133,9 @@ local SPELL_IDS = {
   Shoot = 5019, Shred = 5221, Silence = 15487, Smite = 585, ["Soul Fire"] = 6353, Sprint = 2983, Starfall = 439748,
   Starfire = 2912, Starsurge = 417157, Stoneform = 20594, Stormstrike = 17364, Vanish = 1856, ["War Stomp"] = 20549,
   ["Will of the Forsaken"] = 7744, Wrath = 5176,
+  -- the Forever mage kit, ids read from the client's own spell data on 2026-10-27
+  ["Frost Blast"] = 1326053, ["Arcane Blast"] = 400574, ["Arcane Wrath"] = 1326079, ["Frostfire Bolt"] = 401502,
+  ["Ice Barrier"] = 11426, Scorch = 2948, Flamestrike = 2120, Blizzard = 10, Evocation = 12051, Cannibalize = 20577,
 }
 Fight.SPELL_IDS = SPELL_IDS
 local alias = {}

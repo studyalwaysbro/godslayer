@@ -64,6 +64,35 @@ end
 function InCombatLockdown() return M.inCombat == true end
 function UnitIsUnit(a, b) if M.secretTargets then return M.secret() end local x, y = M.units[a], M.units[b] if b == "player" then return x ~= nil and x.isMe == true end return x ~= nil and x == y end
 C_Spell = { GetSpellName = function(id) return M.spells and M.spells[id] end }
+
+-- auras: M.auras[token][filter] is the list the game would hand back, in order.
+-- A row may carry secret = true to stand for a value this client refuses to give an addon.
+M.auras = {}
+C_UnitAuras = {
+  GetAuraDataByIndex = function(unit, i, filter)
+    local byFilter = M.auras[unit]
+    local list = byFilter and byFilter[filter or "HELPFUL"]
+    local a = list and list[i]
+    if not a then return nil end
+    if a.secret then return { name = M.secret(), spellId = M.secret() } end
+    return a
+  end,
+}
+-- put an aura on a unit. seconds nil means no timer, which is how a stance or a stealth reads.
+function M.aura(unit, filter, name, spellId, seconds, source, stacks)
+  M.auras[unit] = M.auras[unit] or {}
+  local list = M.auras[unit][filter] or {}
+  M.auras[unit][filter] = list
+  list[#list + 1] = {
+    name = name, spellId = spellId, duration = seconds or 0,
+    expirationTime = seconds and (M.now + seconds) or 0,
+    sourceUnit = source, applications = stacks or 0,
+  }
+  return list[#list]
+end
+function M.clearAuras(unit)
+  if unit then M.auras[unit] = nil else M.auras = {} end
+end
 function UIFrameFadeOut(frame, seconds, from, to) frame.__fading = true end
 function UIFrameFadeRemoveFrame(frame) frame.__fading = nil end
 UISpecialFrames = {}
