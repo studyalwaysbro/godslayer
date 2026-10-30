@@ -39,6 +39,7 @@ DEFAULTS = {
     "fps": 60,
     "codec": "hevc",
     "bitrate_kbps": 20000,
+    "cursor": False,              # draw the mouse pointer into clips
     "audio": "game",              # game = the game's own sound only; desktop = everything you hear
     "audio_match": "wow|warcraft",
     "lead_in": 25,                # seconds kept before the first kill
@@ -229,6 +230,7 @@ def start_recorder(cfg, audio, seconds=None):
     cmd = gsr("-w", "portal", "-restore-portal-session", "yes",
               "-portal-session-token-filepath", str(CONFIG.parent / "portal_token"),
               "-f", str(cfg["fps"]), "-fm", "cfr", "-k", cfg["codec"], "-bm", "cbr", "-q", str(cfg["bitrate_kbps"]),
+              "-cursor", "yes" if cfg["cursor"] else "no",
               "-ac", "aac", "-a", audio, "-c", "mp4", "-r", str(seconds or cfg["buffer_seconds"]),
               "-replay-storage", "ram", "-o", str(RAW))
     log("recorder:", " ".join(cmd[4:]))
