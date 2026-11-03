@@ -14,18 +14,22 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "2.5.0"
+ns.VERSION = "2.6.0"
 
 local DEDUPE_SECONDS = 10        -- the signals above can all describe the same death
 local MATCH_WINDOW = 8           -- honorable-kill credit and a seen death must be this close
 local PENDING_SECONDS = 15 * 60  -- how long a kill waits for the victim's guild to be seen
 local KNOWN_MAX_AGE = 7 * 86400  -- how long a remembered guild tag is trusted for scoring
 local KNOWN_CAP, SEEN_CAP, LOG_CAP = 4000, 1500, 150
+local LOG_SLACK = 50             -- lines the log may run over its cap before one trim pass
 local HIST_CAP = 12              -- kills remembered in detail per victim
 local ZONE_CAP = 12              -- zones remembered per victim; the rest go under ELSEWHERE
 local TEXT_MAX = 40              -- longest rank, race, title or zone name kept
 local RANK_CAP = 6               -- guild ranks remembered per victim; the rest go under OTHER_RANKS
 local DETAIL_CAP = 2500          -- victims that keep a kill-by-kill history; older feuds keep their totals
+local HEALTH_GAP = 1             -- one unit is asked whether it is dead at most this often
+local IDLE_RETRY = 2             -- the idle sweep re-reads a plate with no guild yet this often
+local IDLE_SETTLED = 30          -- ... and one whose guild it already has, this often
 local ELSEWHERE, OTHER_RANKS = "Elsewhere", "Other ranks"
 ns.HIST_CAP, ns.ZONE_CAP, ns.RANK_CAP, ns.DETAIL_CAP, ns.KNOWN_CAP = HIST_CAP, ZONE_CAP, RANK_CAP, DETAIL_CAP, KNOWN_CAP
 ns.ELSEWHERE, ns.OTHER_RANKS = ELSEWHERE, OTHER_RANKS
@@ -41,6 +45,57 @@ local function plain(v)
 end
 ns.plain = plain
 
+-- plain(), for a whole list of values in one trip into the client.
+--
+-- plain() is the most-called function in the addon by a wide margin -- the profiler had it at
+-- 62% of every call the addon makes -- and the reason is that it takes one value. A six-field
+-- aura row cost six separate crossings to establish that none of its fields was secret, and an
+-- aura row is read up to forty times per unit per scan.
+--
+-- The client has had the bulk form all along. `scrub` returns its arguments with every secret
+-- value replaced by nil, and with every value that is not a string, number or boolean replaced
+-- by nil as well -- which is the second half of what nearly every plain() caller does by hand
+-- on the very next line. It is documented in FrameScriptDocumentation, which is gated to
+-- nothing, and the client's own FrameXML calls it unqualified
+-- (`Blizzard_FrameXML/SharedPetBattleTemplates.lua:566`), so it is an ordinary global and not a
+-- restricted-environment trick.
+--
+-- Its existence is still not assumed. A global the addon cannot see is a global the addon does
+-- not use, so the fallback is the one-at-a-time path, written to the same contract: string,
+-- number, boolean or nil, never anything else.
+local scrub = scrub
+if type(scrub) ~= "function" then
+  local function one(v)
+    if issecret(v) then return nil end
+    local t = type(v)
+    if t == "string" or t == "number" or t == "boolean" then return v end
+    return nil
+  end
+  -- The length is dispatched on rather than padded out, because the real scrub returns exactly
+  -- as many values as it was given. A fallback that always returned eight would hand two
+  -- surplus nils to anything that forwarded its results, and the difference would only show up
+  -- on the clients that use this path -- the ones nobody can test on.
+  local function many(n, a, b, c, d, e, f, g, h)
+    if n == 0 then return end
+    if n == 1 then return one(a) end
+    if n == 2 then return one(a), one(b) end
+    if n == 3 then return one(a), one(b), one(c) end
+    if n == 4 then return one(a), one(b), one(c), one(d) end
+    if n == 5 then return one(a), one(b), one(c), one(d), one(e) end
+    if n == 6 then return one(a), one(b), one(c), one(d), one(e), one(f) end
+    if n == 7 then return one(a), one(b), one(c), one(d), one(e), one(f), one(g) end
+    return one(a), one(b), one(c), one(d), one(e), one(f), one(g), one(h)
+  end
+  scrub = function(...)
+    local n = select("#", ...)
+    if n <= 8 then return many(n, ...) end
+    local out = {}
+    for i = 1, n do out[i] = one((select(i, ...))) end
+    return unpack(out, 1, n)
+  end
+end
+ns.scrub = scrub
+
 -- Call a game function that may be missing or may reject its arguments.
 local function try(f, ...)
   if type(f) ~= "function" then return nil end
@@ -54,7 +109,13 @@ ns.try = try
 local function clean(s, max)
   s = plain(s)
   if type(s) ~= "string" then return nil end
-  s = s:gsub("|", ""):gsub("%c", ""):match("^%s*(.-)%s*$")
+  -- Each of these three passes builds a new string whether or not it changes anything, and
+  -- almost nothing the client hands over has an escape code or a control character in it. A
+  -- find costs nothing and allocates nothing, so the usual case now makes one string instead of
+  -- three. clean() is called four or five times for every player the addon looks at.
+  if s:find("|", 1, true) then s = s:gsub("|", "") end
+  if s:find("%c") then s = s:gsub("%c", "") end
+  if s:find("^%s") or s:find("%s$") then s = s:match("^%s*(.-)%s*$") end
   max = max or TEXT_MAX
   if #s > max then
     local cut = max
@@ -74,13 +135,25 @@ function ns.Print(msg)
   print("|cffff7d0aGodslayer:|r " .. tostring(msg))
 end
 
+-- The log is a saved variable, so it stays an ordinary array in order: something has to be able
+-- to read it after a crash without running any of this code.
+--
+-- Keeping it capped used to be `while #log > LOG_CAP do table.remove(log, 1) end`, which is the
+-- natural way to write it and moves a hundred and forty-nine entries to drop one. It is paid on
+-- every line logged for the rest of the session. The cap is a cap and not a length, so the trim
+-- waits until there is a batch worth shifting and then does one pass -- same ceiling, a
+-- hundredth of the work, and the file still ends up with LOG_CAP lines in it.
 function ns.Log(kind, msg)
   local db = GodslayerDB
   if not db then return end
   local log = db.log
   local when = try(date, "%m-%d %H:%M:%S")
-  log[#log + 1] = (type(when) == "string" and when or "?") .. " " .. kind .. ": " .. tostring(msg)
-  while #log > LOG_CAP do table.remove(log, 1) end
+  local n = #log + 1
+  log[n] = (type(when) == "string" and when or "?") .. " " .. kind .. ": " .. tostring(msg)
+  if n <= LOG_CAP + LOG_SLACK then return end
+  local drop = n - LOG_CAP
+  for i = 1, LOG_CAP do log[i] = log[i + drop] end
+  for i = LOG_CAP + 1, n do log[i] = nil end
 end
 
 -- ---------------------------------------------------------------------------
@@ -291,7 +364,28 @@ local function resolvePending(id, guild, tier, class)
 end
 
 -- Record what a visible unit tells us. Returns its id and guild when it is a player.
-local function ObserveUnit(unit)
+--
+-- `mode` is "idle" when the two-second sweep is doing the asking rather than something the
+-- player did. A full read is sixteen trips into the client, and the sweep spends them on units
+-- it finished reading long ago: once a plate's guild is known there is nothing left for the
+-- sweep to learn from it, because a guild tag that was going to arrive late has arrived. So an
+-- idle read spends two calls finding out whether to spend the other fourteen.
+--
+-- The limit is thirty seconds, and that number is not a guess about what feels responsive. The
+-- only thing a repeat read can produce is a sighting call, and the spotter will not repeat
+-- itself about the same player inside SPOT_AGAIN, which is fifteen minutes. Thirty seconds is
+-- thirty times finer than the finest thing downstream can act on, so nothing observable
+-- changes. A plate with no guild yet keeps the two-second rhythm, since that case is the entire
+-- reason the sweep exists. Deaths are unaffected either way: they arrive on UNIT_HEALTH and
+-- UNIT_DIED, which read in full.
+local function ObserveUnit(unit, mode)
+  if mode == "idle" then
+    local known = plain(try(UnitGUID, unit))
+    local e = type(known) == "string" and seen[known] or nil
+    if e and GetTime() - (e.t or 0) < (e.guild and IDLE_SETTLED or IDLE_RETRY) then
+      return known, e.guild
+    end
+  end
   if not plain(try(UnitExists, unit)) then return end
   if not plain(try(UnitIsPlayer, unit)) then return end
   local name = fullName(unit)
@@ -341,9 +435,17 @@ local function ObserveUnit(unit)
   local tier = ns.Classify(guild)
   local known = GodslayerDB.known
   if tier then
-    if not known[id] then knownCount = knownCount + 1 end
-    known[id] = { n = name, g = guild, c = e.class, t = time(), l = e.level, r = e.race, s = e.sex,
-                  k = e.rank, p = e.title, z = clean((try(GetRealZoneText))) }
+    -- Written into the record that is already there rather than over it. The fields are the same
+    -- fields either way; the difference is an eleven-field table per sighting, and a sighting
+    -- happens for every tracked player on screen.
+    local k = known[id]
+    if not k then
+      k = {}
+      known[id], knownCount = k, knownCount + 1
+    end
+    k.n, k.g, k.c, k.t = name, guild, e.class, time()
+    k.l, k.r, k.s, k.k, k.p = e.level, e.race, e.sex, e.rank, e.title
+    k.z = clean((try(GetRealZoneText)))
     if knownCount > KNOWN_CAP then pruneKnown() end -- a thousand-player raid can walk past in one sitting
     -- alive, hostile and in view: the announcer says so
     if dead == false and e.hostile and ns.Hype and ns.Hype.Spot then pcall(ns.Hype.Spot, id, name, guild, tier, ns.IsKing(name, tier)) end
@@ -356,13 +458,87 @@ local function ObserveUnit(unit)
 end
 ns.ObserveUnit = ObserveUnit
 
-local function sweepUnits()
-  ns.sweeping = true -- a look around to put a name to a kill is not a sighting
+-- The nameplates the client says are on screen.
+--
+-- Both places that wanted plates used to say `for i = 1, 40 do ObserveUnit("nameplate" .. i)
+-- end` -- the obvious way to find them, and the wrong one. It asks about forty units whether or
+-- not forty exist, builds forty token strings to do it, and the twenty-odd that are not there
+-- still cost a call each to establish that. On a kill, with the sweep below running on top of
+-- the two-second one, the profiler put the kill path alone at 580 trips into the client.
+--
+-- The client already says which plates exist, on NAME_PLATE_UNIT_ADDED and
+-- NAME_PLATE_UNIT_REMOVED, so that is the set that gets read and the token comes from the event
+-- rather than from a concatenation. The forty-token fallback stays for a client that never
+-- sends the added event at all, because a client that says nothing is not the same thing as an
+-- empty screen, and the flag below is the only way to tell them apart.
+local plates, platesAnnounced = {}, false
+local PLATE_TOKENS = {}
+for i = 1, 40 do PLATE_TOKENS[i] = "nameplate" .. i end
+
+local function eachPlate(fn, mode)
+  if platesAnnounced then
+    for token in pairs(plates) do fn(token, mode) end
+    return
+  end
+  for i = 1, 40 do fn(PLATE_TOKENS[i], mode) end
+end
+ns.EachPlate = eachPlate
+
+-- The same set, for a loop that has to be able to stop in the middle, or that would otherwise
+-- pay for a closure. Fight.Engaged walks the plates looking for the one player who is fighting
+-- you and returns the moment it finds them, which a callback cannot do; ns.Odds and ns.Suspects
+-- below just want a list and are called at the two busiest moments the addon has. It fills the
+-- caller's table and returns a count, so nothing is allocated per call -- and nothing past the
+-- count is to be trusted, because the table is not cleared.
+local function plateList(into)
+  local n = 0
+  if platesAnnounced then
+    for token in pairs(plates) do
+      n = n + 1
+      into[n] = token
+    end
+    return n
+  end
+  for i = 1, 40 do into[i] = PLATE_TOKENS[i] end
+  return 40
+end
+ns.Plates = plateList
+
+-- One scratch list each, because a shared one would be a bug waiting for the day something
+-- walks the plates inside a walk of the plates.
+local oddsList, suspectList = {}, {}
+
+-- Look around for one particular player. Both callers want this and neither wanted a sweep.
+--
+-- They used to call the sweep above: a full sixteen-call read of your target, your mouseover,
+-- your focus, your soft target and every nameplate on screen, on every single kill. With a
+-- team's worth of plates up that is the better part of three hundred trips into the client to
+-- answer a question about exactly one of them.
+--
+-- The four units you are pointing at are still read in full, because one of them is almost
+-- always the victim and a full read is the thing that settles the record. The plates are asked
+-- for a GUID and nothing else until one of them turns out to be the player in question. Nobody
+-- loses a sighting to this: the two-second sweep reads every plate on its own account, and this
+-- was never where the addon learned who was on screen.
+--
+-- An id that is not a GUID cannot be matched against one, so a kill known only by name -- what
+-- the honor line gives, when it gives anything -- falls back to the full sweep.
+local function findUnit(id)
+  ns.sweeping = true
   ObserveUnit("target")
   ObserveUnit("mouseover")
   ObserveUnit("focus")
   ObserveUnit("softenemy")
-  for i = 1, 40 do ObserveUnit("nameplate" .. i) end
+  local e = id and seen[id]
+  if not (e and e.guild) then
+    if type(id) == "string" and id:sub(1, 7) == "Player-" then
+      eachPlate(function(token)
+        if plain(try(UnitGUID, token)) == id then ObserveUnit(token) end
+      end)
+    else
+      eachPlate(ObserveUnit)
+    end
+  end
   ns.sweeping = false
 end
 
@@ -405,11 +581,31 @@ function ns.VictimInfo(id)
   return { class = class, level = level, myLevel = type(myLevel) == "number" and myLevel > 0 and myLevel or nil, name = (e and e.name) or (k and k.n) }
 end
 
+-- What we last read off a unit with this name. The death recap hands back a bare caster name and
+-- nothing else, so this is the only thing on the client that can say whether that name belonged to
+-- an enemy player or to a scorpid. Exact spelling first, then the name without its realm.
+function ns.SeenByName(name)
+  if type(name) ~= "string" or name == "" then return nil end
+  local id = nameId[name]
+  if not id then
+    local want = (name:match("^[^-]+") or name):lower()
+    for spelling, other in pairs(nameId) do
+      if (spelling:match("^[^-]+") or spelling):lower() == want then id = other break end
+    end
+  end
+  local e = id and seen[id] or nil
+  if not e then return nil end
+  return { name = e.name, class = e.class, guild = e.guild, hostile = e.hostile, level = e.level, race = e.race }
+end
+
 -- Living enemy players on screen right now, and whether you are alone.
 function ns.Odds()
   local enemies = 0
-  for i = 1, 40 do
-    local unit = "nameplate" .. i
+  -- Four trips into the client per plate, and this is asked on every kill. Forty tokens made it
+  -- a hundred and sixty of them for a screen that had a dozen plates on it.
+  local n = plateList(oddsList)
+  for i = 1, n do
+    local unit = oddsList[i]
     if plain(try(UnitExists, unit)) and plain(try(UnitIsPlayer, unit)) and plain(try(UnitCanAttack, "player", unit)) == true
        and plain(try(UnitIsDeadOrGhost, unit)) ~= true then
       enemies = enemies + 1
@@ -431,8 +627,9 @@ function ns.Suspects()
     list[#list + 1] = { id = guid, name = fullName(unit) }
   end
   local readable = false
-  for i = 1, 40 do
-    local unit = "nameplate" .. i
+  local n = plateList(suspectList)
+  for i = 1, n do
+    local unit = suspectList[i]
     if plain(try(UnitExists, unit)) then
       local onMe = try(UnitIsUnit, unit .. "target", "player")
       if not issecret(onMe) then
@@ -578,7 +775,7 @@ end
 
 local function retryPending(id)
   if not pending[id] then return end
-  sweepUnits() -- ObserveUnit settles the record if the victim is still visible
+  findUnit(id) -- ObserveUnit settles the record if the victim is still visible
   if not pending[id] then return end
   local guild, class = lookup(id)
   if guild then resolvePending(id, guild, ns.Classify(guild), class) end
@@ -611,7 +808,7 @@ local function RegisterKill(id, name, kb, source, calledAs)
   -- a killing blow or an honor line that arrives after its credit was called: the same kill
   if not calledAs and source ~= "HK" and claimCalled then calledAs = claimCalled() end
 
-  sweepUnits()
+  findUnit(id)
   local guild, class, seenName = lookup(id)
   name = seenName or name
   rec = { t = now, kb = kb and true or false, name = name, life = ns.session.life }
@@ -859,10 +1056,32 @@ function handlers.UNIT_DIED(guid)
 end
 
 -- Second way to see a death, for clients where UNIT_DIED does not report bystanders.
+--
+-- This is the busiest handler in the addon and the only one whose rate the addon does not
+-- control: UNIT_HEALTH is registered unfiltered, so every unit in a battleground taking a hit
+-- arrives here, and a well-attended fight is hundreds a second. Most of them are nobody this
+-- addon is looking at and cost nothing but a type check to drop.
+--
+-- The ones that are get a limit, because asking the same unit whether it is dead four hundred
+-- times a second answers the same question four hundred times. One reading per unit per second
+-- is the cap, and a second is not a guess either: a death only matters here because it has to
+-- be paired with honorable-kill credit, and MATCH_WINDOW gives that pairing eight seconds. The
+-- point of the cap is not the average -- at a quiet forty events a second it saves little --
+-- it is that an event rate the addon cannot control stops being a cost the addon cannot
+-- control. Fifteen units in view cost fifteen readings a second whether the event fires forty
+-- times or four hundred.
+--
+-- The watched table is bounded by nature: its keys are unit tokens, of which there are
+-- forty-odd, and PLAYER_ENTERING_WORLD clears it.
+local healthRead = {}
+
 function handlers.UNIT_HEALTH(unit)
   unit = plain(unit)
   if type(unit) ~= "string" then return end
   if unit ~= "target" and unit ~= "focus" and unit:sub(1, 9) ~= "nameplate" then return end
+  local now = GetTime()
+  if now - (healthRead[unit] or 0) < HEALTH_GAP then return end
+  healthRead[unit] = now
   if plain(try(UnitIsDeadOrGhost, unit)) ~= true then return end
   ObserveUnit(unit)
 end
@@ -926,14 +1145,20 @@ function handlers.PLAYER_DEAD()
   -- secret. So this is a heuristic and nothing more. If you died with a hostile player targeted
   -- and we already know their guild, that guild is credited with the death, because it is almost
   -- always the one you were fighting. When we cannot tell, nothing is recorded rather than a guess.
-  if ns.Rival then
-    local id = plain(try(UnitGUID, "target"))
-    if type(id) == "string" and id:sub(1, 7) == "Player-"
+  local id = plain(try(UnitGUID, "target"))
+  local hostileTarget = type(id) == "string" and id:sub(1, 7) == "Player-"
        and plain(try(UnitIsPlayer, "target")) == true
-       and plain(try(UnitCanAttack, "player", "target")) == true then
-      local guild = select(1, lookup(id))
-      if guild then ns.Rival.NoteDeath(guild) end
-    end
+       and plain(try(UnitCanAttack, "player", "target")) == true
+  if ns.Rival and hostileTarget then
+    local guild = select(1, lookup(id))
+    if guild then ns.Rival.NoteDeath(guild) end
+  end
+  -- The threat pool wants a name, and the recap gives a far better one a moment from now. This
+  -- only speaks when there is no recap to wait for.
+  if ns.Threat and hostileTarget and not (ns.Death and ns.Death.Available()) then
+    local guild = select(1, lookup(id))
+    local _, class = try(UnitClass, "target")
+    pcall(ns.Threat.Note, fullName("target"), plain(class), guild, nil)
   end
   ns.session.runs, ns.session.life = {}, ns.session.life + 1
   if ns.session.streak > 0 then
@@ -942,13 +1167,30 @@ function handlers.PLAYER_DEAD()
   end
 end
 
+-- A loading screen destroys every nameplate, and the client re-announces the new ones on the
+-- other side. It does not promise a removal for each of the old ones, so the set is emptied
+-- here rather than trusted to arrive empty. The flag stays set: a client that has announced a
+-- plate once will announce the next one too, and the forty-token fallback is for clients that
+-- never do it at all.
+function handlers.PLAYER_ENTERING_WORLD()
+  for token in pairs(plates) do plates[token] = nil end
+  for token in pairs(healthRead) do healthRead[token] = nil end
+end
+
 function handlers.PLAYER_TARGET_CHANGED() ObserveUnit("target") end
 function handlers.UPDATE_MOUSEOVER_UNIT() ObserveUnit("mouseover") end
 function handlers.PLAYER_FOCUS_CHANGED() ObserveUnit("focus") end
 
 function handlers.NAME_PLATE_UNIT_ADDED(unit)
   unit = plain(unit)
-  if type(unit) == "string" then ObserveUnit(unit) end
+  if type(unit) ~= "string" then return end
+  plates[unit], platesAnnounced = true, true
+  ObserveUnit(unit)
+end
+
+function handlers.NAME_PLATE_UNIT_REMOVED(unit)
+  unit = plain(unit)
+  if type(unit) == "string" then plates[unit] = nil end
 end
 
 function handlers.PLAYER_LOGIN()
@@ -960,14 +1202,19 @@ function handlers.PLAYER_LOGIN()
   if type(hk) == "number" then lastHK = hk end
   ns.Log("login", myName .. " v" .. ns.VERSION .. " build " .. tostring((try(GetBuildInfo))))
   -- guild tags can arrive a moment after a nameplate does, so keep re-reading them
-  C_Timer.NewTicker(2, function()
-    for i = 1, 40 do ObserveUnit("nameplate" .. i) end
-  end)
+  C_Timer.NewTicker(2, function() eachPlate(ObserveUnit, "idle") end)
   if ns.Hype then hype("Login") end
   if ns.Comm then ns.Comm.Init() end
   if ns.Fight then ns.Fight.Init() end
   if ns.Aura then ns.Aura.Init() end
   if ns.Ledger then ns.Ledger.Init() end
+  if ns.Rank then ns.Rank.Init() end
+  if ns.Recap then ns.Recap.Init() end
+  if ns.Field then ns.Field.Init() end
+  if ns.Flag then ns.Flag.Init() end
+  if ns.Control then ns.Control.Init() end
+  if ns.Death then ns.Death.Init() end
+  if ns.Threat then ns.Threat.Init() end
   if ns.UI then ns.UI.Init() end
 end
 
@@ -985,13 +1232,22 @@ ns.frame = frame
 local dispatch, dispatchMark
 local function dispatchTables()
   local mark = (ns.Fight and 1 or 0) + (ns.Aura and 2 or 0) + (ns.Comm and 4 or 0) + (ns.Hype and 8 or 0)
-             + (ns.Ledger and 16 or 0)
+             + (ns.Ledger and 16 or 0) + (ns.Rank and 32 or 0) + (ns.Recap and 64 or 0)
+             + (ns.Field and 128 or 0) + (ns.Control and 256 or 0) + (ns.Death and 512 or 0)
+             + (ns.Threat and 1024 or 0) + (ns.Flag and 2048 or 0)
   if dispatch and dispatchMark == mark then return dispatch end
   local parts = {}
   local function add(t) if type(t) == "table" then parts[#parts + 1] = t end end
   add(ns.Fight and ns.Fight.handlers)
   add(ns.Aura and ns.Aura.handlers)
   add(ns.Ledger and ns.Ledger.handlers)
+  add(ns.Rank and ns.Rank.handlers)
+  add(ns.Recap and ns.Recap.handlers)
+  add(ns.Field and ns.Field.handlers)
+  add(ns.Flag and ns.Flag.handlers)
+  add(ns.Control and ns.Control.handlers)
+  add(ns.Death and ns.Death.handlers)
+  add(ns.Threat and ns.Threat.handlers)
   add(handlers)
   add(ns.Comm and ns.Comm.handlers)
   add(ns.Hype and ns.Hype.handlers)
@@ -1034,8 +1290,17 @@ frame:RegisterEvent("ADDON_LOADED")
 for _, event in ipairs({
   "PLAYER_LOGIN", "PARTY_KILL", "UNIT_DIED", "UNIT_HEALTH", "PLAYER_PVP_KILLS_CHANGED",
   "CHAT_MSG_COMBAT_HONOR_GAIN", "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT",
-  "PLAYER_FOCUS_CHANGED", "NAME_PLATE_UNIT_ADDED", "CHAT_MSG_ADDON",
+  "PLAYER_FOCUS_CHANGED", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "CHAT_MSG_ADDON",
   "PLAYER_GUILD_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_DEAD",
+  -- the ladder: rank is renown on faction 2800 on this build, so the renown event is the one
+  -- that actually fires, and PLAYER_PVP_RANK_CHANGED is kept because the Camelot UI listens to it
+  "MAJOR_FACTION_RENOWN_LEVEL_CHANGED", "PLAYER_PVP_RANK_CHANGED",
+  -- the battleground. These four are what Forever's own scoreboard listens to; the scoreboard
+  -- itself arrives on UPDATE_BATTLEFIELD_SCORE and the numbers on it unseal on PVP_MATCH_COMPLETE.
+  "PVP_MATCH_ACTIVE", "PVP_MATCH_COMPLETE", "PLAYER_JOINED_PVP_MATCH", "UPDATE_BATTLEFIELD_SCORE",
+  -- what has hold of you. C_LossOfControl is readable on this client, and Forever's own display
+  -- of it shows one effect at a time; this reads all of them and the school lockout with them.
+  "LOSS_OF_CONTROL_ADDED", "LOSS_OF_CONTROL_UPDATE", "PLAYER_CONTROL_LOST", "PLAYER_CONTROL_GAINED",
   -- the announcer's own: duels, interrupts, coming back to life
   "DUEL_REQUESTED", "DUEL_FINISHED", "CHAT_MSG_SYSTEM", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED",
   "PLAYER_UNGHOST", "PLAYER_ALIVE",

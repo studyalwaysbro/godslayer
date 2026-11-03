@@ -10,8 +10,8 @@ end
 local function eq(a, b, label) check(a == b, label .. " (got " .. tostring(a) .. ", want " .. tostring(b) .. ")") end
 
 local ME = "Player-1-0000AAAA"
-M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", faction = "Horde" })
-local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
+M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", race = "Scourge", sex = 2, faction = "Horde" })
+local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
 local ns = M.load("Godslayer", FILES)
 M.fire("ADDON_LOADED", "Godslayer")
 M.fire("PLAYER_LOGIN")
@@ -268,7 +268,14 @@ eq(H.Kills(), 1, "the death turning up afterwards is the same kill, not a second
 check(spoken():find("olympus", 1, true), "and its Olympus score is still announced: " .. spoken())
 eq(ns.char.kills, 1, "and scored once")
 -- the killing blow arriving after the credit was called
+--
+-- reset() empties the books but not the matcher's own lists of deaths seen and credits
+-- received, which belong to the session and not to the character. The block above left an
+-- unconsumed death in there, and a credit fired now pairs with it -- correctly, by the
+-- matcher's own rule, and nothing to do with the case being tested here. The clock is moved
+-- past MATCH_WINDOW + 2 instead, which is how a real session clears them.
 reset() clearUnits()
+M.advance(11)
 local slow = enemy("nameplate1", "Slow Event")
 ns.ObserveUnit("nameplate1")
 M.hk = M.hk + 1 M.fire("PLAYER_PVP_KILLS_CHANGED", "player")

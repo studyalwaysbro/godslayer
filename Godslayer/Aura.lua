@@ -25,7 +25,7 @@
 -- wrong, and that is worth knowing before anybody builds a strategy on it.
 
 local _, ns = ...
-local plain, try = ns.plain, ns.try
+local plain, try, scrub = ns.plain, ns.try, ns.scrub
 
 local Aura = { handlers = {} }
 ns.Aura = Aura
@@ -181,22 +181,32 @@ end
 
 -- Aura fields can come back as secret values on this client, so each one is unwrapped before use
 -- and a secret stops the row rather than poisoning a comparison later.
-local function auraAt(unit, i, filter)
+local function auraAt(unit, i, filter, into)
   local get = C_UnitAuras and C_UnitAuras.GetAuraDataByIndex
   if type(get) ~= "function" then return nil end
   local ok, a = pcall(get, unit, i, filter)
   if not ok or type(a) ~= "table" then return nil end
-  local name = plain(a.name)
-  local id = plain(a.spellId)
+  -- One crossing for the whole row. This used to be six plain() calls with a type check beside
+  -- each, which made a single aura the most expensive thing the addon did: the profiler put one
+  -- unthrottled scan of one enemy at 210 trips into the client, 174 of them from here. scrub
+  -- does both halves at once -- a secret value becomes nil, and so does anything that is not a
+  -- string, number or boolean -- so the guards below are about range now and not about type.
+  local name, id, duration, expires, source, stacks =
+    scrub(a.name, a.spellId, a.duration, a.expirationTime, a.sourceUnit, a.applications)
   if type(name) ~= "string" or type(id) ~= "number" then return nil end
-  return {
-    name = name,
-    id = id,
-    duration = tonumber(plain(a.duration)) or 0,
-    expires = tonumber(plain(a.expirationTime)) or 0,
-    source = plain(a.sourceUnit),
-    stacks = tonumber(plain(a.applications)) or 0,
-  }
+  -- `into` is the scanners' scratch row. They look at one aura at a time and keep nothing from
+  -- it but a few numbers, so handing them the same table forty times is the same answer with
+  -- none of the litter: a unit with ten buffs used to cost eleven tables per scan, and a scan
+  -- happens up to six times a second per unit. Callers that keep what they are given -- the
+  -- public Aura.Read below, and the tests through it -- pass nothing and get a fresh row.
+  local row = into or {}
+  row.name = name
+  row.id = id
+  row.duration = tonumber(duration) or 0
+  row.expires = tonumber(expires) or 0
+  row.source = source
+  row.stacks = tonumber(stacks) or 0
+  return row
 end
 
 -- Every aura on a unit, as a list. Stops at the first row the game will not give up whole, which
@@ -224,6 +234,17 @@ end
 --------------------------------------------------------------------------------
 
 local lastCall, saidAt = 0, {}
+
+-- Could a call come out of a scan started right now? announce() asks the same two questions
+-- again before it says anything, which is where lastCall is set and where the authority lives;
+-- this is only here so that a scan with no possible outcome can be skipped before it costs
+-- forty trips into the client.
+local function canCall()
+  local o = opts()
+  if not (o.on and o.aura) then return false end
+  return GetTime() - lastCall >= CALL_GAP
+end
+Aura.CanCall = canCall
 
 local function announce(kind, words, line, clip, weight)
   local o = opts()
@@ -395,8 +416,13 @@ end
 
 local lastScan = {}
 
+-- One row, reused. Nothing here outlives the iteration that reads it.
+local row = {}
+
 local function scanPlayer()
-  for _, a in ipairs(readAuras("player", "HARMFUL")) do
+  for i = 1, 40 do
+    local a = auraAt("player", i, "HARMFUL", row)
+    if not a then break end
     local info = CC[english(a.name)]
     if info and fresh("p/" .. a.id) then
       local who = casterName(a)
@@ -413,6 +439,10 @@ local function scanPlayer()
   end
 end
 
+-- Which of two things worth saying about an enemy wins. A constant, and it used to be built
+-- fresh inside the scan below -- one table per aura event, for four fixed numbers.
+local RANK = { offence = 4, immune = 3, gone = 2, soak = 1 }
+
 -- An enemy unit: their defence, their offence, and the aura a cast of yours just produced.
 local function scanEnemy(unit)
   local guid = plain(try(UnitGUID, unit))
@@ -420,36 +450,48 @@ local function scanEnemy(unit)
   if not plain(try(UnitIsPlayer, unit)) then return end
   if not plain(try(UnitCanAttack, "player", unit)) then return end
 
-  local name = ns.FullName and ns.FullName(unit) or nil
+  -- Reading forty aura slots to decide what to say is pointless while nothing may be said. Two
+  -- calls ago is the whole of it: announce() refuses inside CALL_GAP and the scan would have
+  -- thrown the answer away. This is the one throttle in the file that saves real work rather
+  -- than real noise -- the profiler had this scan at twenty-six trips into the client per aura
+  -- event, and the window it skips is two full seconds wide.
+  --
+  -- The landing check below is deliberately outside it. That one feeds the diminishing-returns
+  -- table and never says anything, so a quiet announcer must not blind it.
+  if canCall() then
+    local name = ns.FullName and ns.FullName(unit) or nil
 
-  -- Everything they have is read first and then one thing is said, because the calls are
-  -- throttled: announcing whichever aura the game happened to list first meant a Shield Wall
-  -- could talk over the Recklessness that was about to kill you.
-  local RANK = { offence = 4, immune = 3, gone = 2, soak = 1 }
-  local best
-  for _, a in ipairs(readAuras(unit, "HELPFUL")) do
-    local key = english(a.name)
-    local def, off = DEFENCE[key], OFFENCE[key]
-    local kind, words, note
-    if off then kind, words, note = "offence", off.words, off.note
-    elseif def then kind, words, note = def.kind, def.words, def.note end
-    if kind and (not best or RANK[kind] > RANK[best.kind]) then
-      best = { kind = kind, words = words, note = note, id = a.id, left = secondsLeft(a) }
+    -- Everything they have is read first and then one thing is said, because the calls are
+    -- throttled: announcing whichever aura the game happened to list first meant a Shield Wall
+    -- could talk over the Recklessness that was about to kill you.
+    local bestKind, bestWords, bestNote, bestId, bestLeft
+    for i = 1, 40 do
+      local a = auraAt(unit, i, "HELPFUL", row)
+      if not a then break end
+      local key = english(a.name)
+      local def, off = DEFENCE[key], OFFENCE[key]
+      local kind, words, note
+      if off then kind, words, note = "offence", off.words, off.note
+      elseif def then kind, words, note = def.kind, def.words, def.note end
+      if kind and (not bestKind or RANK[kind] > RANK[bestKind]) then
+        bestKind, bestWords, bestNote, bestId, bestLeft = kind, words, note, a.id, secondsLeft(a)
+      end
     end
-  end
-  if best and fresh(guid .. "/" .. best.kind .. "/" .. best.id) then
-    local left = best.left
-    local digits = (best.kind == "offence") and "%.0f" or "%.1f"
-    announce(best.kind, best.words,
-      (name or "They") .. (left and (" for " .. digits .. "s"):format(left) or "") ..
-        (best.note and ("    " .. best.note) or ""),
-      best.kind == "offence" and "offence" or (best.kind == "immune" and "immune" or nil),
-      best.kind == "offence" and 3 or 2)
+    if bestKind and fresh(guid .. "/" .. bestKind .. "/" .. bestId) then
+      local digits = (bestKind == "offence") and "%.0f" or "%.1f"
+      announce(bestKind, bestWords,
+        (name or "They") .. (bestLeft and (" for " .. digits .. "s"):format(bestLeft) or "") ..
+          (bestNote and ("    " .. bestNote) or ""),
+        bestKind == "offence" and "offence" or (bestKind == "immune" and "immune" or nil),
+        bestKind == "offence" and 3 or 2)
+    end
   end
 
   -- Did the crowd control you just cast land on this unit? If so the game will say how long for.
   if pendingCast and pendingCast.guid == guid and GetTime() - pendingCast.at < 3 then
-    for _, a in ipairs(readAuras(unit, "HARMFUL")) do
+    for i = 1, 40 do
+      local a = auraAt(unit, i, "HARMFUL", row)
+      if not a then break end
       if english(a.name) == pendingCast.name and a.duration > 0 then
         Aura.NoteLanding(guid, pendingCast.group, a.duration, pendingCast.name)
         pendingCast = nil

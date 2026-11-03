@@ -10,8 +10,8 @@ end
 local function eq(a, b, label) check(a == b, label .. " (got " .. tostring(a) .. ", want " .. tostring(b) .. ")") end
 
 local ME = "Player-1-0000AAAA"
-M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", faction = "Horde", isMe = true })
-local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
+M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", race = "Scourge", sex = 2, faction = "Horde", isMe = true })
+local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
 local ns = M.load("Godslayer", FILES)
 M.fire("ADDON_LOADED", "Godslayer")
 M.fire("PLAYER_LOGIN")
@@ -67,6 +67,21 @@ eq(GodslayerDB.wide.race.Gnome, 2, "gnomes in Olympus count as gnomes too")
 kill(enemy("Big Lad", "Random Strangers", { race = "Tauren" }))
 eq(GodslayerDB.wide.race.Tauren, 1, "other races are counted as well")
 eq(GodslayerDB.wide.race.Gnome, 2, "a tauren is not a gnome")
+
+-- A race whose token is not its name. GetPlayerInfoByGUID returns "Undead" third and "Scourge"
+-- fourth, and the count is keyed on the fourth: an Undead filed under "Undead" matches nothing
+-- in RACE_TOKENS, so it used to be a kill that vanished -- on an English client for the Undead
+-- and the Night Elves, and on any other client for every race in the game.
+kill(enemy("Rotten Pete", "Random Strangers", { race = "Scourge" }))
+eq(GodslayerDB.wide.race.Scourge, 1, "an Undead is counted under its token")
+eq(GodslayerDB.wide.race.Undead, nil, "and never under its localised name")
+kill(enemy("Shadowmelder", "Random Strangers", { race = "NightElf" }))
+eq(GodslayerDB.wide.race.NightElf, 1, "a Night Elf keeps the token's spelling, with no space")
+
+-- A token the client offers that this addon has never heard of is dropped, not filed.
+kill(enemy("Something New", "Random Strangers", { race = "Vulpera" }))
+eq(GodslayerDB.wide.race.Vulpera, nil, "an unknown race token is not counted")
+eq(GodslayerDB.wide.race.Scourge, 1, "and does not disturb the ones that are")
 
 -- ---------------------------------------------------------------------------
 -- 3. Opening by itself after a quiet realm

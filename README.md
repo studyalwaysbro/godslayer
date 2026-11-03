@@ -29,6 +29,7 @@ Made by **The True Torchmen**. For the Horde.
 - **Moments.** Some kills are more than a number. REVENGE on the player you were fighting when you died. DOMINATION over one you keep killing. GIANT SLAYER for a victim well above your level, and a sad trombone for one far below it. OUTNUMBERED when you were alone against a crowd. COMEBACK after a bad run. A dry word about the victim's class, now and then ("The bubble was on cooldown.").
 - **Your class has a sound.** Your own big spells, cast in a fight with a player, make a noise worth making. The sheep when you Polymorph. A choir when you bubble. A bonk on Hammer of Justice, chains breaking and an eagle on Blessing of Freedom, a smoke puff on Vanish, a body hitting the floor on Feign Death, a scream on Psychic Scream, a demon on Death Coil, a bear when you become one. Seventy-three spells over all nine classes and the racials that matter, each rationed so a rotation is not a drum solo.
 - **Finishers.** A player who dies to you a moment after your spell landed is named by it, on the banner and out loud after the kill call: EXECUTED, PYROBLASTED, INCINERATED, SHATTERED, EVISCERATED, IN THE BACK, DEATH BY WAND, JUDGED, SMITED, MIND BLOWN, SOUL TAKEN, THUNDERSTRUCK, SHOCKED, SNIPED, MOONSTRUCK, MAULED. Every announcer says them in their own way ("Mauled. Nature is not kind.").
+- **The guild pools who keeps killing it.** Your dossier is yours alone, so every Torchman learns the realm's dangerous players one death at a time, separately. Each copy of the addon now tells the others, on the hidden channel, who just killed it — and the pooled answer turns up where you need it: on the battleground scoreboard before the gates open, under your cursor, and on the card after you die. `/godslayer threat`.
 - **The whole guild hears your big ones.** Hit GODLIKE, a RAMPAGE, GODSLAYER, or kill the King, and every guildmate running Godslayer gets a line in chat and, when they are not in a fight of their own, the announcer: "A Torchman is GODLIKE!" Rationed per guildmate, and the King is news every time.
 - **The chat wheel.** Dota's, with lines of our own. Bind a key (Key Bindings, AddOns, Godslayer), hold it, point at a line and let go. Banter on the first ring ("Easiest honor of my life."), callouts on the second ("Focus the healer!", "Rogue in stealth! Watch out!"); right-click turns the ring. Your party or raid hears the same line in the same voice if they run Godslayer, with your name in their chat. Nothing is written in any chat channel and nobody outside your group hears it. `/godslayer wheel` opens it for clicking.
 - **DENIED.** Interrupt an enemy player's spell and you hear it, see it, and now and then get told about it.
@@ -44,6 +45,12 @@ Made by **The True Torchmen**. For the Horde.
 - **The end of a hunt.** A heartbeat and a word with ten seconds left, so you can do something about it. Then the card, and the sum of it in chat: kills, points, best run. Ten kills without dying is a FLAWLESS HUNT. Beat your best hunt and you hear about it at the kill that does it.
 - **A hunt theme.** No song of your own? The addon comes with one, so the first kill starts music for everybody.
 - **The guild feed.** When a guildmate's score goes up, you get a line in chat and, now and then, the announcer mentions it.
+- **The last seconds of your life, hit by hit.** The combat log is shut to addons here, and Forever ships no death recap — but the data is open and unsecret. Die and you get the sequence: every hit, who landed it, your health at each step, how much was avoidable, and which one finished you. Plus the tally of what keeps killing you.
+- **Where the flag is while the map is shut.** Forever pins the flags on both maps, and a pin is a
+  texture that exists only while the map is open. This gives the yards, the turn to make as a
+  clock face, the speed, and how far a carrier is from scoring.
+- **What has hold of you, and what you can still cast.** Forever's own Loss of Control display shows one effect at a time — the highest priority, longest remaining — and only when the `lossOfControl` CVar is on. The data under it carries no secrecy annotation anywhere, so this reads all of it at once. Get Counterspelled and you are told which *school* is locked, for how long, and which of your own spells are still live. That last part is the one nothing else answers: Frostfire Bolt is in two schools at once, so a Counterspell on it takes your Fireball with it, and no icon on screen will tell you that.
+- **Who is in this battleground.** The scoreboard's numbers are sealed for the whole match on this client, but the ranks are not. Walk into a battleground and the addon tells you what you have walked into: both sides' rosters, each side's position on the fourteen rungs, who is highest and should not be opened on alone, how many of them can heal, and which of them you have killed before. When it ends the numbers unseal and you get the whole thing, including where you placed among all forty.
 
 ## What they have left
 
@@ -82,6 +89,269 @@ no-diminish spells too, because a shortening there would mean the client's own t
 
 Every number comes from `Godslayer/Pvp.lua`, generated from the installed client by
 `node tools/build_pvp_data.mjs`. `tools/pvp_report.md` is the readable version of it.
+
+## The ladder
+
+Forever has the vanilla fourteen: Scout to High Warlord for the Horde, Private to Grand Marshal
+for the Alliance. What it does not have is any of the functions an addon would reach for —
+`UnitPVPRank` does not exist anywhere in this client.
+
+Rank is kept as **renown on a major faction**, number 2800, which is how Forever's own character
+sheet reads it. `/godslayer rank` gives you the rung, the points inside it, what the next one is
+called, and — once you have killed anything tonight — roughly how many more kills it is from here.
+
+Two things in there are built to trip you. The title strings come in two unrelated families, and
+the wrong one is correct at rank 0 and then calls a Scout "Combatant I". And `GetPVPLifetimeStats`
+reports your best rank on a different numeric scale from the live one, four apart, so a straight
+read turns a First Sergeant into a Centurion. Both are handled, and both have tests.
+
+Dishonorable kills are live on this build, and the client's own tooltip says each one reduces your
+ranking. They arrive on the same event as honor, so the addon says something when you take one.
+
+## What actually happened
+
+`COMBAT_LOG_EVENT_UNFILTERED` is gone for addons here, which is why Forever has no Recount, no
+Skada and no Details, and why everything above counts kills rather than damage.
+
+The engine kept the numbers anyway. `C_DamageMeter` is public and documented on this client, and
+it gives the aggregate per source and per spell: damage, DPS, healing, absorbs, interrupts,
+dispels, damage taken, avoidable damage taken, deaths. `/godslayer recap` reads it:
+
+- what you dealt and at what rate, what you took, what you healed
+- your best spell and its share of your damage
+- **what killed you** — the spell the engine itself flags as the fatal one, and who cast it
+- how much of what hit you was avoidable
+- what each enemy personally put into you, kept against their name across fights
+
+It is a recap and not a live meter for a reason that is not a preference: every one of those
+getters is marked `SecretWhenInCombat`, so during the fight they hand back secret values, which
+cannot be added or compared. The numbers are read once the fight is over. Anything on this client
+claiming a live damage readout is reading nothing or about to throw.
+
+If the engine has nothing, the addon says the engine had nothing rather than reporting a quiet
+fight. The meter has its own availability check and its own failure reason, and both are shown.
+
+## The battleground
+
+The call every battleground addon reaches for is `GetBattlefieldScore`, and **on Forever it does
+not exist**. It is defined in exactly one file, `Blizzard_Deprecated/Mainline/Deprecated_12_0_1.lua`,
+and the toc gates that file `[AllowLoadGameType mainline]`. Forever's game type is camelot, so the
+file never loads and the `loadDeprecationFallbacks` CVar inside it never gets a chance to matter.
+A scoreboard addon carried over from Classic calls a nil global here.
+
+The real call is `C_PvP.GetScoreInfo`, which is what Forever's own scoreboard uses. And it carries
+`SecretInActivePvPMatch`: from the moment the gates open until the match is over, every number on
+that scoreboard is a secret value. Killing blows, deaths, damage, healing, every objective count.
+There is no way around it, so there is no such thing as a live battleground damage column on this
+realm.
+
+Seven fields come through anyway, because the client marks them `NeverSecret`: name, faction,
+race, gender, class, class token, and `honorLevel`. That last one is the interesting one, because
+in Camelot it is not the modern honor level — it is **the player's PvP rank**, and Forever's own
+scoreboard reads it with the same formula as the ladder above.
+
+So what is readable during the match is the one thing worth reading during it. `/godslayer field`:
+
+- both rosters, by name and class
+- each side's ladder: the average rung, how many are on it, and who is highest
+- how many rungs they are above or below you, and who you should not open on alone
+- how many on each side are in a class that can heal (not who is healing: `talentSpec` is sealed too)
+- which of them your dossier already knows, and how many times you have killed them
+
+`/godslayer field them` lists their side highest rung first. Then the match ends, the seal lifts,
+and the numbers arrive all at once: your killing blows, honorable kills, deaths, honor, damage,
+healing, where each of those placed you among all forty, which objectives you scored, and who on
+their side did the most killing. `/godslayer field last` keeps it.
+
+Two honest limits. The scoreboard has no guild column, so nothing here can feed the rival hunt;
+the cross-reference is by name against your own dossier. And during the match `guid` is sealed
+too, so a live roster can only be keyed by name — the client's own code agrees, and touches
+`scoreInfo.guid` only once the match is complete.
+
+## What has hold of you
+
+Almost everything worth reading on this client is behind a secrecy annotation. `C_LossOfControl`
+is not. It is declared available in every environment, and the call that reads it carries no
+annotation on its returns at all — the engine will simply tell you what has hold of you, which
+spell did it, and how many seconds are left.
+
+Forever does show some of it. The client's own display loads here:
+
+```
+Blizzard_FrameXML/Blizzard_FrameXML.toc:135
+  LossOfControlFrame.lua [AllowLoadGameType mists, mainline]
+```
+
+`mainline` is a family rather than a game type and camelot is inside it, so that frame is in this
+game — behind the `lossOfControl` CVar, showing exactly one effect at a time:
+
+```
+Blizzard_FrameXML/LossOfControlFrame.lua:66
+  -- only display an alert type if there's nothing up or it has higher priority.
+  -- If same priority, it needs to have longer time remaining
+```
+
+One at a time is the whole difference. A stun landing on top of a Counterspell replaces the
+Counterspell on screen, and the lockout is the half that decides what you do next.
+
+**The school lockout is the part that matters.** When a cast of yours is interrupted the game does
+not lock that spell. It locks the spell's *school*, and the entry says which — as a bit mask, so
+it can name more than one. Two spells in this build sit in two schools at once: **Frostfire Bolt
+is Fire and Frost together**, so a Counterspell landing on it locks both, and for a mage that
+leaves only Arcane. Chaos Bolt is five schools. Anything treating a lockout as one school is
+simply wrong for those two.
+
+So `/godslayer control` answers the question you actually had, which was never "what was
+interrupted" but "what can I still cast":
+
+> **FIRE+FROST LOCKED** — Fire and Frost locked for 6.2s. Still up: Arcane Blast, Blink, Polymorph.
+
+Each spell's school comes from the client's own `SpellMisc.SchoolMask`, and your spellbook narrows
+it to spells you actually have. `/godslayer control open` lists your book by school and marks the
+locked one.
+
+The rest of it: a stun, fear or root gets named with its remaining time, the engine's own duration
+feeds the diminishing-returns measurement (a better number than an aura read, because it is the
+figure the engine is counting down), and the session tally keeps which schools get locked on you
+most and the measured seconds you spent unable to act — measured between losing and regaining
+control, not summed from what each effect claimed, because two overlapping stuns claim twelve
+seconds and take six.
+
+The one thing it does not invent is a list of control types. The client itself special-cases
+exactly one, `SCHOOL_INTERRUPT`, and renders the rest from the entry's own text. This does the
+same, so a kind of control this build has and nobody here has heard of still gets announced
+properly.
+
+## The last seconds of your life
+
+Everything above is shaped by the combat log being shut to addons here. This part is not, because
+`C_DeathRecap` is open: four functions, **not one secrecy annotation between them**, handing back
+combat-log-shaped rows for the seconds before you died — the spell, who cast it, how much it did,
+which school, how much you absorbed or resisted, your health at that moment, whether it was
+avoidable, and which one finished you.
+
+Forever has a death recap window — `Blizzard_DeathRecap` is gated to the `mainline` family and
+camelot is in it — reachable from the damage meter, the death dialog and a chat link. It is a
+window you open afterwards and read. This is the same rows, said out loud the moment you hit the
+floor, kept, and pooled with the guild.
+
+`/godslayer death`:
+
+```
+Your death in Stranglethorn Vale at 19:06, 5 hits over 8.0 seconds:
+   -8.0s  Frostbolt (Sir Problem)        700  100% left
+          60 resisted
+   -4.0s  Curse of Agony (Grimnight)     120   81% left
+   -2.5s  Shadow Bolt (Grimnight)        500   64% left  avoidable
+          400 absorbed
+   -1.2s  Melee (Sir Problem)            420   50% left
+   -0.0s  Pyroblast (Sir Problem)      1,100   36% left  <- killed you
+          300 overkill
+  500 of the 2,840 you took was avoidable, 18% of it.
+```
+
+The engine hands those rows back **newest first** — the only statement of that fact anywhere is
+one line in a UI that does not load in this game — so a reader that trusts the order tells the
+story backwards and names the wrong spell as the one that killed you.
+
+`/godslayer death who` keeps the tally: what finishes you most often, who actually does the
+damage (summed across their hits, because the player who lands the last blow is usually not the
+one who did the work), and how much of everything that has killed you was avoidable.
+
+## Who keeps killing us
+
+Nothing in the game answers this. The guild roster, the honor ladder and the scoreboard all
+describe your own side. Your dossier describes the people *you* have killed. So the seventh
+Torchman to walk into a Warsong against the same arcane mage learns it exactly the way the first
+one did, and the guild never accumulates anything.
+
+Each copy of the addon now sends the others one short line when it dies: who did it, their class,
+their guild, and where. Every copy folds those into one table keyed on the killer. Nothing is
+written in any chat channel.
+
+```
+/godslayer threat
+
+Who the guild keeps dying to:
+  Sir Problem        Paladin   <Olympus>        11 deaths, 5 of us   2h ago
+  Grimnight          Warlock   <Olympus>         6 deaths, 4 of us   1d ago
+  Tiny Problem       Mage      <Olympus>         9 deaths, 1 of us   20m ago
+  3 names, 26 deaths pooled from 6 of us. Yours alone: 7.
+```
+
+Sorted by how many **separate** Torchmen a name has taken, not by the raw count: nine deaths to
+one person is a grudge, and nine of us once each is a problem, and only the second one is worth
+warning the guild about. `/godslayer threat <name>` opens one of them — everyone of ours they have
+killed, and how many times you have killed them back. `/godslayer threat guilds` answers which
+enemy guild is actually beating us, which is a different question from which one we farm.
+
+It pays off in three places. On the battleground scoreboard, before the gates open, beside the
+ladder read: *the guild has died to 2 of them: Sir Problem (5 of us, 11 times)*. Under your cursor,
+once per name. And on the death card, where the line about who killed you now carries what the
+rest of the guild already knew about them.
+
+**Who killed you is a heuristic on this client, and the addon treats it as one.** The combat log
+is shut, so nothing reports a killer. The recap names the caster of every hit and whoever did most
+of the damage is the answer; failing that, the hostile player you had targeted. Either way what
+comes back is a bare *name* — and the recap names a Venomtail Scorpid as happily as a player. So a
+name only enters a table the whole guild reads once something else vouches that it belongs to an
+enemy player: it was on screen and attackable, or it is in your dossier, or a guildmate has
+already reported it. A name nothing vouches for is dropped **and counted**, and the count prints
+at the bottom of the report, because a silent drop is the bug you never find.
+
+The leaderboard also carries a **Rung** column now — everyone's place on the fourteen, which rides
+along on the same message the totals do.
+
+## Where the flag is
+
+Forever already draws the flags. Both maps get them:
+
+```
+Blizzard_WorldMap/Blizzard_WorldMap.lua:209
+  self:AddDataProvider(CreateFromMixins(BattlefieldFlagDataProviderMixin));
+Blizzard_BattlefieldMap/Mainline/Blizzard_BattlefieldMap.lua:199
+  self:AddDataProvider(CreateFromMixins(BattlefieldFlagDataProviderMixin));
+```
+
+So this is not a missing feature, and the pin is genuinely live — it refreshes in `OnUpdate`. It
+is also a texture on a map, and it only exists while the map is open, which in a Warsong game is
+never.
+
+`/godslayer flag`:
+
+```
+2 flags on this map:
+  Yours   at home       62y 11 o'clock
+  Theirs  carried      210y  2 o'clock  7.0 y/s  48y from the cap
+Theirs flag is 48 yards from the cap.
+```
+
+Distance in yards, the turn to make as a clock face, how fast it is moving, and how far it is from
+scoring. It calls out a flag taken, a flag dropped and a flag home, and the line about the cap
+goes on the end of the battleground report.
+
+**Both coordinate systems are flipped, and that is where this goes wrong quietly.** The engine
+answers positions in normalised map space, and a distance does not exist there: the same 0.1 is a
+different number of yards on every map and a different number across a map than down it. So both
+points go through `C_Map.GetWorldPosFromMapPos` into real yards — where x runs **north** and y runs
+**west**, while normalised x runs east and normalised y runs south. Both axes reverse. Get one
+sign wrong and the distances still look plausible, the bearings are mirrored, and the addon sends
+you the wrong way with complete confidence. The tests are driven in yards for that reason: every
+distance asserted is a number the test asked for, and the round trip has to give it back.
+
+**Whose flag is whose is inferred, and it abstains.** `GetBattlefieldFlagPosition` hands back an
+index and a texture id and no faction, and nothing anywhere says which index is which side. But a
+flag sits at its own base until somebody takes it, so the first place an index holds is that
+flag's home — and when the gates open you are standing at yours. Both readings are guesses with a
+confidence test in front of them. A flag that was already moving the first time it was seen gets
+no base, and the report says how many it is abstaining on. A player who was at midfield when the
+flags were first read gets no side, and both flags are called "a flag". The yards and the bearing
+need neither inference and are exact in every case.
+
+The cap distance falls out of the homes without knowing anything about the map: you score by
+carrying their flag to yours, so a carried flag's destination is the *other* flag's home. With one
+flag on the map, or three, there is no single other home and that number is simply not given
+rather than guessed at.
 
 ## Install
 
@@ -161,6 +431,13 @@ Every line is in `tools/voice_script.json`: six packs, five scripts, and the cha
 | `/godslayer hitlist` | Olympians seen and not killed yet |
 | `/godslayer cds [name]` | What an enemy has spent, and when it comes back |
 | `/godslayer dr` | This build's diminishing groups, and the curve measured so far |
+| `/godslayer rank` | Your rung on the fourteen, the points left, and what tonight's rate makes of it |
+| `/godslayer recap [n]` | The last fight by the numbers, and what killed you |
+| `/godslayer field` | Who is in this battleground and how far up the ladder they are. `field them`, `field us`, `field last` |
+| `/godslayer control` | What has hold of you, which school is locked and what is still castable. `control open` for your book by school |
+| `/godslayer death` | The last seconds of your life, hit by hit. `death who` for what keeps killing you |
+| `/godslayer threat` | Who the guild keeps dying to. `threat <name>` for one of them, `threat guilds` for whose they are |
+| `/godslayer flag` | Where the flag is with the map shut: yards, bearing, speed, distance to the cap. `flag watch` toggles the callouts |
 | `/godslayer share` | Post a brag line to guild chat |
 | `/godslayer top` | Post the top 3 to guild chat |
 | `/godslayer demo` | Preview the kill banner |
@@ -189,12 +466,104 @@ Killing the other faction on a PvP realm is the game. Be a menace with a sword, 
 
 ## For tinkerers
 
+    sh tools/check.sh          # everything: syntax, the generated files, every suite, the soak, the cost
+
+Or one at a time:
+
     lua tests/run.lua          # scenario tests, Lua 5.1
     lua tests/v2.lua           # what 2.0 added
     lua tests/v22.lua          # what 2.2 added: fights, class sounds, finishers, streaks, the wheel
+    lua tests/field.lua        # the battleground, and the seal on its scoreboard
+    lua tests/control.lua      # school lockouts, including the two-school ones
+    lua tests/death.lua        # the death recap, and the order it comes back in
+    lua tests/threat.lua       # the pooled threat list, and what it refuses off the wire
+    lua tests/flag.lua         # the flag, and the two coordinate systems between you and it
+    lua tests/perf.lua         # what it costs the client, counted rather than assumed
     lua tests/fuzz.lua 3000    # 3,000 random sessions against a fake client
 
-`tests/mock.lua` is a small stand-in for the game API, including the "secret values" the Forever client uses. Bug reports and new brag lines are welcome in Issues. If a kill does not register, `/godslayer log` shows what the addon saw.
+`tests/mock.lua` is a small stand-in for the game API, including the "secret values" the Forever
+client uses. It models the seals rather than smoothing them over: a battleground scoreboard goes
+secret mid-match and an aura goes secret in combat, the way they do in game, because a friendly
+mock passes code that reads a secret as a zero. It also has to get the dull things right — its
+`time()` returns whole seconds because the client's does, and the one run where it did not, nine
+assertions in a different file failed for a reason nothing in them named. The map is driven in
+yards for the same reason: the client answers in normalised space, converting to yards reverses
+both axes, and a mock that took yards straight through would pass a sign error.
+
+The soak is not decoration either. It supplies the shapes a real client never sends and a broken
+one might — a player facing `0/0` is where the flag report's one crash came from.
+
+### What it costs the client
+
+    luatex --luaonly tools/profile.lua            # the report
+    luatex --luaonly tools/profile.lua --check    # the report, and a failure over budget
+
+An addon's cost in World of Warcraft is not its size and it is barely its arithmetic. It is trips
+across the Lua/C boundary, and garbage. Every `UnitGUID`, every `GetTime`, every `C_Map` call is a
+journey into the client; a hundred an event is invisible and ten thousand a second is a frame
+hitch, which in a fight is the whole reason anyone installed a PvP addon in the first place. And
+Lua's collector runs *during* the frame, so every table made on a hot event is a stutter paid for
+later, at a moment nothing gets to choose.
+
+Neither is visible from reading the code, because both are about how often a line runs rather than
+what it says. So `tools/profile.lua` boots the addon against the mock, drives a battleground at a
+rate a real one reaches — fifteen nameplates, forty health events a second, a kill every twelve
+seconds — and counts both, per call and per handler. `--check` makes it a gate: the budgets are
+the last measurement plus about fifteen percent, so the next change to put a module on a hot
+event has to notice that it did.
+
+Four things it found, which between them halved what the addon asks the client for:
+
+* **Nothing should walk forty nameplate tokens.** Four places did — the two-second sweep, the
+  sweep on every kill, the "who is hitting me" search, and the two questions the announcer asks
+  at a kill and at a death. The client *says* which plates exist, on `NAME_PLATE_UNIT_ADDED` and
+  `NAME_PLATE_UNIT_REMOVED`. A screen with a dozen plates on it was paying for twenty-eight that
+  were not there, three times over.
+* **An idle sweep should not re-read what it knows.** Once a plate's guild has arrived there is
+  nothing left to learn from it, and the only thing a repeat read can produce is a sighting call
+  — which the spotter will not repeat about the same player inside fifteen minutes. So a settled
+  plate is re-read every thirty seconds instead of every two, and nothing observable changes.
+* **`scrub` already exists.** The addon's `plain()` takes one value and asks the client whether it
+  is secret, and it was 62% of every call the addon made, because a six-field aura row costs six
+  of them. The client has had the bulk form all along — `scrub` returns its arguments with every
+  secret value replaced by `nil`, and every value that is not a string, number or boolean replaced
+  as well, which is the half most `plain()` callers were doing by hand on the next line. One
+  unthrottled aura scan went from 210 trips into the client to 70.
+* **Identify the spell before paying for the caster.** `UNIT_SPELLCAST_SUCCEEDED` is unfiltered,
+  so it arrives for every cast anyone in view finishes, and almost none of them are spells the
+  cooldown ledger tracks. Establishing that is a table lookup. Establishing that the caster is a
+  hostile player is six trips into the client, and was being spent first.
+
+`tests/perf.lua` is what keeps those four honest. A promise about *how often* something is called
+cannot be tested by looking at the answer — the answer is the same either way, which is the entire
+point — so the mock counts the calls and the suite asserts the rates. It also runs the addon's
+`scrub` fallback against the client's own `scrub` on every shape of value, because two code paths
+that are meant to agree and are never run against each other are a bug waiting for whichever
+client takes the other one. The soak gives a quarter of its thousand sessions a client with no
+`scrub` at all, for the same reason.
+
+Two files here are generated from the client's own data and must not be edited by hand:
+
+    node tools/build_pvp_data.mjs            # Godslayer/Pvp.lua and tools/pvp_report.md
+    luatex --luaonly tools/build_secrecy_map.lua   # docs/SECRECY.md
+
+**`docs/SECRECY.md` is the one to read before writing anything for this client.** It is built from
+the client's own generated API documentation and joins every secrecy rule to every call that
+carries it, lists the fields that are deliberately left open, and lists the interface files that
+are gated out of this game type — which is the difference between a function existing and existing
+here. Nearly every mistake in writing an addon for Forever is one of those three things, and all
+three look the same from the outside.
+
+That last list had **twice too many files in it** until this version, and the cause is worth
+knowing before you trust any `.toc` reading of your own: `AllowLoadGameType` takes the name of a
+**family** as well as a game type, and camelot is a member of `mainline`. Matching the word
+literally marks twenty-eight addons as absent that are plainly in the game — the mail frame, the
+friends list, the auction house — and invents gaps in the interface that are not there. The
+generator now reads families, handles `ExcludeLoadGameType` on both the file lines and the toc
+header, and asserts its own evidence for the family claim on every run.
+
+Bug reports and new brag lines are welcome in Issues. If a kill does not register,
+`/godslayer log` shows what the addon saw.
 
 ## Legal-ish
 

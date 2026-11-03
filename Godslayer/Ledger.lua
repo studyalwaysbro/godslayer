@@ -254,6 +254,12 @@ end
 -- A major cooldown with no aura to see is the one worth calling: a Lay on Hands or a Blink leaves
 -- nothing on them to read, so without this it happens in silence. Anything Aura already calls is
 -- left to Aura, so nothing is said twice.
+-- Is this a spell the ledger has a cooldown for? A pure table lookup, exposed so that the
+-- handler below can ask before it spends anything on the unit that cast it.
+function Ledger.Tracks(spell)
+  return type(spell) == "string" and spellInfo(spell) ~= nil
+end
+
 local function worthCalling(spell, info)
   if info.wait < MAJOR then return false end
   if ns.Aura then
@@ -265,12 +271,20 @@ end
 function h.UNIT_SPELLCAST_SUCCEEDED(unit, _, spellID)
   unit = plain(unit)
   if type(unit) ~= "string" or unit == "player" or unit == "pet" then return end
+
+  -- The spell is identified before anything is asked about the unit, and that order is the whole
+  -- economy of this handler. UNIT_SPELLCAST_SUCCEEDED is registered unfiltered, so in a
+  -- battleground it fires for every cast anyone in view completes -- and almost none of them are
+  -- spells this file has a cooldown for. Establishing that costs a table lookup. Establishing
+  -- that the caster is a hostile player costs six trips into the client, and used to be spent
+  -- first, on every Frostbolt and every wand shot on the screen.
+  local spell = spellName(spellID)
+  if not Ledger.Tracks(spell) then return end
+
   if not plain(try(UnitExists, unit)) then return end
   if not plain(try(UnitIsPlayer, unit)) then return end
   if not plain(try(UnitCanAttack, "player", unit)) then return end
 
-  local spell = spellName(spellID)
-  if not spell then return end
   local guid = plain(try(UnitGUID, unit))
   if type(guid) ~= "string" then return end
 

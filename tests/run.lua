@@ -8,9 +8,9 @@ end
 local function eq(a, b, label) check(a == b, label .. " (got " .. tostring(a) .. ", want " .. tostring(b) .. ")") end
 
 local ME = "Player-1-0000AAAA"
-M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", faction = "Horde" })
+M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", race = "Scourge", sex = 2, faction = "Horde" })
 
-local ns = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
+local ns = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "SomethingElse")
 check(GodslayerDB == nil, "ignores other addons loading")
 M.fire("PARTY_KILL", ME, "Player-1-00000001") -- before init: must not error
@@ -183,8 +183,15 @@ for _, m in ipairs(M.sentAddon) do
   check(#m[2] <= 255, "addon message fits")
 end
 check(sawHello, "hello sent after login"); check(sawStats, "stats broadcast after kills")
-check(sawStats and sawStats:match("^S;1;7;15;6;4;2;MAGE;" .. ns.VERSION:gsub("%.", "%%.") .. ";2;%x%x%x%x%x%x$"), "stats payload: " .. tostring(sawStats))
-local myTag = sawStats:match(";(%x+)$")
+-- Twelve fields since 2.6.0: the rung is appended AFTER the token, so the token stays at
+-- position eleven where every older copy of the addon looks for it. That ordering is the whole
+-- reason the format could be widened at all, so it is asserted on the field index rather than on
+-- the end of the string.
+check(sawStats and sawStats:match("^S;1;7;15;6;4;2;MAGE;" .. ns.VERSION:gsub("%.", "%%.") .. ";2;%x%x%x%x%x%x;"), "stats payload: " .. tostring(sawStats))
+local fields = { strsplit(";", sawStats or "") }
+local myTag = fields[11]
+check(type(myTag) == "string" and myTag:match("^%x%x%x%x%x%x$"), "the token is the eleventh field: " .. tostring(myTag))
+check(#fields == 12, "and the rung is the twelfth (" .. #fields .. " fields)")
 M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;400;400;400;0;0;MAGE;1.0.0;0;" .. myTag, "GUILD", "Vesh")  -- own echo under a shorter name
 M.fire("CHAT_MSG_ADDON", "Godslayer", "H;1;" .. myTag, "GUILD", "Vesh")
 M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;10;22;8;4;3;WARRIOR;1.0.0", "GUILD", "Brakka Ashmane")
@@ -338,7 +345,11 @@ for _, r in ipairs(board2) do
 end
 GodslayerFrame.tabs[3].__scripts.OnClick()
 check(GodslayerFrame.rows[1].cells[2].__text:find("Kingslayer", 1, true), "kingslayer tag on the leaderboard")
-check(GodslayerFrame.rows[1].cells[3].__text == "Blasphemer", "title column on the leaderboard: " .. tostring(GodslayerFrame.rows[1].cells[3].__text))
+-- Cell 3 is the ladder rung since 2.6.0 and the Godslayer title moved along to cell 4. A rung of
+-- its own is a dash here: the mock's major faction answers nothing, which is also what the real
+-- one does for the first moments after login.
+check(GodslayerFrame.rows[1].cells[3].__text:find("-", 1, true), "rung column on the leaderboard: " .. tostring(GodslayerFrame.rows[1].cells[3].__text))
+check(GodslayerFrame.rows[1].cells[4].__text == "Blasphemer", "title column on the leaderboard: " .. tostring(GodslayerFrame.rows[1].cells[4].__text))
 check(GodslayerFrame.status.__text:find("Title", 1, true) and GodslayerFrame.status.__text:find("Regicides", 1, true), "status line rendered")
 ns.Comm.ForgetRoster()
 
@@ -576,7 +587,7 @@ checkPhrases("1 kill")
 local saved = GodslayerDB
 M.frames, M.timers = { UIParent, Minimap, GameTooltip }, {}
 GodslayerFrame, GodslayerMinimapButton = nil, nil
-local ns2 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
+local ns2 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
 check(GodslayerDB == saved and ns2.char.kills == 1, "totals reload from saved variables")
 eq(GodslayerDB.version, 2, "data version")
@@ -594,7 +605,7 @@ do
   }
   M.frames, M.timers = { UIParent, Minimap, GameTooltip }, {}
   GodslayerFrame, GodslayerWindow, GodslayerMinimapButton, M.failTemplate = nil, nil, nil, nil
-  local ns3 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
+  local ns3 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
   local c3 = ns3.char
   eq(GodslayerDB.version, 2, "old data is marked as migrated"); eq(c3.kills, 2, "old kills kept"); eq(c3.points, 10, "old points kept")
@@ -624,7 +635,11 @@ do
   local mine
   for _, m in ipairs(M.sentAddon) do if m[2]:match("^S;1;") then mine = m[2] end end
   local fields = { strsplit(";", mine) }
-  eq(#fields, 11, "our stats message keeps the 1.0.0 field count")
+  -- Twelve since 2.6.0, and the twelfth is the only one that may be added: the token has to stay
+  -- at eleven or every 1.0.0 copy on the realm stops recognising its own echo and starts counting
+  -- itself as a guildmate.
+  eq(#fields, 12, "our stats message is the 1.0.0 shape plus the appended rung")
+  check(fields[11]:match("^%x%x%x%x%x%x$"), "the token is still the eleventh field")
 
   -- thousands of victims: only the newest feuds keep kill-by-kill history, every total stays
   local victims, extra = c3.victims, ns3.DETAIL_CAP + 120
@@ -669,7 +684,7 @@ do
   local OWN = "Interface\\AddOns\\GodslayerMusic\\"
   local SONG = OWN .. "kill.mp3"
   M.frames = {} -- one client, one copy of the addon: the copies loaded earlier in this file stop listening
-  local ns4 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
+  local ns4 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer") M.fire("PLAYER_LOGIN")
   local H = ns4.Hype
   local realToday, realPoints = ns4.KillsToday, ns4.char.points
@@ -1179,7 +1194,7 @@ do
   ns4.KillsToday, ns4.char.points = realToday, realPoints
   A.files[SONG] = true
   M.frames = {}
-  local ns5 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
+  local ns5 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer") M.fire("PLAYER_LOGIN")
   H = ns5.Hype
   A.played, A.stopped, A.music, A.musicStops = {}, {}, nil, 0
@@ -1319,5 +1334,11 @@ do
   assert(loadfile("Godslayer/Core.lua"))("Godslayer", probe)
   eq(toc:match("## Version: ([%d%.]+)"), probe.VERSION, "the toc and the code agree on the version")
 end
+-- The clock, last. A fractional time() is a client this game does not have, and the damage it does
+-- is invisible: date() throws, try() eats it, and every kill quietly loses its day and its hour
+-- three hundred assertions earlier. Counted at the source so it fails here instead of nowhere.
+eq(M.dateFloats, 0, "nothing asked date() for a fractional second")
+eq(time() % 1, 0, "time() returns whole seconds, like the client's")
+
 M.realPrint(("%d passed, %d failed"):format(passed, failed))
 os.exit(failed == 0 and 0 or 1)

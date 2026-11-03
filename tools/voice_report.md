@@ -2,7 +2,7 @@
 
 Every clip, the take that was kept, and what the transcription heard. `match` is how closely the words
 heard match the script (1.00 is exact). `bite` is how much edge the voice has (higher is fiercer).
-845 clips. Worth a listen: none flagged.
+977 clips. Worth a listen: none flagged.
 
 
 ## Titan (titan)
@@ -146,6 +146,28 @@ heard match the script (1.00 is exact). `bite` is how much edge the voice has (h
 | ally_rampage | A Torchman is on a RAMPAGE! | A torch man is on a rampage | 0.98 | 0 | 1 of 1 | 3.9 | -8.8 |  |
 | ally_godslayer | A Torchman has become a GODSLAYER! | A torch man has become a god slayer | 0.97 | 0 | 1 of 1 | 4.0 | -10.3 |  |
 | ally_regicide | A Torchman has slain the King! | A torchman has slain the king | 1.00 | 0 | 1 of 1 | 3.5 | -9.6 |  |
+| rankup | A NEW RANK! THE WAR KNOWS YOUR NAME! | A new rank. The war knows your name | 1.00 | 1 | 3 of 3 | 4.5 | -10.4 |  |
+| offence | BEWARE! THEY COME EMPOWERED! | Beware, they come empowered | 1.00 | 1 | 3 of 3 | 3.3 | -8.9 |  |
+| fieldwon | VICTORY! THE FIELD IS YOURS! | Victory! The field is yours | 1.00 | 1 | 3 of 3 | 3.8 | -7.7 |  |
+| fieldlost | Defeat. Remember how this tastes. | Defeat. Remember how this tastes | 1.00 | 0 | 1 of 1 | 3.8 | -8.7 |  |
+| locked | Locked out! Improvise! | Locked out. Improvise | 1.00 | 0 | 1 of 1 | 3.2 | -11.0 |  |
+| controlled | Held fast! Endure! | Held fast. Endure | 1.00 | 0 | 1 of 1 | 3.5 | -9.3 |  |
+| field | The field is scouted. Pick your prey! | The field is scouted. Pick your prey | 1.00 | 0 | 1 of 1 | 3.9 | -8.3 |  |
+| fieldhard | They outrank you. Humble them! | They outrank you. Humble them | 1.00 | 0 | 1 of 1 | 3.1 | -9.7 |  |
+| immune | Immune! Hold your spells! | Immune. Hold your spells | 1.00 | 0 | 1 of 1 | 3.5 | -9.1 |  |
+| flagtaken | The flag is taken! | The flag is taken | 1.00 | 0 | 1 of 1 | 2.5 | -8.5 |  |
+| flagdown | The flag is down! | The flag is down | 1.00 | 0 | 1 of 1 | 2.4 | -8.4 |  |
+| flaghome | The flag is home! | The flag is home | 1.00 | 0 | 1 of 1 | 3.4 | -7.6 |  |
+| cc_stun | Stunned! Shake it off! | Stunned? Shake it off | 1.00 | 0 | 1 of 1 | 3.1 | -8.3 |  |
+| cc_fear | Feared! Master yourself! | Feared. Master yourself | 1.00 | 0 | 1 of 1 | 3.7 | -7.4 |  |
+| cc_horror | Horrified! Stand your ground! | Horrified. Stand your ground | 1.00 | 0 | 1 of 1 | 3.8 | -9.3 |  |
+| cc_incap | Incapacitated! Wake! | Incapacitated. Wake | 1.00 | 0 | 1 of 1 | 3.6 | -10.0 |  |
+| cc_banish | Banished! Patience! | Banished. Patience | 1.00 | 0 | 1 of 1 | 3.1 | -7.6 |  |
+| cc_root | Rooted! Fight where you stand! | Rooted. Fight where you stand | 1.00 | 0 | 1 of 1 | 3.5 | -9.6 |  |
+| cc_disorient | Blinded! Trust your instincts! | Blinded. Trust your instincts | 1.00 | 0 | 1 of 1 | 3.4 | -10.7 |  |
+| cc_silence | Silenced! Let steel speak! | Silenced. Let steel speak | 1.00 | 0 | 1 of 1 | 3.8 | -8.5 |  |
+| cc_charm | Charmed! That hand is not yours! | Charmed. That hand is not yours | 1.00 | 0 | 1 of 1 | 3.8 | -8.9 |  |
+| cc_snare | Slowed! Press on! | Slowed. Press on | 1.00 | 0 | 1 of 1 | 3.1 | -8.4 |  |
 
 ## Herald (herald)
 
@@ -288,6 +310,28 @@ heard match the script (1.00 is exact). `bite` is how much edge the voice has (h
 | ally_rampage | A Torchman is on a RAMPAGE! | A torch man is on a rampage | 0.98 | 0 | 1 of 1 | 2.9 | -10.9 |  |
 | ally_godslayer | A Torchman has become a GODSLAYER! | A torch man has become a god slayer | 0.97 | 0 | 1 of 1 | 4.4 | -12.3 |  |
 | ally_regicide | A Torchman has slain the King! | A torch man has slain the king! | 0.98 | 0 | 1 of 1 | 2.6 | -10.2 |  |
+| rankup | A NEW RANK! THE WAR KNOWS YOUR NAME! | A new rank. The war knows your name | 1.00 | 2 | 3 of 3 | 4.3 | -12.2 |  |
+| offence | BEWARE! THEY COME EMPOWERED! | Beware! They come empowered | 1.00 | 2 | 3 of 3 | 3.1 | -11.8 |  |
+| fieldwon | VICTORY! THE FIELD IS YOURS! | Victory! The field is yours | 1.00 | 0 | 3 of 3 | 3.4 | -7.8 |  |
+| fieldlost | Defeat. Remember how this tastes. | Defeat. Remember how this tastes | 1.00 | 0 | 1 of 1 | 3.8 | -11.1 |  |
+| locked | Locked out! Improvise! | Locked out. Improvise | 1.00 | 0 | 1 of 1 | 2.6 | -11.8 |  |
+| controlled | Held fast! Endure! | Hold fast! Endure! | 0.94 | 0 | 1 of 1 | 2.6 | -11.4 |  |
+| field | The field is scouted. Pick your prey! | The field is scouted. Pick your prey | 1.00 | 0 | 1 of 1 | 3.5 | -9.5 |  |
+| fieldhard | They outrank you. Humble them! | They outrank you. Humble them | 1.00 | 0 | 1 of 1 | 2.9 | -10.9 |  |
+| immune | Immune! Hold your spells! | Immune! Hold your spells | 1.00 | 0 | 1 of 1 | 2.8 | -12.0 |  |
+| flagtaken | The flag is taken! | The flag is taken | 1.00 | 0 | 1 of 1 | 1.9 | -10.1 |  |
+| flagdown | The flag is down! | The flag is down | 1.00 | 0 | 1 of 1 | 2.4 | -10.1 |  |
+| flaghome | The flag is home! | The flag is home | 1.00 | 0 | 1 of 1 | 2.6 | -11.6 |  |
+| cc_stun | Stunned! Shake it off! | Stunned. Shake it off | 1.00 | 0 | 1 of 1 | 2.6 | -9.9 |  |
+| cc_fear | Feared! Master yourself! | Feared. Master yourself | 1.00 | 0 | 1 of 1 | 3.4 | -11.5 |  |
+| cc_horror | Horrified! Stand your ground! | Horrified. Stand your ground | 1.00 | 0 | 1 of 1 | 3.0 | -10.1 |  |
+| cc_incap | Incapacitated! Wake! | Incapacitated. Wake | 1.00 | 0 | 1 of 1 | 2.9 | -9.0 |  |
+| cc_banish | Banished! Patience! | Banished! Patience | 1.00 | 0 | 1 of 1 | 3.0 | -6.8 |  |
+| cc_root | Rooted! Fight where you stand! | Rooted. Fight where you stand | 1.00 | 0 | 1 of 1 | 2.8 | -11.9 |  |
+| cc_disorient | Blinded! Trust your instincts! | Blind it! Trust your instincts | 0.91 | 0 | 1 of 1 | 2.8 | -9.5 |  |
+| cc_silence | Silenced! Let steel speak! | Silenced! Let steel speak | 1.00 | 0 | 1 of 1 | 3.6 | -9.8 |  |
+| cc_charm | Charmed! That hand is not yours! | Charmed. That hand is not yours | 1.00 | 0 | 1 of 1 | 3.6 | -11.2 |  |
+| cc_snare | Slowed! Press on! | Slowed. Press on | 1.00 | 0 | 1 of 1 | 2.7 | -12.0 |  |
 
 ## Valkyrie (valkyrie)
 
@@ -431,6 +475,28 @@ heard match the script (1.00 is exact). `bite` is how much edge the voice has (h
 | ally_rampage | A Torchman is on a RAMPAGE! | A torch man is on a rampage | 0.98 | 0 | 1 of 1 | 3.4 | -10.1 |  |
 | ally_godslayer | A Torchman is a GODSLAYER! Sing it! | A torchman is a god slayer. Sing it | 0.99 | 0 | 1 of 1 | 4.8 | -11.8 |  |
 | ally_regicide | A Torchman has slain the King! Hail! | A torch man has slain the king. Hail | 0.99 | 0 | 1 of 1 | 4.2 | -8.9 |  |
+| rankup | A NEW RANK! THE SLAIN SALUTE YOU! | A new rank. The slain salute you | 1.00 | 2 | 3 of 3 | 4.3 | -9.8 |  |
+| offence | WAR HORNS! THEY COME EMPOWERED! | War horns. They come empowered | 1.00 | 2 | 3 of 3 | 3.8 | -11.3 |  |
+| fieldwon | VICTORY! THE FIELD IS OURS! | Victory! The field is ours | 1.00 | 2 | 3 of 3 | 4.6 | -8.0 |  |
+| fieldlost | Defeat. The slain remember everything. | Defeat. The slain remember everything | 1.00 | 0 | 1 of 1 | 4.5 | -9.0 |  |
+| locked | Locked! Let the shield answer! | Locked. Let the shield answer | 1.00 | 0 | 1 of 1 | 3.6 | -10.1 |  |
+| controlled | Held! Break the chains! | Held! Break the chains | 1.00 | 0 | 1 of 1 | 3.4 | -10.4 |  |
+| field | The enemy is counted. Spears ready! | The enemy is counted. Spears ready | 1.00 | 0 | 1 of 1 | 3.9 | -8.8 |  |
+| fieldhard | They outrank us. Good. More glory! | They outrank us. Good. More glory | 1.00 | 0 | 1 of 1 | 4.3 | -11.7 |  |
+| immune | Immune! Spare your strength! | Immune. Spare your strength | 1.00 | 0 | 1 of 1 | 3.7 | -9.1 |  |
+| flagtaken | The banner is taken! | The banner is taken | 1.00 | 0 | 1 of 1 | 2.8 | -9.0 |  |
+| flagdown | The banner falls! | The banner falls | 1.00 | 0 | 1 of 1 | 2.8 | -10.0 |  |
+| flaghome | The banner is home! | The banner is home | 1.00 | 0 | 1 of 1 | 2.8 | -8.5 |  |
+| cc_stun | Stunned! On your feet, warrior! | Stunned. On your feet, warrior | 1.00 | 0 | 1 of 1 | 3.2 | -12.0 |  |
+| cc_fear | Feared! Find your courage! | Feared. Find your courage | 1.00 | 0 | 1 of 1 | 3.6 | -10.2 |  |
+| cc_horror | Horror grips you! Cast it off! | Horror grips you. Cast it off | 1.00 | 0 | 1 of 1 | 3.1 | -10.7 |  |
+| cc_incap | Laid low! Rise! | Laid low. Rise | 1.00 | 0 | 1 of 1 | 3.6 | -10.4 |  |
+| cc_banish | Banished! The field waits! | Banished! The field waits | 1.00 | 0 | 1 of 1 | 3.6 | -8.7 |  |
+| cc_root | Rooted! Cut yourself loose! | Rooted. Cut yourself loose | 1.00 | 0 | 1 of 1 | 4.0 | -9.5 |  |
+| cc_disorient | Blinded! Shield high! | Blinded. Shield high | 1.00 | 0 | 1 of 1 | 2.7 | -8.7 |  |
+| cc_silence | Silenced! The axe still sings! | Silenced. The axe still sings | 1.00 | 0 | 1 of 1 | 4.2 | -8.2 |  |
+| cc_charm | Charmed! Reclaim your will! | Charmed. Reclaim your will | 1.00 | 0 | 1 of 1 | 3.8 | -11.7 |  |
+| cc_snare | Slowed! Push through! | Slowed. Push through | 1.00 | 0 | 1 of 1 | 2.8 | -10.9 |  |
 
 ## Frostbite (frost)
 
@@ -575,6 +641,28 @@ heard match the script (1.00 is exact). `bite` is how much edge the voice has (h
 | ally_rampage | A Torchman is on a RAMPAGE! Brr! | A torch man is on a rampage. Brr | 0.98 | 0 | 1 of 1 | 4.6 | -8.7 |  |
 | ally_godslayer | A Torchman is a GODSLAYER! Jealous! | A torch man is a god slayer. Jealous | 0.97 | 0 | 1 of 1 | 4.1 | -7.6 |  |
 | ally_regicide | A Torchman killed the King! Without me! | A torch man killed the king without me | 0.99 | 0 | 1 of 1 | 3.4 | -8.5 |  |
+| rankup | A NEW RANK! CHILLS! ACTUAL CHILLS! | A new rank. Chills, actual chills | 1.00 | 0 | 3 of 3 | 4.3 | -9.1 |  |
+| offence | CAREFUL! SOMEONE WOKE UP ANGRY! | Careful. Someone woke up angry | 1.00 | 2 | 3 of 3 | 3.3 | -7.7 |  |
+| fieldwon | VICTORY! ICE COLD! | Victory! Ice cold | 1.00 | 2 | 3 of 3 | 3.4 | -5.0 |  |
+| fieldlost | Defeat. Brr. Let's not. | Defeat brrr let's not | 0.97 | 0 | 1 of 1 | 3.1 | -7.8 |  |
+| locked | Locked out! Brain freeze! | Locked out brain freeze | 1.00 | 0 | 1 of 1 | 2.8 | -6.6 |  |
+| controlled | All frozen up! Hang on! | All frozen up hang on | 1.00 | 0 | 1 of 1 | 3.1 | -9.6 |  |
+| field | Counted them all! This looks fun! | Counted them all. This looks fun | 1.00 | 0 | 1 of 1 | 3.1 | -10.8 |  |
+| fieldhard | Ooh, big ranks! Stay frosty! | Ooh, big ranks. Stay frosty | 1.00 | 0 | 1 of 1 | 3.5 | -8.4 |  |
+| immune | Immune! Don't waste the good stuff! | Immune: Don't waste the good stuff | 1.00 | 0 | 1 of 1 | 2.9 | -10.8 |  |
+| flagtaken | Flag taken! Ooh! | Flag taken. Ooh | 1.00 | 0 | 1 of 1 | 2.9 | -8.2 |  |
+| flagdown | Flag on the floor! | Flag on the floor | 1.00 | 0 | 1 of 1 | 2.0 | -10.5 |  |
+| flaghome | Flag's home! Cozy! | Flags home. Cozy | 1.00 | 0 | 1 of 1 | 2.8 | -9.7 |  |
+| cc_stun | Stunned! Ow ow ow! | Stunned. Ow, ow, ow | 1.00 | 0 | 1 of 1 | 2.6 | -8.7 |  |
+| cc_fear | Feared! Where are we going? | Feared. Where are we going? | 1.00 | 0 | 1 of 1 | 2.5 | -10.6 |  |
+| cc_horror | Horrified! It's not that scary! | Horrified. It's not that scary | 1.00 | 0 | 1 of 1 | 3.6 | -10.7 |  |
+| cc_incap | Napping? Now? Really? | Napping now really? | 1.00 | 0 | 1 of 1 | 3.1 | -10.7 |  |
+| cc_banish | Banished! How rude! | Banished? How rude | 1.00 | 0 | 1 of 1 | 2.5 | -10.1 |  |
+| cc_root | Rooted! Stuck solid! | Rooted. Stuck solid | 1.00 | 0 | 1 of 1 | 3.1 | -9.0 |  |
+| cc_disorient | Blinded! Over here! No, here! | Blinded! Over here. No, here | 1.00 | 0 | 1 of 1 | 3.6 | -8.1 |  |
+| cc_silence | Silenced! Shh, apparently! | Silenced. Shh. Apparently | 1.00 | 0 | 1 of 1 | 3.1 | -5.1 |  |
+| cc_charm | Charmed! Snap out of it! | Charmed. Snap out of it | 1.00 | 0 | 1 of 1 | 2.4 | -8.5 |  |
+| cc_snare | Slowed! Cold feet? | Slowed. Cold feet? | 1.00 | 0 | 1 of 1 | 2.7 | -11.9 |  |
 
 ## The Naturalist (naturalist)
 
@@ -720,6 +808,28 @@ heard match the script (1.00 is exact). `bite` is how much edge the voice has (h
 | ally_rampage | Elsewhere, a Torchman is on a rampage. | Elsewhere, a torch man is on a rampage | 0.99 | 0 | 1 of 1 | 3.0 | -12.2 |  |
 | ally_godslayer | Elsewhere, a Torchman has become a godslayer. | Elsewhere, a torch man has become a god slayer | 0.98 | 0 | 1 of 1 | 3.6 | -11.4 |  |
 | ally_regicide | Elsewhere, a Torchman has slain the King. | Elsewhere, a torchman has slain the king | 1.00 | 0 | 1 of 1 | 3.0 | -13.0 |  |
+| rankup | A promotion. The hierarchy adjusts itself accordingly. | A promotion? The hierarchy adjusts itself accordingly | 1.00 | 1 | 3 of 3 | 4.1 | -13.1 |  |
+| offence | Observe. The prey bares its fangs. | Observe, the prey bears its fangs | 0.97 | 0 | 3 of 3 | 3.1 | -12.7 |  |
+| fieldwon | Victory. The strong survive, as ever. | Victory. The strong survive, as ever | 1.00 | 2 | 3 of 3 | 3.6 | -13.4 |  |
+| fieldlost | Defeat. Nature selected the other side today. | Defeat. Nature selected the other side today | 1.00 | 0 | 1 of 1 | 3.8 | -11.8 |  |
+| locked | A lockout. The repertoire narrows, briefly. | A lockout. The repertoire narrows briefly | 1.00 | 0 | 1 of 1 | 3.7 | -14.5 |  |
+| controlled | Restrained. Nature is seldom fair. | Restrained. Nature is seldom fair | 1.00 | 0 | 1 of 1 | 3.3 | -11.2 |  |
+| field | The rival herd is counted. The hunt may begin. | The rival herd is counted. The hunt may begin | 1.00 | 0 | 1 of 1 | 3.7 | -14.7 |  |
+| fieldhard | A stronger herd. Fascinating. Dangerous. | A stronger herd. Fascinating. Dangerous | 1.00 | 0 | 1 of 1 | 4.2 | -12.4 |  |
+| immune | Impenetrable. Conserve the venom. | Impenetrable. Conserve the venom | 1.00 | 0 | 1 of 1 | 3.2 | -14.0 |  |
+| flagtaken | The flag is taken. A chase begins. | The flag is taken. A chase begins | 1.00 | 0 | 1 of 1 | 3.2 | -10.8 |  |
+| flagdown | The flag is dropped. Opportunity, for someone. | The flag is dropped. Opportunity for someone | 1.00 | 0 | 1 of 1 | 3.7 | -13.6 |  |
+| flaghome | The flag returns home. Order is restored. | The flag returns home. Order is restored | 1.00 | 0 | 1 of 1 | 3.6 | -13.8 |  |
+| cc_stun | Stunned. Even the apex predator blinks. | Stunned. Even the apex predator blinks | 1.00 | 0 | 1 of 1 | 3.8 | -12.8 |  |
+| cc_fear | Flight, for once, over fight. | Flight for once over fight | 1.00 | 0 | 1 of 1 | 2.7 | -15.3 |  |
+| cc_horror | Horror. The night has teeth after all. | Horror. The night has teeth after all | 1.00 | 0 | 1 of 1 | 3.8 | -14.3 |  |
+| cc_incap | Subdued. Patience. Play dead. | Subdued. Patience. Play dead | 1.00 | 0 | 1 of 1 | 3.7 | -12.3 |  |
+| cc_banish | Banished. Briefly removed from the ecosystem. | Banished: briefly removed from the ecosystem | 1.00 | 0 | 1 of 1 | 3.6 | -13.4 |  |
+| cc_root | Rooted. The ground itself objects. | Rooted. The ground itself objects | 1.00 | 0 | 1 of 1 | 3.4 | -13.6 |  |
+| cc_disorient | Blinded. The senses betray their owner. | Blinded. The senses betray their owner | 1.00 | 0 | 1 of 1 | 3.5 | -14.3 |  |
+| cc_silence | Silenced. No birdsong this morning. | Silenced. No birdsong this morning | 1.00 | 0 | 1 of 1 | 3.9 | -13.6 |  |
+| cc_charm | Charmed. The mind wanders from the body. | Charmed. The mind wanders from the body | 1.00 | 0 | 1 of 1 | 3.4 | -14.6 |  |
+| cc_snare | Slowed. The chase turns against us. | Slowed. The chase turns against us | 1.00 | 0 | 1 of 1 | 3.3 | -11.2 |  |
 
 ## Sable (sable)
 
@@ -863,6 +973,28 @@ heard match the script (1.00 is exact). `bite` is how much edge the voice has (h
 | ally_rampage | A Torchman is on a RAMPAGE! | A torch man is on a rampage | 0.98 | 0 | 1 of 1 | 3.2 | -8.2 |  |
 | ally_godslayer | A Torchman is a GODSLAYER! Show off! | A torch man is a god slayer. Show off | 0.97 | 0 | 1 of 1 | 3.8 | -8.3 |  |
 | ally_regicide | A Torchman killed the King! Clip it! | A torch man killed the king. Clip it | 0.99 | 0 | 1 of 1 | 2.8 | -7.6 |  |
+| rankup | RANK UP! LOOK AT YOU GO! | Rank up. Look at you go | 1.00 | 0 | 3 of 3 | 2.7 | -6.8 |  |
+| offence | HEADS UP! THEY'RE POPPING EVERYTHING! | Heads up, they're popping everything | 1.00 | 0 | 3 of 3 | 3.0 | -7.1 |  |
+| fieldwon | VICTORY! NEVER DOUBTED YOU! | Victory! Never doubted you | 1.00 | 0 | 3 of 3 | 3.1 | -4.8 |  |
+| fieldlost | Defeat. We're not posting that one. | Defeat. We're not posting that one | 1.00 | 0 | 1 of 1 | 3.4 | -8.9 |  |
+| locked | Locked out! Awkward! | Locked out. Awkward | 1.00 | 0 | 1 of 1 | 2.7 | -10.2 |  |
+| controlled | You're controlled! Just vibe! | You're controlled. Just vibe | 1.00 | 0 | 1 of 1 | 2.8 | -10.2 |  |
+| field | Scouted! Easy lobby! | Scouted: easy lobbies | 0.89 | 0 | 1 of 1 | 2.4 | -8.2 |  |
+| fieldhard | They outrank you! Free content! | They outrank you. Free content | 1.00 | 0 | 1 of 1 | 2.7 | -7.6 |  |
+| immune | Immune! Stop hitting that! | Immune. Stop hitting that | 1.00 | 0 | 1 of 1 | 2.8 | -8.5 |  |
+| flagtaken | Flag taken! Drama! | Flag taken. Drama | 1.00 | 0 | 1 of 1 | 2.5 | -8.4 |  |
+| flagdown | Flag's down! Grab it! | Flags down. Grab it | 1.00 | 0 | 1 of 1 | 2.0 | -8.2 |  |
+| flaghome | Flag's home! Tidy! | Flags home. Tidies | 0.88 | 0 | 1 of 1 | 2.4 | -8.2 |  |
+| cc_stun | Stunned! Rude! | Stunned. Rude | 1.00 | 0 | 1 of 1 | 2.2 | -9.2 |  |
+| cc_fear | Feared! Where are you going? | Feared. Where are you going? | 1.00 | 0 | 1 of 1 | 2.6 | -9.2 |  |
+| cc_horror | Horrified! So dramatic! | Horrified? So dramatic | 1.00 | 0 | 1 of 1 | 3.0 | -10.2 |  |
+| cc_incap | Napping! Bold choice! | Napping. Bold choice | 1.00 | 0 | 1 of 1 | 2.6 | -8.9 |  |
+| cc_banish | Banished! See you in a bit! | Vanished. See you in a bit | 0.96 | 0 | 1 of 1 | 2.4 | -6.0 |  |
+| cc_root | Rooted! You live here now! | Rooted. You live here now | 1.00 | 0 | 1 of 1 | 2.5 | -8.8 |  |
+| cc_disorient | Blinded! Eyes up! | Blinded. Eyes up | 1.00 | 0 | 1 of 1 | 2.3 | -7.7 |  |
+| cc_silence | Silenced! The audacity! | Silenced. The audacity | 1.00 | 0 | 1 of 1 | 2.9 | -7.8 |  |
+| cc_charm | Charmed! Who's driving? | Charmed. Who's driving? | 1.00 | 0 | 1 of 1 | 2.9 | -7.6 |  |
+| cc_snare | Slowed! Little legs! | Slowed. Little legs | 1.00 | 0 | 1 of 1 | 2.5 | -10.1 |  |
 
 ## Chat wheel (wheel)
 

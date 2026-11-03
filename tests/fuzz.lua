@@ -4,14 +4,18 @@
 package.path = "tests/?.lua;" .. package.path
 local M = require("mock")
 local RUNS, EVENTS = tonumber(arg[1]) or 1000, tonumber(arg[2]) or 250
-local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
+local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Flag.lua", "Control.lua", "Death.lua", "Threat.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
 local ME, MATE, STRANGER = "Player-1-0000AAAA", "Player-1-0000BBBB", "Player-1-0000CCCC"
 local GUILDS = { "OLYMPUS", "OLYMPUS", "Olympus Kitchen", "OLYMPUS BETZ", "OLYMPUS XIlI", "HOELYMPUS", "The Enclave",
                  "0lympus", "Method", "The True Torchmen", "Olympic Swim Team", "", "x|cffff0000y|r", "Olympus;S;1", false }
 local TOKENS = { "target", "mouseover", "focus", "softenemy", "nameplate1", "nameplate2", "nameplate3", "nameplate17", "nameplate40" }
 local GARBAGE = { "", ";", "S", "S;1", "S;1;;;;;;", "S;1;1;1;1;1;1;MAGE;1.0.0", "S;1;5;25;5;5;5;MAGE;1.0.0;5", "S;1;-1;0;0;0;0",
                   "S;1;1e99;1;1;1;1", "S;1;3;3;3;3;0;mage;v", "H;1", "H;2", "H", "S;1;2;10;2;0;2;|cff;|r;2", ("S;1;"):rep(60),
-                  "S;1;1.5;2;1;0;0", "S;1;2;2;3;0;0", "S;1;2;2;1;3;0", "S;1;nan;inf;1;1;1" }
+                  "S;1;1.5;2;1;0;0", "S;1;2;2;3;0;0", "S;1;2;2;1;3;0", "S;1;nan;inf;1;1;1",
+                  -- 2.6: the rung rides on the end, where an older copy never looks
+                  "S;1;5;25;5;5;5;MAGE;2.6.0;5;abcdef;7", "S;1;5;25;5;5;5;MAGE;2.6.0;5;abcdef;99",
+                  "S;1;5;25;5;5;5;MAGE;2.6.0;5;abcdef;-1", "S;1;5;25;5;5;5;MAGE;2.6.0;5;abcdef;1.5",
+                  "S;1;5;25;5;5;5;MAGE;2.6.0;5;abcdef;", "K;1", "K;1;;;;;", "K;1;Name;MAGE;G;Z", ("K;1;"):rep(60) }
 local ZONES = { "Stranglethorn Vale", "Hillsbrad Foothills", "Ashenvale", "", "Zone|cffff0000 Red|r", ("Long Zone Name "):rep(8),
                 "Sen\195\177ora's Rest", "A\nB", "Elsewhere" }
 local RACES = { "Human", "Dwarf", "Night Elf", "Gnome", "", "R|ace", ("Race"):rep(30) }
@@ -23,16 +27,22 @@ local SLASHES = { "hype", "hype test", "hype test olympus", "hype test king", "h
                   "add Method", "ignore OLYMPUS BETZ", "unignore OLYMPUS BETZ", "remove Method", "ignore Olympus", "unignore Olympus",
                   "add", "ignore   ", "reset", "reset roster", "bogus |cff", "add %s%d", "ignore ;;;",
                   "dossier Enemy", "dossier Enemy3 Last3", "dossier", "dossier %s|cff", "who asmon", "nemesis", "hitlist",
+                  "threat", "threat guilds", "threat forget", "threat Enemy", "threat %s|cff", "threat    ", "threat ;;;",
                   -- 2.2: fights, class sounds, finishers, streaks, the wheel
                   "hype test engage", "hype test engage god", "hype engage off", "hype engage on", "hype class off", "hype class on",
                   "hype finishers off", "hype finishers on", "hype test finisher execute", "hype test finisher zz", "hype test sig polymorph",
                   "hype test sig", "hype test streak godlike", "hype test streak", "hype streaks off", "hype streaks on", "hype wheel off",
-                  "hype wheel on", "wheel", "wheel list", "wheel 3", "wheel 99", "wheel -1" }
+                  "hype wheel on", "wheel", "wheel list", "wheel 3", "wheel 99", "wheel -1",
+                  -- 2.6: the ladder, the recap, the battleground, the lockout
+                  "rank", "rank zz", "recap", "recap 1", "recap 99", "recap -1", "dr",
+                  "field", "field them", "field us", "field last", "field zz",
+                  "control", "control open", "control zz",
+                  "death", "death 1", "death 2", "death 99", "death who", "death zz" }
 local SPELLS = { [118] = "Polymorph", [642] = "Divine Shield", [5308] = "Execute", [5019] = "Shoot", [116] = "Frostbolt", [2139] = "Counterspell",
                  [1] = "Hearthstone", [2] = "Feign Death", [3] = "Bear Form", [4] = "Chaos Bolt" }
 local WHEEL_MESSAGES = { "W;1;1;aaa", "W;1;16;aaa", "W;1;0;aaa", "W;1;17;aaa", "W;1;x;aaa", "W;1;2.5;aaa", "W;1", "R;1;godlike;bbb", "R;1;regicide;bbb",
                          "R;1;rampage", "R;1;zz;bbb", "R;1;;bbb", "R;2;godlike;bbb" }
-local failures, totalKills, totalEvents, migrated, dossiers = 0, 0, 0, 0, 0
+local failures, totalKills, totalEvents, migrated, dossiers, noScrub = 0, 0, 0, 0, 0, 0
 
 -- A database the way 1.0.0 wrote it: totals that add up, victims with none of the new fields.
 local function oldDatabase(R)
@@ -75,11 +85,25 @@ for seed = 1, RUNS do
   M.sentAddon, M.sentChat, M.printed, M.lockdown, M.inGuild, M.hk, M.addonResult = {}, {}, {}, false, true, R(0, 40), 0
   M.frames = { UIParent, Minimap, GameTooltip }
   M.zone, M.subzone, M.myLevel, M.secretZone, M.secretMyLevel, M.dateError = "Stranglethorn Vale", "Booty Bay", R(1, 60), nil, nil, nil
+  -- the newer namespaces keep state of their own, and a run that inherits the last one's
+  -- battleground or lockout is not a fresh client
+  M.bg, M.bgRequests, M.loc, M.known, M.knowAll = nil, 0, {}, {}, R(3) == 1
+  M.recaps, M.recapMax = {}, 0
   GodslayerDB, GodslayerFrame, GodslayerWindow, GodslayerMinimapButton, M.failTemplate = nil, nil, nil, nil, R(10) == 1
   local inherited = 0
   if R(3) == 1 then GodslayerDB, inherited = oldDatabase(R); migrated = migrated + 1 end
-  M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", faction = "Horde" })
+  M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", race = "Scourge", sex = 2, faction = "Horde" })
+  -- One run in four is given a client with no `scrub`, which makes the addon install its own
+  -- one-value-at-a-time fallback instead. Taken away before the load and not after, because
+  -- Core.lua captures the global once when it loads and a client that acquires the function
+  -- halfway through a session is not a client that exists. Both paths are supposed to give the
+  -- same answers to everything in this file, and the only way to know they do is to make a
+  -- quarter of the storms run through the other one.
+  local realScrub = scrub
+  local without = R(4) == 1
+  if without then scrub, noScrub = nil, noScrub + 1 end
   local ns = M.load("Godslayer", FILES)
+  scrub = realScrub
   M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
   -- every announcer line exists on disk, so the voice really queues and plays in this soak
   M.audio.files, M.audio.played, M.audio.music = {}, {}, nil
@@ -108,7 +132,7 @@ for seed = 1, RUNS do
     return players[R(#players)].guid
   end
   for _ = 1, EVENTS do
-    local e = R(31)
+    local e = R(43)
     if e <= 4 then
       local token = TOKENS[R(#TOKENS)]
       M.units[token] = (R(4) == 1) and nil or players[R(#players)]
@@ -198,6 +222,133 @@ for seed = 1, RUNS do
       if R(3) == 1 then Godslayer_Wheel(R(2) == 1 and "down" or "up") end
     elseif e == 21 then
       if M.tooltipHook then GameTooltip.__unit = R(3) == 1 and M.secret() or TOKENS[R(#TOKENS)]; GameTooltip.__lines = {}; M.tooltipHook(GameTooltip) end
+    elseif e <= 24 then
+      -- A battleground, built badly on purpose: rows with no faction, ranks off the end of the
+      -- ladder, a scoreboard that empties mid-match, a match that completes twice.
+      local what = R(5)
+      if what == 1 then
+        M.bg = nil
+        M.fire("PLAYER_ENTERING_WORLD")
+      else
+        local rows = {}
+        for i = 1, R(0, 6) do
+          local p = players[R(#players)]
+          rows[i] = { name = ({ p.name, p.name, "", nil, ("N"):rep(80), "A|cffB" })[R(6)],
+                      faction = ({ 0, 1, 0, 1, nil, 2, -1, 1.5 })[R(8)],
+                      race = p.race, gender = p.sex, class = "Mage", token = p.class,
+                      rank = ({ R(0, 14), R(0, 14), nil, 262, -3, 14, 0, 99 })[R(8)],
+                      guid = p.guid, kb = R(0, 20), hk = R(0, 40), deaths = R(0, 9),
+                      honor = R(0, 900), damage = R(0, 200000), healing = R(0, 90000),
+                      stats = (R(3) == 1) and { { name = ({ "Flag Captures", "", nil })[R(3)], value = R(0, 5) } } or nil }
+        end
+        M.battleground({ rows = rows, state = ({ 0, 1, 2, 3, 3, 4, 5 })[R(7)],
+                         factional = R(4) ~= 1, winner = ({ 0, 1, nil, 7 })[R(4)],
+                         duration = R(0, 3000), cols = (R(2) == 1) and { "Flag Captures", "" } or nil })
+        M.fire(({ "PLAYER_JOINED_PVP_MATCH", "PVP_MATCH_ACTIVE", "UPDATE_BATTLEFIELD_SCORE", "PLAYER_ENTERING_WORLD" })[R(4)])
+        if R(3) == 1 then M.bgComplete(({ 0, 1, nil })[R(3)], R(0, 3000)) M.fire("PVP_MATCH_COMPLETE") end
+        if R(4) == 1 then M.fire("PVP_MATCH_COMPLETE") end
+        if R(5) == 1 then M.bg = nil M.fire("UPDATE_BATTLEFIELD_SCORE") end
+      end
+    elseif e <= 26 then
+      -- Something has hold of you, with a school mask that may be nonsense and a kind nobody
+      -- here has heard of. The point is that neither throws.
+      local rows = {}
+      for i = 1, R(0, 3) do
+        rows[i] = { kind = ({ "STUN", "FEAR", "SCHOOL_INTERRUPT", "SCHOOL_INTERRUPT", "ROOT",
+                              "SOMETHING_NEW", "", nil })[R(8)],
+                    id = ({ 118, 122, 116, 18469, 4, nil, 999999, -1 })[R(8)],
+                    spell = ({ "Polymorph", "Counterspell", nil, "", ("S"):rep(90) })[R(5)],
+                    duration = ({ R(0, 20), nil, -4, 0, 1e99 })[R(5)],
+                    left = ({ R(0, 20), nil, -1 })[R(3)],
+                    school = ({ 16, 4, 20, 124, 0, nil, 128, 255, -8, 1.5 })[R(10)],
+                    show = ({ 0, 1, 2, 2, nil })[R(5)] }
+      end
+      M.control(rows)
+      M.fire("LOSS_OF_CONTROL_ADDED", ({ "player", "player", "target", nil, M.secret() })[R(5)], ({ 1, 2, nil, 0, 99 })[R(5)])
+      if R(3) == 1 then M.fire("LOSS_OF_CONTROL_UPDATE", "player") end
+      if R(2) == 1 then M.fire("PLAYER_CONTROL_LOST") M.advance(R(0, 3)) end
+      if R(2) == 1 then M.fire("PLAYER_CONTROL_GAINED") end
+      if R(4) == 1 then M.forgetAll() ns.Control.Known(true) end
+    elseif e <= 28 then
+      -- A death recap, built wrong on purpose: timestamps out of order or missing, extras that
+      -- add up to more than the hit, a max health of zero, an environmental type nobody names.
+      local rows = {}
+      for i = 1, R(0, 6) do
+        local gross = ({ R(0, 4000), nil, -50, 0, 1e99 })[R(5)]
+        rows[i] = { event = ({ "SPELL_DAMAGE", "SWING_DAMAGE", "SPELL_PERIODIC_DAMAGE",
+                               "ENVIRONMENTAL_DAMAGE", "RANGE_DAMAGE", "", nil })[R(7)],
+                    spellId = ({ 118, 116, 686, nil, 999999, -4 })[R(6)],
+                    spellName = ({ "Polymorph", nil, "", ("S"):rep(90), "A|cffB" })[R(5)],
+                    caster = ({ players[R(#players)].name, nil, "", ("C"):rep(80) })[R(4)],
+                    amount = gross,
+                    overkill = ({ 0, R(0, 5000), nil })[R(3)],
+                    absorbed = ({ 0, R(0, 5000), nil })[R(3)],
+                    resisted = ({ 0, R(0, 99), nil })[R(3)],
+                    blocked = ({ 0, R(0, 99), nil })[R(3)],
+                    school = ({ 1, 4, 16, 20, nil, 999 })[R(6)],
+                    timestamp = ({ M.wall - R(0, 20), nil, 0, -1 })[R(4)],
+                    currentHP = ({ R(0, 3000), nil, -10 })[R(3)],
+                    environmentalType = ({ "Falling", "Slime", nil, "", "NOSUCHTHING" })[R(5)],
+                    avoidable = R(3) == 1, deadly = R(4) == 1 }
+      end
+      M.death(rows, ({ 3000, 0, nil, -1 })[R(4)])
+      M.fire("PLAYER_DEAD")
+      if R(3) == 1 then M.advance(1) end
+      if R(5) == 1 then M.clearDeaths() end
+    elseif e <= 31 then
+      -- The threat pool's trust boundary. Everything here arrives from another copy of the addon,
+      -- so these are the shapes a hostile sender would use: separators inside a field, escape
+      -- codes, control characters, a name past the cap, our own token echoed back, and a report
+      -- naming us.
+      local p = players[R(#players)]
+      local name = ({ p.name, p.name, "", nil, ("N"):rep(90), "A|cffB", "Has;Semi", "Ctrl\1Char",
+                      "Vesh Torchman", "Venomtail Scorpid" })[R(10)]
+      local class = ({ p.class, "", nil, "Rogue7", ("X"):rep(40), "|cffWARRIOR" })[R(6)]
+      local guild = ({ GUILDS[R(#GUILDS)], "", nil, ("G"):rep(90), "G;uild" })[R(5)]
+      local zone = ({ ZONES[R(#ZONES)], nil, "" })[R(3)]
+      local body = table.concat({ "K", ({ 1, 1, 1, 2, 0, -1 })[R(6)], tostring(name or ""),
+                                  tostring(class or ""), tostring(guild or ""), tostring(zone or ""),
+                                  ({ "ffffff", "aaaaaa", "" })[R(3)] }, ";")
+      M.fire("CHAT_MSG_ADDON", "Godslayer", body,
+             ({ "GUILD", "GUILD", "GUILD", "PARTY", "RAID", "WHISPER" })[R(6)],
+             ({ "Brakka Ashmane", "Zul Embertusk", "Vesh Torchman", "A|cffB", "", M.secret() })[R(6)])
+      if R(4) == 1 then ns.Threat.Note(name, class, guild, zone) end
+      if R(6) == 1 then ns.Threat.Command(({ "", "guilds", "forget", tostring(name or ""), "   " })[R(5)]) end
+      if R(8) == 1 then ns.session.life = ns.session.life + 1 end
+    elseif e <= 34 then
+      -- The flags, and every shape the engine is allowed to answer with. A nil x is the documented
+      -- "not on this map"; a secret value, a string and a NaN are not documented anywhere and are
+      -- here because this is arithmetic and one bad number poisons a distance rather than
+      -- throwing. The map going away mid-read is the case a tick spanning a zone change hits.
+      if R(8) == 1 then
+        M.map = ({ { id = 1339, north = 1000, west = 1000, tall = 1000, wide = 1000 },
+                   { id = 2, north = 0, west = 0, tall = 1, wide = 1 },
+                   nil })[R(3)]
+      end
+      M.facing = ({ 0, math.pi, math.pi / 2, -1, 99, 0 / 0, nil })[R(7)]
+      local rows = {}
+      for i = 1, R(4) - 1 do
+        rows[i] = { north = ({ 300, 900, 500, 1e9, -1e9, 0 })[R(6)],
+                    west = ({ 500, 500, 300, 1e9, 0 })[R(5)],
+                    onMap = R(5) ~= 1 }
+      end
+      M.flagsAt(rows)
+      if R(3) == 1 then
+        M.playerAt(({ 300, 900, 500, 1e9 })[R(4)], ({ 500, 300, 0 })[R(3)])
+      end
+      M.advance(R(3))
+      ns.Flag.Tick()
+      if R(4) == 1 then ns.Flag.Command(({ "", "watch", "  ", "nonsense" })[R(4)]) end
+      -- Whatever came back, a distance that is not a number has no business being printed.
+      for _, row in ipairs(ns.Flag.Read() or {}) do
+        if row.yards ~= nil and (type(row.yards) ~= "number" or row.yards ~= row.yards) then
+          fail(seed, "flag distance was not a number: " .. tostring(row.yards))
+        end
+        if row.where ~= nil and type(row.where) ~= "string" then
+          fail(seed, "flag bearing was not words: " .. tostring(row.where))
+        end
+      end
+      M.map = { id = 1339, north = 1000, west = 1000, tall = 1000, wide = 1000 }
     else
       M.fire("PLAYER_ENTERING_WORLD"); M.fire("PLAYER_GUILD_UPDATE", "player")
     end
@@ -330,6 +481,6 @@ for seed = 1, RUNS do
   if #M.sentAddon > 8 + (M.now - 1000) / 5 then fail(seed, "addon channel spam: " .. #M.sentAddon .. " in " .. (M.now - 1000) .. "s") end
   totalKills = totalKills + c.kills
 end
-M.realPrint(("%d runs (%d starting from a 1.0.0 database), %d events, %d kills scored, %d dossiers checked, %d failures")
-  :format(RUNS, migrated, totalEvents, totalKills, dossiers, failures))
+M.realPrint(("%d runs (%d from a 1.0.0 database, %d on a client with no scrub), %d events, %d kills scored, %d dossiers checked, %d failures")
+  :format(RUNS, migrated, noScrub, totalEvents, totalKills, dossiers, failures))
 os.exit(failures == 0 and 0 or 1)

@@ -182,12 +182,19 @@ local function onMe(unit)
   return not issecret(yes) and yes == true
 end
 
+-- The two units you are actually pointing at, as a constant: this list used to be built fresh
+-- inside Fight.Engaged, which runs on a one-second ticker and again on every hit you take.
+local SIGHTS = { "target", "softenemy" }
+
+-- Scratch space for the plate walk below, reused rather than built per call for the same reason.
+local onScreen = {}
+
 -- The unit you are fighting, if it is a player. nil when it is not, or nobody can tell.
 function Fight.Engaged()
   if not inCombat() then return nil end
   local now = GetTime()
   local hit, acted = now - lastHit <= HIT_WINDOW, now - lastAct <= ACT_WINDOW
-  for _, unit in ipairs({ "target", "softenemy" }) do
+  for _, unit in ipairs(SIGHTS) do
     -- in your sights and fighting is not enough on its own: they may be busy with a boar of their own.
     -- A fight the client will not confirm needs you to have acted on them.
     if enemyPlayer(unit) then
@@ -199,8 +206,13 @@ function Fight.Engaged()
   if enemyPlayer("focus") and busy("focus") ~= false and onMe("focus") then return "focus" end
   -- hit with nothing at all in your sights: an enemy player fighting on screen is the likeliest one
   local sighted = plain(try(UnitExists, "target")) or plain(try(UnitExists, "softenemy"))
-  for i = 1, 40 do
-    local unit = "nameplate" .. i
+  -- The plates the client says are on screen, not forty tokens on the chance one of them is a
+  -- unit. enemyPlayer alone is four trips into the client per token, so this loop was a hundred
+  -- and sixty of them for a screen with a dozen plates on it -- paid every time you are hit
+  -- with nobody in your sights, which in a battleground is most of the time.
+  local plates = ns.Plates and ns.Plates(onScreen) or 0
+  for i = 1, plates do
+    local unit = onScreen[i]
     if enemyPlayer(unit) and busy(unit) == true then
       if onMe(unit) then return unit end
       if hit and not sighted then return unit end

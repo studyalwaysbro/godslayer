@@ -190,6 +190,10 @@ ns.RIVAL = {
 -- target in the game, they are almost always engineers, and something about killing one is
 -- funnier than it has any right to be.
 
+-- The client's own race tokens, from ChrRaces: the stable, unlocalised key. Scourge is the
+-- Undead and NightElf is the Night Elves, which is why nothing here is keyed on a display name.
+-- Rival.lua checks a kill's race against this list before counting it, so a token the client
+-- invents that we have never heard of is dropped rather than filed under itself.
 ns.RACE_TOKENS = { Human = true, Dwarf = true, Gnome = true, NightElf = true, Draenei = true,
                    Orc = true, Scourge = true, Tauren = true, Troll = true, BloodElf = true,
                    Goblin = true, Worgen = true, Pandaren = true }

@@ -391,7 +391,11 @@ local function boardRows()
     local name = classColored(r.name, r.class)
     if (r.kings or 0) > 0 then name = name .. GOLD .. " [Kingslayer]|r" end
     if r.me then name = name .. GREY .. " (you)|r" end
-    rows[i] = { i, name, (ns.RankFor(r.points)), r.kills, r.uniques, r.kb, r.orig, r.points }
+    -- The ladder rung, which arrives on the stats message from everyone running 2.6.0 or newer.
+    -- A dash means they have not sent one, not that they are a Civilian: rung 0 prints as 0.
+    local rung = tonumber(r.rung)
+    rows[i] = { i, name, rung and tostring(rung) or (GREY .. "-|r"),
+                (ns.RankFor(r.points)), r.kills, r.uniques, r.kb, r.orig, r.points }
   end
   return rows
 end
@@ -404,8 +408,9 @@ local TABS = {
     cols = { { "#", 26, "RIGHT" }, { "Guild", 280, "LEFT" }, { "Members killed", 110, "RIGHT" },
              { "Kills", 70, "RIGHT" }, { "Points", 70, "RIGHT" } } },
   { label = "Leaderboard", rows = boardRows, empty = "",
-    cols = { { "#", 26, "RIGHT" }, { "Hunter", 190, "LEFT" }, { "Title", 140, "LEFT" }, { "Kills", 40, "RIGHT" },
-             { "Unique", 46, "RIGHT" }, { "KB", 32, "RIGHT" }, { "OLYMPUS", 62, "RIGHT" }, { "Points", 46, "RIGHT" } } },
+    cols = { { "#", 26, "RIGHT" }, { "Hunter", 160, "LEFT" }, { "Rung", 40, "RIGHT" }, { "Title", 120, "LEFT" },
+             { "Kills", 40, "RIGHT" }, { "Unique", 46, "RIGHT" }, { "KB", 32, "RIGHT" }, { "OLYMPUS", 62, "RIGHT" },
+             { "Points", 46, "RIGHT" } } },
   { label = "Hit List", rows = hitRows, empty = "No Olympian seen and still breathing. Turn on enemy nameplates.",
     cols = { { "#", 26, "RIGHT" }, { "Player", 140, "LEFT" }, { "Lvl", 30, "RIGHT" }, { "Guild", 150, "LEFT" },
              { "Rank", 90, "LEFT" }, { "Seen in", 100, "LEFT" }, { "Seen", 40, "RIGHT" } } },
@@ -415,9 +420,10 @@ local TABS = {
 local DOSSIER_COLS = { { "Dossier", 150, "LEFT" }, { "", 490, "LEFT" } }
 local TAB_NOTES = {
   [1] = "Click a player for their dossier",
+  [3] = "Rung is the honor ladder, 1 to 14. A dash means their copy has not sent one",
   [4] = "Olympians you have seen and not killed yet",
 }
-local MAX_COLS = 8
+local MAX_COLS = 9
 
 -- ---------------------------------------------------------------------------
 -- Main window
@@ -965,6 +971,13 @@ local function printHelp()
   print("  /godslayer hype       your kill song and the announcer: test, on, off, window <seconds>")
   print("  /godslayer cds [name] what an enemy has spent and when it is back")
   print("  /godslayer dr         this build's diminishing groups, and the curve measured so far")
+  print("  /godslayer rank       your rung on the fourteen, the points left, and what tonight's rate makes of it")
+  print("  /godslayer recap [n]  the last fight by the numbers, and what killed you")
+  print("  /godslayer field      who is in this battleground and how far up the ladder they are")
+  print("  /godslayer control   what has hold of you, which school is locked, and what is still up")
+  print("  /godslayer death     the last seconds of your life, hit by hit. death who for the tally")
+  print("  /godslayer threat    who the guild keeps dying to. threat <name>, threat guilds")
+  print("  /godslayer flag      where the flag is with the map shut. flag watch toggles the calls")
   print("  /godslayer clip       mark this moment for your recorder")
   print("  /godslayer wheel      the chat wheel (or bind a key: Key Bindings, AddOns, Godslayer)   wheel list | wheel <number>")
   print("  /godslayer share      post a brag line to guild chat")
@@ -1045,6 +1058,27 @@ local function slash(input)
       print(("  %-24s %s%s"):format(row.spell, when, note))
     end
 
+  elseif cmd == "rank" then
+    if not ns.Rank then ns.Print("The rank part did not load. Quit the game fully and start it again.") return end
+    ns.Rank.Command(rest)
+  elseif cmd == "recap" then
+    if not ns.Recap then ns.Print("The recap part did not load. Quit the game fully and start it again.") return end
+    ns.Recap.Command(rest)
+  elseif cmd == "field" then
+    if not ns.Field then ns.Print("The battleground part did not load. Quit the game fully and start it again.") return end
+    ns.Field.Command(rest)
+  elseif cmd == "flag" then
+    if not ns.Flag then ns.Print("The flag part did not load. Quit the game fully and start it again.") return end
+    ns.Flag.Command(rest)
+  elseif cmd == "control" then
+    if not ns.Control then ns.Print("The control part did not load. Quit the game fully and start it again.") return end
+    ns.Control.Command(rest)
+  elseif cmd == "death" then
+    if not ns.Death then ns.Print("The death part did not load. Quit the game fully and start it again.") return end
+    ns.Death.Command(rest)
+  elseif cmd == "threat" then
+    if not ns.Threat then ns.Print("The threat part did not load. Quit the game fully and start it again.") return end
+    ns.Threat.Command(rest)
   elseif cmd == "dr" then
     if not ns.Aura then ns.Print("The aura part did not load. Quit the game fully and start it again.") return end
     ns.Print("diminishing returns on this build (" .. tostring(ns.PVP_BUILD) .. "):")

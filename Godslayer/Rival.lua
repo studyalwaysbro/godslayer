@@ -106,22 +106,24 @@ function Rival.NoteKill(id, guild, tier)
   local w = db()
   if not w then return end
   if tier == "original" or tier == "network" then w.seenOlympus = true w.quiet = 0 end
-  -- Race comes from whatever the dossier already learned, and falls back to the GUID, which is
-  -- the one read that never goes secret.
+  -- Race is counted by the client's TOKEN, which is the fourth return of GetPlayerInfoByGUID and
+  -- not the third. The third is the localised name, and the two are different strings: in
+  -- ChrRaces the Undead are id 5, name "Undead", token "Scourge", and a Night Elf is "Night Elf"
+  -- against "NightElf". Keying on the localised name counts a Horde player's own race under a
+  -- name no table here knows, and counts nothing at all on a client that is not in English.
+  -- The dossier only ever learns the localised name, so it is no use for this and is not asked.
   local race = nil
-  local k = id and GodslayerDB.known and GodslayerDB.known[id]
-  race = k and k.r or nil
-  if not race and type(id) == "string" and id:sub(1, 7) == "Player-" then
-    local _, _, r = try(GetPlayerInfoByGUID, id)
-    r = plain(r)
-    if type(r) == "string" and r ~= "" then race = r end
+  if type(id) == "string" and id:sub(1, 7) == "Player-" then
+    local _, _, _, token = try(GetPlayerInfoByGUID, id)
+    token = plain(token)
+    if type(token) == "string" and token ~= "" and ns.RACE_TOKENS[token] then race = token end
   end
   if guild and guild ~= "" then
     local f = feudOf(guild)
     if f then f.mine = (f.mine or 0) + 1 end
   end
-  if type(race) == "string" and race ~= "" then
-    local token = race:gsub("%s", "")
+  if race then
+    local token = race
     w.race[token] = (w.race[token] or 0) + 1
     if token == "Gnome" then
       local before = w.gnomeRank

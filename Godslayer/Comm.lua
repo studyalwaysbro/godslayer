@@ -43,7 +43,12 @@ end
 
 local function statsMessage()
   local c = ns.char
-  return table.concat({ "S", PROTO, c.kills, c.points, c.uniques, c.kb, c.orig, c.class or "", ns.VERSION, c.kings or 0, token }, ";")
+  -- The rung goes on the END, after the token. A copy of an older version destructures eleven
+  -- fields and finds its own token at position eleven exactly as before, so it still drops its
+  -- own echo; the twelfth is simply thrown away. Appending is the only safe way to widen this.
+  local rung = ns.Rank and tonumber(ns.Rank.Level and ns.Rank.Level()) or nil
+  return table.concat({ "S", PROTO, c.kills, c.points, c.uniques, c.kb, c.orig, c.class or "",
+                        ns.VERSION, c.kings or 0, token, rung or "" }, ";")
 end
 
 local function broadcast()
@@ -127,6 +132,33 @@ function Comm.Streak(kind)
 end
 Comm.PendingStreaks = function() return #pendingStreaks end
 
+-- Who just killed one of us, for the rest of us. Queued the same way a streak is: a death inside
+-- an instance cannot be sent from there, and the ones that pile up go out when we are back out.
+-- Older versions do not know the kind and fall past every branch of the handler, which is why the
+-- kind letter can be widened at all.
+local lastThreat, pendingThreats = -1000, {}
+local THREAT_GAP, THREAT_KEEP, THREAT_PENDING = 8, 900, 6
+local function flushThreats()
+  local now = GetTime()
+  while pendingThreats[1] and now - pendingThreats[1].t > THREAT_KEEP do table.remove(pendingThreats, 1) end
+  local p = pendingThreats[1]
+  if not p or now - lastThreat < THREAT_GAP then return end
+  if not send(table.concat({ "K", PROTO, p.name, p.class or "", p.guild or "", p.zone or "", token }, ";")) then return end
+  table.remove(pendingThreats, 1)
+  lastThreat = now
+  if pendingThreats[1] then C_Timer.After(THREAT_GAP + 0.5, flushThreats) end
+end
+function Comm.Threat(name, class, guild, zone)
+  if type(name) ~= "string" or name == "" then return false end
+  if #pendingThreats >= THREAT_PENDING then table.remove(pendingThreats, 1) end
+  pendingThreats[#pendingThreats + 1] = { name = name, class = class, guild = guild, zone = zone, t = GetTime() }
+  local waiting = #pendingThreats
+  flushThreats()
+  if #pendingThreats >= waiting and pendingThreats[1] then C_Timer.After(THREAT_GAP + 0.5, flushThreats) end
+  return true
+end
+Comm.PendingThreats = function() return #pendingThreats end
+
 -- The chat wheel, for the people you are grouped with: their Godslayer plays the same line.
 function Comm.Wheel(n)
   if not (C_ChatInfo and C_ChatInfo.SendAddonMessage) or lockedDown() then return false end
@@ -149,10 +181,18 @@ function Comm.handlers.CHAT_MSG_ADDON(prefix, text, channel, sender)
   local who = shortName(sender):gsub("|", ""):sub(1, 48) -- no escape codes in the roster
   if who == ns.myName or sender == ns.myName then return end -- our own message echoed back
 
-  local kind, proto, a, b, c, d, e, class, ver, kings, tag = strsplit(";", text)
+  local kind, proto, a, b, c, d, e, class, ver, kings, tag, rung = strsplit(";", text)
   if tonumber(proto) ~= PROTO then return end
   -- the group hears the wheel; everything else is the guild's
   if (kind == "W") ~= (channel ~= "GUILD") then return end
+  if kind == "K" then
+    if e == token then return end
+    if ns.Threat then
+      local ok, err = pcall(ns.Threat.Heard, who, a, b, c, d)
+      if not ok then ns.errors = (ns.errors or 0) + 1 ns.Log("error", "threat: " .. tostring(err)) end
+    end
+    return
+  end
   if kind == "W" or kind == "R" then
     if b == token then return end
     if kind == "W" and ns.Wheel then
@@ -195,6 +235,8 @@ function Comm.handlers.CHAT_MSG_ADDON(prefix, text, channel, sender)
       class = (type(class) == "string" and class:match("^%u+$")) and class or nil,
       ver = type(ver) == "string" and ver:match("^[%w%.%-]+$") and ver:sub(1, 12) or nil,
       kings = math.min(count(kings) or 0, orig),
+      -- fourteen rungs, and anything outside them is not this ladder, so it is not kept
+      rung = (function(v) v = tonumber(v) return (v and v >= 0 and v <= 14 and v == math.floor(v)) and v or nil end)(rung),
       t = time(),
     }
     noteVersion(db.roster[guild][who].ver)
@@ -206,6 +248,7 @@ function Comm.handlers.PLAYER_ENTERING_WORLD()
   if dirty then C_Timer.After(MIN_GAP, broadcast) end
   -- out of an instance: whatever we could not tell the guild in there goes now
   if pendingStreaks[1] then C_Timer.After(MIN_GAP, flushStreaks) end
+  if pendingThreats[1] then C_Timer.After(MIN_GAP, flushThreats) end
 end
 
 -- Everyone we have totals for in the current guild, plus ourselves, best first.
@@ -213,14 +256,16 @@ function Comm.Leaderboard()
   local rows = {}
   local c = ns.char
   rows[1] = { name = ns.myName, kills = c.kills, points = c.points, uniques = c.uniques,
-              kb = c.kb, orig = c.orig, kings = c.kings or 0, class = c.class, me = true }
+              kb = c.kb, orig = c.orig, kings = c.kings or 0, class = c.class, me = true,
+              rung = ns.Rank and tonumber(ns.Rank.Level and ns.Rank.Level()) or nil }
   local guild = guildName()
   local roster = guild and GodslayerDB.roster[guild]
   if roster then
     for name, r in pairs(roster) do
       if name ~= ns.myName then
         rows[#rows + 1] = { name = name, kills = r.kills, points = r.points, uniques = r.uniques,
-                            kb = r.kb, orig = r.orig, kings = r.kings or 0, class = r.class, t = r.t }
+                            kb = r.kb, orig = r.orig, kings = r.kings or 0, class = r.class, t = r.t,
+                            rung = r.rung }
       end
     end
   end
@@ -248,5 +293,5 @@ function Comm.Init()
     end
   end
   C_Timer.After(10, hello)
-  C_Timer.NewTicker(30, function() broadcast() flushStreaks() end) -- picks up anything a lockdown or throttle held back
+  C_Timer.NewTicker(30, function() broadcast() flushStreaks() flushThreats() end) -- picks up anything a lockdown or throttle held back
 end

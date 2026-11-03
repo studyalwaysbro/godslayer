@@ -87,6 +87,11 @@ const durations = new Map(L.table('SpellDuration', BUILD).map(r => [String(r.ID)
 
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 
+// The engine's school bits. Index, not mask, is what the client's own strings are keyed on:
+// SPELL_SCHOOL0_CAP is Physical and SPELL_SCHOOL6_CAP is Arcane, and the mask is 1 << index.
+const SCHOOLS = [[1, 'Physical'], [2, 'Holy'], [4, 'Fire'], [8, 'Nature'],
+                 [16, 'Frost'], [32, 'Shadow'], [64, 'Arcane']];
+
 // Durations in this table are milliseconds; -1 means "until cancelled".
 function seconds(index) {
   const row = durations.get(String(index));
@@ -117,6 +122,7 @@ for (const [name, id] of [...ids].sort((a, b) => a[0].localeCompare(b[0]))) {
     sharedCd: shared || 0,
     duration: seconds(m.DurationIndex),
     pvpDuration: seconds(m.PvPDurationIndex),
+    school: num(m.SchoolMask) || 0,
   });
 }
 
@@ -161,9 +167,17 @@ lines.push('-- cat       a shared cooldown group: casting any spell in it puts t
 lines.push('-- catCd     how long casting THIS spell locks that group for, which differs per spell');
 lines.push('-- cd        the spell\'s own cooldown in seconds');
 lines.push('-- pvp       the duration it gets against a player, when that differs from `dur`');
+lines.push('-- school    the spell\'s school as a bit mask, which is what a Counterspell locks out');
 lines.push('local _, ns = ...');
 lines.push('');
 lines.push(`ns.PVP_BUILD = ${q(BUILD)}`);
+lines.push('');
+lines.push('-- Spell schools as the engine masks them: 1 << index, index 0 Physical to 6 Arcane.');
+lines.push('-- A lockout from an interrupt is a mask of these, so it can name more than one school.');
+lines.push('-- The strings are the client\'s own and are read at runtime; these are the fallback.');
+lines.push('ns.SCHOOL_BITS = {');
+for (const [bit, name] of SCHOOLS) lines.push(`  [${bit}] = { key = ${q('SPELL_SCHOOL' + Math.log2(bit) + '_CAP')}, name = ${q(name)} },`);
+lines.push('}');
 lines.push('');
 lines.push('-- The diminishing groups this build actually has, labelled by a member you will recognise.');
 lines.push('ns.DR_GROUPS = {');
@@ -191,6 +205,7 @@ for (const s of spells) {
   if (s.sharedCd) bits.push(`catCd = ${s.sharedCd}`);
   if (s.duration != null) bits.push(`dur = ${s.duration}`);
   if (s.pvpDuration != null && s.pvpDuration !== s.duration) bits.push(`pvp = ${s.pvpDuration}`);
+  if (s.school) bits.push(`school = ${s.school}`);
   if (s.categoryName) bits.push(`catName = ${q(s.categoryName)}`);
   lines.push(`  ${key(s.name)} = { ${bits.join(', ')} },`);
 }
@@ -259,6 +274,28 @@ else {
   rep.push('|---|---|---|');
   for (const s of diff) rep.push(`| ${s.name} | ${s.duration ?? '-'}s | ${s.pvpDuration}s |`);
 }
+rep.push('');
+rep.push('## Schools, and what an interrupt locks');
+rep.push('');
+rep.push('A Counterspell or a Kick locks the **school** of the spell it hit, not the spell. These are');
+rep.push('the masks the client gives each spell, so a lockout can be turned into a list of what is');
+rep.push('still castable instead of a bare "interrupted".');
+rep.push('');
+rep.push('| mask | school | spells here |');
+rep.push('|---|---|---|');
+for (const [bit, name] of SCHOOLS) {
+  const members = spells.filter(s => s.school === bit).map(s => s.name).sort();
+  rep.push(`| ${bit} | ${name} | ${members.length ? members.join(', ') : '-'} |`);
+}
+const multi = spells.filter(s => s.school && !SCHOOLS.some(([b]) => b === s.school));
+if (multi.length) {
+  rep.push('');
+  rep.push(`Spells in more than one school (${multi.length}): ` +
+    multi.map(s => `${s.name} (${s.school})`).sort().join(', '));
+}
+const noSchool = spells.filter(s => !s.school).map(s => s.name).sort();
+rep.push('');
+rep.push(`Spells the client gives no school (${noSchool.length}): ${noSchool.length ? noSchool.join(', ') : 'none'}`);
 rep.push('');
 rep.push('## Longest cooldowns');
 rep.push('');

@@ -816,6 +816,116 @@
     "ally_regicide",
     "points",
     "A Torchman has slain the King!"
+   ],
+   [
+    "rankup",
+    "call",
+    "A NEW RANK! THE WAR KNOWS YOUR NAME!"
+   ],
+   [
+    "offence",
+    "call",
+    "BEWARE! THEY COME EMPOWERED!"
+   ],
+   [
+    "fieldwon",
+    "call",
+    "VICTORY! THE FIELD IS YOURS!"
+   ],
+   [
+    "fieldlost",
+    "aside",
+    "Defeat. Remember how this tastes."
+   ],
+   [
+    "locked",
+    "points",
+    "Locked out! Improvise!"
+   ],
+   [
+    "controlled",
+    "points",
+    "Held fast! Endure!"
+   ],
+   [
+    "field",
+    "points",
+    "The field is scouted. Pick your prey!"
+   ],
+   [
+    "fieldhard",
+    "points",
+    "They outrank you. Humble them!"
+   ],
+   [
+    "immune",
+    "points",
+    "Immune! Hold your spells!"
+   ],
+   [
+    "flagtaken",
+    "points",
+    "The flag is taken!"
+   ],
+   [
+    "flagdown",
+    "points",
+    "The flag is down!"
+   ],
+   [
+    "flaghome",
+    "points",
+    "The flag is home!"
+   ],
+   [
+    "cc_stun",
+    "points",
+    "Stunned! Shake it off!"
+   ],
+   [
+    "cc_fear",
+    "points",
+    "Feared! Master yourself!"
+   ],
+   [
+    "cc_horror",
+    "points",
+    "Horrified! Stand your ground!"
+   ],
+   [
+    "cc_incap",
+    "points",
+    "Incapacitated! Wake!"
+   ],
+   [
+    "cc_banish",
+    "points",
+    "Banished! Patience!"
+   ],
+   [
+    "cc_root",
+    "points",
+    "Rooted! Fight where you stand!"
+   ],
+   [
+    "cc_disorient",
+    "points",
+    "Blinded! Trust your instincts!"
+   ],
+   [
+    "cc_silence",
+    "points",
+    "Silenced! Let steel speak!"
+   ],
+   [
+    "cc_charm",
+    "points",
+    "Charmed! That hand is not yours!"
+   ],
+   [
+    "cc_snare",
+    "points",
+    "Slowed! Press on!"
    ]
   ],
   "valkyrie": [
@@ -1453,6 +1563,116 @@
     "ally_regicide",
     "points",
     "A Torchman has slain the King! Hail!"
+   ],
+   [
+    "rankup",
+    "call",
+    "A NEW RANK! THE SLAIN SALUTE YOU!"
+   ],
+   [
+    "offence",
+    "call",
+    "WAR HORNS! THEY COME EMPOWERED!"
+   ],
+   [
+    "fieldwon",
+    "call",
+    "VICTORY! THE FIELD IS OURS!"
+   ],
+   [
+    "fieldlost",
+    "aside",
+    "Defeat. The slain remember everything."
+   ],
+   [
+    "locked",
+    "points",
+    "Locked! Let the shield answer!"
+   ],
+   [
+    "controlled",
+    "points",
+    "Held! Break the chains!"
+   ],
+   [
+    "field",
+    "points",
+    "The enemy is counted. Spears ready!"
+   ],
+   [
+    "fieldhard",
+    "points",
+    "They outrank us. Good. More glory!"
+   ],
+   [
+    "immune",
+    "points",
+    "Immune! Spare your strength!"
+   ],
+   [
+    "flagtaken",
+    "points",
+    "The banner is taken!"
+   ],
+   [
+    "flagdown",
+    "points",
+    "The banner falls!"
+   ],
+   [
+    "flaghome",
+    "points",
+    "The banner is home!"
+   ],
+   [
+    "cc_stun",
+    "points",
+    "Stunned! On your feet, warrior!"
+   ],
+   [
+    "cc_fear",
+    "points",
+    "Feared! Find your courage!"
+   ],
+   [
+    "cc_horror",
+    "points",
+    "Horror grips you! Cast it off!"
+   ],
+   [
+    "cc_incap",
+    "points",
+    "Laid low! Rise!"
+   ],
+   [
+    "cc_banish",
+    "points",
+    "Banished! The field waits!"
+   ],
+   [
+    "cc_root",
+    "points",
+    "Rooted! Cut yourself loose!"
+   ],
+   [
+    "cc_disorient",
+    "points",
+    "Blinded! Shield high!"
+   ],
+   [
+    "cc_silence",
+    "points",
+    "Silenced! The axe still sings!"
+   ],
+   [
+    "cc_charm",
+    "points",
+    "Charmed! Reclaim your will!"
+   ],
+   [
+    "cc_snare",
+    "points",
+    "Slowed! Push through!"
    ]
   ],
   "frost": [
@@ -2095,6 +2315,116 @@
     "ally_regicide",
     "points",
     "A Torchman killed the King! Without me!"
+   ],
+   [
+    "rankup",
+    "call",
+    "A NEW RANK! CHILLS! ACTUAL CHILLS!"
+   ],
+   [
+    "offence",
+    "call",
+    "CAREFUL! SOMEONE WOKE UP ANGRY!"
+   ],
+   [
+    "fieldwon",
+    "call",
+    "VICTORY! ICE COLD!"
+   ],
+   [
+    "fieldlost",
+    "aside",
+    "Defeat. Brr. Let's not."
+   ],
+   [
+    "locked",
+    "points",
+    "Locked out! Brain freeze!"
+   ],
+   [
+    "controlled",
+    "points",
+    "All frozen up! Hang on!"
+   ],
+   [
+    "field",
+    "points",
+    "Counted them all! This looks fun!"
+   ],
+   [
+    "fieldhard",
+    "points",
+    "Ooh, big ranks! Stay frosty!"
+   ],
+   [
+    "immune",
+    "points",
+    "Immune! Don't waste the good stuff!"
+   ],
+   [
+    "flagtaken",
+    "points",
+    "Flag taken! Ooh!"
+   ],
+   [
+    "flagdown",
+    "points",
+    "Flag on the floor!"
+   ],
+   [
+    "flaghome",
+    "points",
+    "Flag's home! Cozy!"
+   ],
+   [
+    "cc_stun",
+    "points",
+    "Stunned! Ow ow ow!"
+   ],
+   [
+    "cc_fear",
+    "points",
+    "Feared! Where are we going?"
+   ],
+   [
+    "cc_horror",
+    "points",
+    "Horrified! It's not that scary!"
+   ],
+   [
+    "cc_incap",
+    "points",
+    "Napping? Now? Really?"
+   ],
+   [
+    "cc_banish",
+    "points",
+    "Banished! How rude!"
+   ],
+   [
+    "cc_root",
+    "points",
+    "Rooted! Stuck solid!"
+   ],
+   [
+    "cc_disorient",
+    "points",
+    "Blinded! Over here! No, here!"
+   ],
+   [
+    "cc_silence",
+    "points",
+    "Silenced! Shh, apparently!"
+   ],
+   [
+    "cc_charm",
+    "points",
+    "Charmed! Snap out of it!"
+   ],
+   [
+    "cc_snare",
+    "points",
+    "Slowed! Cold feet?"
    ]
   ],
   "naturalist": [
@@ -2742,6 +3072,116 @@
     "ally_regicide",
     "points",
     "Elsewhere, a Torchman has slain the King."
+   ],
+   [
+    "rankup",
+    "call",
+    "A promotion. The hierarchy adjusts itself accordingly."
+   ],
+   [
+    "offence",
+    "call",
+    "Observe. The prey bares its fangs."
+   ],
+   [
+    "fieldwon",
+    "call",
+    "Victory. The strong survive, as ever."
+   ],
+   [
+    "fieldlost",
+    "aside",
+    "Defeat. Nature selected the other side today."
+   ],
+   [
+    "locked",
+    "points",
+    "A lockout. The repertoire narrows, briefly."
+   ],
+   [
+    "controlled",
+    "points",
+    "Restrained. Nature is seldom fair."
+   ],
+   [
+    "field",
+    "points",
+    "The rival herd is counted. The hunt may begin."
+   ],
+   [
+    "fieldhard",
+    "points",
+    "A stronger herd. Fascinating. Dangerous."
+   ],
+   [
+    "immune",
+    "points",
+    "Impenetrable. Conserve the venom."
+   ],
+   [
+    "flagtaken",
+    "points",
+    "The flag is taken. A chase begins."
+   ],
+   [
+    "flagdown",
+    "points",
+    "The flag is dropped. Opportunity, for someone."
+   ],
+   [
+    "flaghome",
+    "points",
+    "The flag returns home. Order is restored."
+   ],
+   [
+    "cc_stun",
+    "points",
+    "Stunned. Even the apex predator blinks."
+   ],
+   [
+    "cc_fear",
+    "points",
+    "Flight, for once, over fight."
+   ],
+   [
+    "cc_horror",
+    "points",
+    "Horror. The night has teeth after all."
+   ],
+   [
+    "cc_incap",
+    "points",
+    "Subdued. Patience. Play dead."
+   ],
+   [
+    "cc_banish",
+    "points",
+    "Banished. Briefly removed from the ecosystem."
+   ],
+   [
+    "cc_root",
+    "points",
+    "Rooted. The ground itself objects."
+   ],
+   [
+    "cc_disorient",
+    "points",
+    "Blinded. The senses betray their owner."
+   ],
+   [
+    "cc_silence",
+    "points",
+    "Silenced. No birdsong this morning."
+   ],
+   [
+    "cc_charm",
+    "points",
+    "Charmed. The mind wanders from the body."
+   ],
+   [
+    "cc_snare",
+    "points",
+    "Slowed. The chase turns against us."
    ]
   ],
   "sable": [
@@ -3379,6 +3819,116 @@
     "ally_regicide",
     "points",
     "A Torchman killed the King! Clip it!"
+   ],
+   [
+    "rankup",
+    "call",
+    "RANK UP! LOOK AT YOU GO!"
+   ],
+   [
+    "offence",
+    "call",
+    "HEADS UP! THEY'RE POPPING EVERYTHING!"
+   ],
+   [
+    "fieldwon",
+    "call",
+    "VICTORY! NEVER DOUBTED YOU!"
+   ],
+   [
+    "fieldlost",
+    "aside",
+    "Defeat. We're not posting that one."
+   ],
+   [
+    "locked",
+    "points",
+    "Locked out! Awkward!"
+   ],
+   [
+    "controlled",
+    "points",
+    "You're controlled! Just vibe!"
+   ],
+   [
+    "field",
+    "points",
+    "Scouted! Easy lobby!"
+   ],
+   [
+    "fieldhard",
+    "points",
+    "They outrank you! Free content!"
+   ],
+   [
+    "immune",
+    "points",
+    "Immune! Stop hitting that!"
+   ],
+   [
+    "flagtaken",
+    "points",
+    "Flag taken! Drama!"
+   ],
+   [
+    "flagdown",
+    "points",
+    "Flag's down! Grab it!"
+   ],
+   [
+    "flaghome",
+    "points",
+    "Flag's home! Tidy!"
+   ],
+   [
+    "cc_stun",
+    "points",
+    "Stunned! Rude!"
+   ],
+   [
+    "cc_fear",
+    "points",
+    "Feared! Where are you going?"
+   ],
+   [
+    "cc_horror",
+    "points",
+    "Horrified! So dramatic!"
+   ],
+   [
+    "cc_incap",
+    "points",
+    "Napping! Bold choice!"
+   ],
+   [
+    "cc_banish",
+    "points",
+    "Banished! See you in a bit!"
+   ],
+   [
+    "cc_root",
+    "points",
+    "Rooted! You live here now!"
+   ],
+   [
+    "cc_disorient",
+    "points",
+    "Blinded! Eyes up!"
+   ],
+   [
+    "cc_silence",
+    "points",
+    "Silenced! The audacity!"
+   ],
+   [
+    "cc_charm",
+    "points",
+    "Charmed! Who's driving?"
+   ],
+   [
+    "cc_snare",
+    "points",
+    "Slowed! Little legs!"
    ]
   ]
  },

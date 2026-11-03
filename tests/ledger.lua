@@ -9,8 +9,8 @@ end
 local function eq(a, b, label) check(a == b, label .. " (got " .. tostring(a) .. ", want " .. tostring(b) .. ")") end
 
 local ME = "Player-1-0000AAAA"
-M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", faction = "Horde", isMe = true })
-local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
+M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", race = "Scourge", sex = 2, faction = "Horde", isMe = true })
+local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
 local ns = M.load("Godslayer", FILES)
 M.fire("ADDON_LOADED", "Godslayer")
 M.fire("PLAYER_LOGIN")
@@ -74,6 +74,23 @@ M.advance(5)
 eq(L.Left(PRIEST, "Lay on Hands"), 0, "and it is gone five seconds later")
 M.fire("UNIT_SPELLCAST_SUCCEEDED", "target", nil, 633) -- Lay on Hands
 check(L.Left(PRIEST, "Power Word: Shield") > 1100, "whereas a Lay on Hands locks it for twenty minutes")
+
+-- 4b. the same group, two different locks, read off the client at 70707 ------
+-- Frost Nova and Fire Nova are both in category 35. Frost Nova locks it for 25 seconds and
+-- Fire Nova for 10, which is the per-spell rule again and the reason a group cannot be stored
+-- as one number. A ledger that did would call a mage's nova back fifteen seconds early.
+eq(ns.PVP["Frost Nova"].cat, 35, "Frost Nova is in cooldown category 35")
+eq(ns.PVP["Fire Nova"].cat, 35, "and so is Fire Nova")
+eq(ns.PVP["Frost Nova"].catCd, 25, "Frost Nova locks the group for 25 seconds")
+eq(ns.PVP["Fire Nova"].catCd, 10, "and Fire Nova for 10")
+
+local MAGE_FOE = "Player-1-0000FFFF"
+M.addUnit("target", { name = "Nova Guy", guid = MAGE_FOE, class = "MAGE", faction = "Alliance" })
+M.fire("UNIT_SPELLCAST_SUCCEEDED", "target", nil, 122) -- Frost Nova
+local novaLock = L.Left(MAGE_FOE, "Fire Nova")
+check(novaLock > 24 and novaLock <= 25, "a Frost Nova locks the group for its own 25 (got " .. novaLock .. ")")
+M.advance(26)
+eq(L.Left(MAGE_FOE, "Fire Nova"), 0, "and it is clear 26 seconds later")
 
 -- 5. only enemy players are written down --------------------------------------
 local before = 0

@@ -9,8 +9,8 @@ end
 local function eq(a, b, label) check(a == b, label .. " (got " .. tostring(a) .. ", want " .. tostring(b) .. ")") end
 
 local ME = "Player-1-0000AAAA"
-M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", faction = "Horde", isMe = true })
-local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
+M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", race = "Scourge", sex = 2, faction = "Horde", isMe = true })
+local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
 local ns = M.load("Godslayer", FILES)
 M.fire("ADDON_LOADED", "Godslayer")
 M.fire("PLAYER_LOGIN")
@@ -152,6 +152,13 @@ check(A.DRGroup("Kidney Shot") ~= A.DRGroup("Cheap Shot"), "but Kidney Shot is i
 eq(A.DRGroup("Seduction"), A.DRGroup("Fear"), "Seduction diminishes with fears, not with charms")
 eq(A.DRGroup("Scatter Shot"), A.DRGroup("Polymorph"), "Scatter Shot diminishes with Polymorph")
 eq(A.DRGroup("Blind"), 0, "and Blind does not diminish at all on this build")
+
+-- Build 70707 put two of Forever's own spells into the Polymorph group, which took it from
+-- eight members to ten. Chastise is the one that matters to a mage: a priest landing it eats
+-- into the same diminishing returns as your sheep, and nothing says so in game.
+eq(A.DRGroup("Chastise"), A.DRGroup("Polymorph"), "Forever's Chastise diminishes with Polymorph")
+eq(A.DRGroup("Confounding Flash"), A.DRGroup("Polymorph"), "and so does Confounding Flash")
+eq((ns.DR_GROUPS[A.DRGroup("Polymorph")] or {}).members, 10, "which makes ten in that group")
 eq(A.DRGroup("Not A Spell"), 0, "an unknown spell has no group")
 eq(A.GroupLabel(0), "no group", "group zero is named for what it is")
 eq(A.GroupLabel(A.DRGroup("Polymorph")), "Polymorph", "a group is named after a member you know")
