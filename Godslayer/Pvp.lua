@@ -1,5 +1,5 @@
 -- Written by tools/build_pvp_data.mjs from the client's own game data. Do not edit by hand.
--- Build 1.60.1.70753. Every number here is what this client says, not what vanilla did.
+-- Build 1.60.1.70790. Every number here is what this client says, not what vanilla did.
 --
 -- dr        the game's diminishing-returns group; spells sharing it diminish together, 0 never does
 -- cat       a shared cooldown group: casting any spell in it puts the whole group on cooldown
@@ -9,7 +9,7 @@
 -- school    the spell's school as a bit mask, which is what a Counterspell locks out
 local _, ns = ...
 
-ns.PVP_BUILD = "1.60.1.70753"
+ns.PVP_BUILD = "1.60.1.70790"
 
 -- Spell schools as the engine masks them: 1 << index, index 0 Physical to 6 Arcane.
 -- A lockout from an interrupt is a mask of these, so it can name more than one school.
@@ -205,7 +205,7 @@ ns.PVP = {
   Starsurge = { id = 417157, cd = 6, dur = 15, school = 64 },
   Stealth = { id = 1784, cat = 38, catCd = 10, dur = -1, school = 1, catName = "Aura" },
   Stoneform = { id = 20594, cd = 180, dur = 8, school = 1 },
-  Stormstrike = { id = 17364, cd = 8, dur = 12, school = 1 },
+  Stormstrike = { id = 17364, cd = 6, dur = 12, school = 1 },
   ["Swift Judgement"] = { id = 1310994, cd = 60, school = 2 },
   ["Templar's Bulwark"] = { id = 1311015, cd = 300, dur = 8, school = 2 },
   Vanish = { id = 1856, cat = 39, catCd = 300, school = 1, catName = "Shapeshift" },

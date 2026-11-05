@@ -9,16 +9,17 @@
 -- Three widening rings now, and the addon finds its own target if it has to:
 --
 --   original / network   Olympus, exactly as before, 5 and 1 points
---   rival                one guild, nominated by you or by the addon
---   any                  every other player kill: no points, still tracked, voiced, dossiered
+--   rival                one guild, nominated by you or by the addon, 3 points
+--   any                  every other player kill, one point, tracked, voiced, dossiered
 --
--- The widening is **off until it is needed**. Every ring past Olympus stays shut while an Olympus
--- guild is still being seen, so nothing about today's scoring changes on a realm that has them.
--- After three sessions with no sighting the addon opens the rings itself and says so once.
+-- Since 2.7.0 the rings are open from the first login. Olympus took the PvE ruleset at launch
+-- (2026-11-04) and rulesets are separate megaservers, so the sighting the old three-session
+-- wait was waiting for can never come. The Olympus tiers stay wired and still pay first if a
+-- name ever matches; they are a bonus now, not a gate.
 --
 --   /godslayer rival              what the addon is hunting, and why
 --   /godslayer rival <guild>      nominate one by hand; shared with the guild
---   /godslayer rival off          back to Olympus only
+--   /godslayer rival off          no rival, and no nominating; the one-point baseline stays
 --   /godslayer gnomes             the gnome count and what it has made you
 --
 -- Races come from the dossier, which reads `GetPlayerInfoByGUID`. That function carries no
@@ -47,17 +48,20 @@ end
 -- ---------------------------------------------------------------------------
 
 -- Olympus always answers first and is never overridden: if the real thing is on the realm, it is
--- the hunt. Only past that does the nominated rival, and then the open ring, get a say.
+-- the hunt. Past that comes the nominated rival, and then the open ring, which since 2.7.0 is
+-- unconditional: Olympus took the PvE ruleset at launch, so on this megaserver the open ring IS
+-- the game, and a mode where most kills score nothing starved the titles and broke the board.
+-- The one way a guild scores nothing now is the ignore list, which stays the player's to use.
 function ns.ClassifyWide(guild)
   local tier = ns.Classify(guild)
   if tier then return tier end
-  local w = db()
-  if not (w and w.on) then return nil end
-  if type(guild) ~= "string" or guild == "" then return nil end
+  if type(guild) ~= "string" then return nil end
+  if guild == "" then return "any" end -- a victim seen with no guild at all
   local norm = ns.NormGuild(guild)
-  if norm == "" then return nil end
+  if norm == "" then return "any" end
   if GodslayerDB.ignore[norm] then return nil end
-  if w.rival and norm == w.rival then return "rival" end
+  local w = db()
+  if w and w.rival and norm == w.rival then return "rival" end
   return "any"
 end
 
@@ -156,6 +160,16 @@ function Rival.NoteDeath(guild)
   if f then f.theirs = (f.theirs or 0) + 1 end
 end
 
+-- A kill scored with no tag turned out to have a guild. The race was already counted when the
+-- kill scored, so this feeds only the feud, and the Olympus sighting if that is what it was.
+function Rival.NoteUpgrade(guild, tier)
+  local w = db()
+  if not w or not guild or guild == "" then return end
+  if tier == "original" or tier == "network" then w.seenOlympus = true w.quiet = 0 end
+  local f = feudOf(guild)
+  if f then f.mine = (f.mine or 0) + 1 end
+end
+
 function Rival.GnomeRank(n)
   if type(n) ~= "number" then return nil end
   local title
@@ -169,8 +183,10 @@ end
 -- Opening the rings
 -- ---------------------------------------------------------------------------
 
--- At login: if a whole session went by without one Olympus guild, that is evidence. Three in a
--- row and the realm does not have them, so the addon stops waiting and widens itself.
+-- At login. The quiet-session count stays as the record of what this realm has shown, but the
+-- hunt no longer waits on it: Olympus launched on the PvE ruleset (2026-11-04), a different
+-- megaserver, so the wait for a sighting that can never come was retired in 2.7.0. The rings
+-- are open from the first login, and only /godslayer rival off stops the nominating.
 function Rival.OnLogin()
   local w = db()
   if not w then return end
@@ -180,12 +196,10 @@ function Rival.OnLogin()
     w.quiet = (w.quiet or 0) + 1
   end
   w.seenOlympus = false
-  if w.on or w.off then return end
-  if (w.quiet or 0) < (ns.RIVAL.quietSessions or 3) then return end
-  w.on = true
-  ns.Print("Three sessions and no Olympus on this realm. The hunt is open: every player kill now counts, "
-      .. "and I will name you a rival once there is enough blood to pick one. /godslayer rival to see it, "
-      .. "or /godslayer rival off to go back to Olympus only.")
+  if w.opened or w.off then return end
+  w.on, w.opened = true, 1
+  ns.Print("Every player kill counts now, one point each, and I will name you a rival worth three "
+      .. "once there is enough blood to pick one. /godslayer rival to see where that stands.")
 end
 
 -- ---------------------------------------------------------------------------
@@ -199,12 +213,12 @@ function Rival.Command(rest)
 
   if rest == "off" then
     w.on, w.off, w.rival, w.rivalLocked = nil, true, nil, nil
-    ns.Print("Back to Olympus only. Nothing else scores.")
+    ns.Print("Rival cleared, and I will not pick another. Every kill still counts one point; the Olympus tiers still pay if they ever show.")
     return
   end
   if rest == "on" then
     w.on, w.off = true, nil
-    ns.Print("The hunt is open: every player kill counts, Olympus still counts most.")
+    ns.Print("I will name you a rival again once there is enough blood to pick one. Rival kills count three.")
     return
   end
   if rest == "clear" then
@@ -229,9 +243,7 @@ function Rival.Command(rest)
 
   -- Bare command: say where the hunt stands and why.
   if not w.on then
-    ns.Print("Hunting Olympus only." .. (w.off and " You turned the wider hunt off." or
-      (" No sighting for " .. (w.quiet or 0) .. " session" .. ((w.quiet == 1) and "" or "s") .. "; it opens by itself at "
-       .. (ns.RIVAL.quietSessions or 3) .. ".")))
+    ns.Print("Every kill counts one point. You turned the rival hunt off; /godslayer rival on brings it back.")
     return
   end
   if w.rival then

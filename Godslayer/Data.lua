@@ -57,70 +57,59 @@ ns.VICTIM_TIERS = {
   { 3, "Regular" },
   { 5, "Loyalty Card Holder" },
   { 8, "Frequent Flyer, Graveyard Air" },
-  { 12, "Emotional Support Olympian" },
+  { 12, "Emotional Support Enemy" },
   { 20, "Personal Tithe" },
   { 35, "Claimed As A Dependent" },
   { 50, "Basically My Alt" },
 }
 
--- Tokens: {kills} "7 Olympus kills"   {points} "19 points"   {uniques} "5 different Olympians"
+-- Tokens: {kills} "7 kills"   {points} "19 points"   {uniques} "5 different players"
 --         {orig} "3 from the original OLYMPUS"   {n} {p} {u} {o} are the bare numbers.
 --         {rank} your title   {king} "the King himself 2 times"
 --         {nemesis} "Bob Smith (7 times)"   {zone} the zone you kill in most
---         {prey} the class you kill most   {today} "4 Olympus kills today"   {up} levels above you
+--         {prey} the class you kill most   {today} "4 kills today"   {up} levels above you
+--         {rival} the guild named your rival, once one is named
 -- Lines with {n} are only picked at 2+ kills, lines with {orig} or {o} only when you have one,
 -- lines with {king} only after a regicide, {nemesis} once somebody has died to you twice,
 -- {today} at 2+ kills today, {up} when you have killed somebody at least 2 levels above you,
--- {zone} and {prey} once the addon has seen where and what you kill.
+-- {zone} and {prey} once the addon has seen where and what you kill, {rival} once one is named.
 -- Keep every line plain ASCII and under about 200 characters; chat cuts off at 255.
+--
+-- These are the war lines, always on offer. The Olympus lines live in ns.PHRASES_OLYMPUS below
+-- and only come back once there is a real Olympus kill behind them.
 ns.PHRASES = {
-  "Mount Olympus update: {kills}, {points}. The gods bleed, and they drop nothing.",
-  "{kills} and counting. Turns out you can gank a pantheon.",
-  "Olympus has 30+ full guilds. I have {kills}. Somebody has to do the census.",
-  "Two kinds of players in Forever: people in Olympus, and people farming Olympus. {kills}, {points}.",
-  "Dude. DUDE. {kills}. That's actually crazy.",
-  "{uniques} sent to the spirit healer. Hope the King issues a decree about it.",
-  "Zeus called. He wants his {n} guildies back. They're still running from the graveyard.",
+  "War report: {kills}, {points}. The Alliance keeps shipping them. I keep signing for them.",
   "{kills}. At this point I should get a rep bar for it.",
-  "Personally responsible for {n} Olympus repair bills. You're welcome, Stormwind blacksmiths.",
-  "They brought 30 guilds. I brought a keyboard. {kills}, {points}.",
-  "Olympus News Network, breaking: local Horde player now at {kills}. More at 11.",
+  "{kills}. The spirit healer greets me by name now. Professional courtesy.",
+  "Personally responsible for {n} Alliance repair bills. You're welcome, Stormwind blacksmiths.",
   "{kills}. They needed the whole raid. I needed two globals.",
-  "Scoreboard check: {points} off {kills}. The Lords and Captains have been notified.",
   "Another one for the untabarded list. {kills} total.",
-  "{orig}. Five points each. The King's own guild pays best.",
-  "I don't always PvP, but when I do, the nameplate says OLYMPUS. {kills}.",
-  "{kills}. Somewhere a mute addon just got another download.",
-  "Asmon said he'd go Hardcore if we got Classic Plus. Good thing he didn't: {kills}.",
   "{uniques} personally introduced to the Alliance graveyard system.",
-  "Corpse run speedrun category: any% Olympus. I've started {n} of them.",
+  "Corpse run speedrun category: any% Alliance. I've started {n} of them.",
   "Lok'tar ogar. {kills}, {points}. The transmog competition is over, I'm wearing their tears.",
   "{kills}. Not a single one of them remembered to salute.",
   "Hunting report: {kills}, {uniques}, {points}. Season stays open.",
-  "They march 2,000 deep into Grim Batol. I wait at the flight path. {kills}.",
-  "Olympus invited everyone on the server. I'm the one guy who RSVP'd with a crit. {kills}.",
   "{kills}. Every layer, same result.",
-  "Icarus flew too close to the sun. {n} Olympians flew too close to me.",
-  "The gods of Olympus are immortal. Their guild members have had {n} exceptions so far.",
-  "{points} on the board. Achilles had one weak spot. Olympus has about 30,000.",
-  "Sisyphus had the boulder. Olympus has the corpse run. {kills}.",
+  "Icarus flew too close to the sun. {n} Alliance flew too close to me.",
+  "Achilles had one weak spot. I have found {u} so far. {points}.",
+  "Sisyphus had the boulder. The Alliance has the corpse run. {kills}.",
   "Opened Pandora's box. It was just {kills} and a hearthstone on cooldown.",
-  "{kills}. If Olympus is Mount Olympus, call me a landslide.",
-  "Realm first Sulfuras was cool. Realm first {points} points of Olympus is cooler.",
+  "Peace was an option. My repair bill said no. {kills}, {points}.",
   "That's {kills}. Is this what the main tank of the Alliance looks like?",
-  "For the Horde. {kills}, {points}. The King can dock it from the guild treasury.",
+  "For the Horde. {kills}, {points}. Thunder Bluff sleeps safe tonight.",
   "Added to the kill-on-sight list of {uniques}. It's mutual.",
   "A 10fps Stormwind can't save them out here. {kills}.",
   "Just doing my part. {kills}, {points}. Would you like to know more?",
   "Res sickness is temporary. Being one of my {kills} is forever.",
-  "Olympus guild cap is 1,000. My kill count is working on it: {n} so far.",
-  "{kills}. They keep making more guilds. I keep making more room on the scoreboard.",
-  "Titans beat the old gods. Torchmen beat Olympus. {kills}, {points}.",
-  "Prometheus stole fire from Olympus. We're just here for the rest of it. {kills}.",
-  "New title unlocked: {rank}. {kills}, {points}. Olympus HR has been informed.",
+  "{kills}. They keep making more characters. I keep making more room on the scoreboard.",
+  "Biggest upset on the books: a victim {up} levels above me. Turns out the gear is cosmetic.",
+  "New title unlocked: {rank}. {kills}, {points}. Stormwind HR has been informed.",
+  "{rival} has a problem. The problem has {points} and is still logging in.",
+  "Feud report: {rival} keeps sending their best, and I keep sending them back. {kills}.",
+  "{rival} was named this realm's problem by a committee of one. The vote was unanimous. {kills}.",
   "They call me {rank} now. {kills}. My mother is proud. Zeus is not.",
   "Rank: {rank}. Hobby: {kills}. Employer: the Horde.",
-  "{rank} reporting in. {points} of pure, ethically sourced Olympian tears.",
+  "{rank} reporting in. {points} of pure, ethically sourced Alliance tears.",
   "The torch is not for warmth. It's for finding them in the dark. {kills}.",
   "Azeroth cleansing report: {kills} scrubbed, {uniques} rinsed, zero remorse.",
   "They pass around invites. We pass the torch. {kills}, {points}.",
@@ -128,14 +117,31 @@ ns.PHRASES = {
   "{nemesis}. At what point do I have to claim them as a dependent?",
   "Shoutout to {nemesis}, my most loyal customer. The punch card is almost full.",
   "I know {nemesis} better than their own guild does. We meet at the graveyard.",
-  "{zone} is my office. Olympus keeps walking into it. {kills}.",
-  "Tourism board update: {zone} remains closed to Olympians. {kills}.",
-  "Olympus travel advisory: avoid {zone}. Signed, the reason for the advisory.",
+  "{zone} is my office. The Alliance keeps scheduling walk-ins. {kills}.",
+  "Tourism board update: {zone} remains closed to the Alliance. {kills}.",
+  "Alliance travel advisory: avoid {zone}. Signed, the reason for the advisory.",
   "Favorite prey this season: {prey}. They die like everyone else, just louder.",
   "The ledger says I mostly kill {prey}. Nothing personal. Okay, a little personal.",
   "{today}. It's not even dinner.",
   "Daily report: {today}. The spirit healer knows them by name now.",
-  "Biggest upset on the books: an Olympian {up} levels above me. Turns out the gear is cosmetic.",
+}
+
+-- The Olympus lines. Offered alongside the war lines only once a real Olympus kill is on the
+-- books, which on this megaserver means a wanderer or a renamed affiliate: Olympus launched on
+-- the PvE ruleset. The {king} lines additionally need a regicide, as ever.
+ns.PHRASES_OLYMPUS = {
+  "Mount Olympus update: {kills}, {points}. The gods bleed, and they drop nothing.",
+  "{kills} and counting. Turns out you can gank a pantheon.",
+  "Two kinds of players in Forever: people in Olympus, and people farming Olympus. {kills}, {points}.",
+  "Dude. DUDE. {kills}. That's actually crazy.",
+  "{orig}. Five points each. The King's own guild pays best.",
+  "I don't always PvP, but when I do, the nameplate says OLYMPUS. {kills}.",
+  "Olympus News Network, breaking: local Horde player now at {kills}. More at 11.",
+  "{kills}. Somewhere a mute addon just got another download.",
+  "The gods of Olympus are immortal. Their guild members have had {n} exceptions so far.",
+  "Titans beat the old gods. Torchmen beat Olympus. {kills}, {points}.",
+  "Prometheus stole fire from Olympus. We're just here for the rest of it. {kills}.",
+  "They said Olympus was on another server. Nobody told {o} of them. {points}.",
   "REGICIDE. I have slain {king}. He said 'dude' on the way down.",
   "Killed {king}. The King is dead. Long live whoever is next in the 30-guild line of succession.",
   "Slew {king}. Somewhere, 30,000 guildmates felt a disturbance in the layer.",
@@ -143,31 +149,30 @@ ns.PHRASES = {
 
 -- Used when the counter is still at zero.
 ns.PHRASES_ZERO = {
-  "Zero Olympus kills so far. The pantheon sleeps safely tonight. For now.",
-  "Godslayer installed, counter at 0. Olympus, I am inside your layer.",
-  "No Olympus kills yet. Consider this a formal decree of intent.",
+  "Kill counter at zero. Consider this a formal declaration of intent.",
+  "Godslayer installed, counter at 0. The torch is lit. The rest is scheduling.",
+  "No kills yet. The Alliance is safe tonight. This is not a promise.",
 }
 
 -- ---------------------------------------------------------------------------
--- When Olympus is not on your realm
+-- The hunt without Olympus
 -- ---------------------------------------------------------------------------
--- Olympus is Asmongold's guild and it is Alliance, PvP ruleset. Horde Olympus guilds exist and
--- run the same addon, but none of that is guaranteed to land on the realm we actually get on
--- 11-04. Before this, Classify returned nil for every guild that was not Olympus, which means a
--- realm without them left the addon inert: nothing scored, no title ever moved, no leaderboard.
+-- Olympus is Asmongold's guild network, and at launch (2026-11-04) he put it on the PvE
+-- ruleset. Rulesets are separate megaservers and the PvP ruleset is faction-locked, so on this
+-- server an Olympus nameplate can never appear, and a scoring table built around one starved
+-- everything: points, titles, the leaderboard, the brag lines.
 --
--- So the hunt now has three widening rings, and the addon finds its own target if it has to:
+-- So since 2.7.0 every player kill counts, in three rings:
 --
---   original / network   Olympus, unchanged, 5 and 1 points
---   rival                one guild you nominate, or the addon nominates for you
---   any                  every other player kill: no points, but tracked, voiced and dossiered
+--   original / network   Olympus, unchanged, 5 and 1 points, dormant but wired
+--   rival                one guild you nominate, or the addon nominates for you, 3 points
+--   any                  every other player kill, one point, tracked, voiced and dossiered
 --
--- The third ring is what keeps the addon alive on day one whatever realm we land on, and it is
--- what the race and ability callouts below hang off. Points stay rationed on purpose: a kill on
--- a random Alliance rogue should feel good and count for nothing.
+-- One point is the baseline on purpose: the title ladder still takes a season, a rival kill is
+-- still worth three of anybody else, and the ignore list is still the one way to score nothing.
 
 ns.RIVAL_POINTS = 3
-ns.ANY_POINTS = 0
+ns.ANY_POINTS = 1
 
 -- How the addon nominates a rival when it has seen no Olympus guild for a while. It picks the
 -- guild with the most blood between you, counting their kills on you double, because the guild

@@ -265,8 +265,12 @@ ns.ObserveUnit("nameplate1")
 late.dead = true M.fire("UNIT_DIED", late.guid)
 M.advance(4)
 eq(H.Kills(), 1, "the death turning up afterwards is the same kill, not a second one")
-check(spoken():find("olympus", 1, true), "and its Olympus score is still announced: " .. spoken())
-eq(ns.char.kills, 1, "and scored once")
+-- the five-point Olympus score is what proves the tag was honoured; the lead clip may be the
+-- sacrilege rung rather than the base call when a streak is already running
+check(spoken():find("plus_five", 1, true), "and its Olympus score is still announced: " .. spoken())
+eq(ns.char.victims[late.guid].kills, 1, "and the victim is scored once")
+eq(ns.char.victims[late.guid].tier, "original", "as the original guild")
+eq(ns.char.victims[late.guid].points, 5, "worth five")
 -- the killing blow arriving after the credit was called
 --
 -- reset() empties the books but not the matcher's own lists of deaths seen and credits

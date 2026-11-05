@@ -58,7 +58,7 @@ luatex --luaonly tools/build_secrecy_map.lua --check
 echo
 echo "== suites =="
 total=0
-for s in run v2 v22 aura rival ledger rank recap field flag control death threat perf; do
+for s in run v2 v22 aura rival pivot ledger rank recap field flag control death threat perf; do
   out=$(GS_SEED="$SEED" GS_SUITE="tests/$s.lua" luatex --luaonly "$RUNNER" 2>&1 | tail -1)
   printf '%-10s %s\n' "$s" "$out"
   case "$out" in

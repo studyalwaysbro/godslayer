@@ -1,26 +1,28 @@
 # Godslayer
 
-**A World of Warcraft: Forever addon for people who looked at a 30-guild pantheon and thought "that's a lot of honor."**
+**A World of Warcraft: Forever addon for people who looked at the enemy faction and thought "that's a lot of honor."**
 
 Prometheus stole fire from Olympus. We kept the torch and came back for the rest.
 
-Godslayer counts every kill you land on `OLYMPUS` and the whole Olympus guild network, scores it, hands you increasingly unhinged titles, and ranks you against your guildmates. Then it gives you a button that brags about it in guild chat.
+Godslayer counts every player you kill, scores it, hands you increasingly unhinged titles, and ranks you against your guildmates. Then it gives you a button that brags about it in guild chat.
+
+> **Launch note (November 2026):** Asmongold put the Olympus network on the PvE ruleset, a different megaserver from the PvP one. So Godslayer no longer waits for an Olympus nameplate that is never coming: every player kill counts now, one point each. If an Olympus guild ever does turn up on your server, the five-point bounty is still wired and still pays. Name any guild your rival for three points a kill. See [Scoring](#what-counts).
 
 Made by **The True Torchmen**. For the Horde.
 
 ## What it does
 
-- **Counts your Olympus kills.** Every unique player, which guild they wore, how many times, how many were your killing blow.
-- **Scores them.** 5 points for a member of the original `OLYMPUS`. 1 point for any other guild in the network (Olympus Kitchen, OLYMPUS BETZ, OLYMPUS LXX, all hundred-and-something of them).
+- **Counts your kills.** Every unique player, which guild they wore, how many times, how many were your killing blow.
+- **Scores them.** One point for any player. Three for a member of the guild you name your rival. Five for a member of the original `OLYMPUS`, and one for any other guild in its network (Olympus Kitchen, OLYMPUS BETZ, OLYMPUS LXX), if the network is even on your server.
 - **Guild leaderboard.** Every guildmate running Godslayer shows up, ranked by points. No setup.
-- **65+ brag lines.** One click posts your numbers to guild chat in a new way each time. Some of them now name your nemesis. There is also a button that posts one victim's whole record.
+- **60+ brag lines.** One click posts your numbers to guild chat in a new way each time. Some of them now name your nemesis or your rival. There is also a button that posts one victim's whole record. The Olympus-flavoured lines keep themselves in reserve until you actually land an Olympus kill.
   > Zeus called. He wants his 14 guildies back. They're still running from the graveyard.
 - **Titles.** Start as an Unlit Torch. Work up through Heretic, Temple Robber, Thief of Fire and Pantheon Problem to Godslayer. There is one title above Godslayer. You will have to earn it to read it.
 - **Kill streaks.** Double Sacrilege. Triple Heresy. Titanomachy.
 - **Regicide.** Kill the King of Olympus himself and the addon makes sure you never forget it. Neither will the leaderboard.
 - **A dossier on everyone you kill.** Click a name in the kill log. Level, race, class, guild, their rank inside it, PvP title, where you killed them, what time of day they usually die, your best day on them, and the last dozen kills one by one.
 - **They get titles too.** One kill makes someone a Fresh Sacrifice. Five makes them a Loyalty Card Holder. Keep going and you can claim them as a dependent.
-- **Hit list.** Every Olympian you have seen and not killed yet, with where you saw them last. Homework.
+- **Hit list.** Every Olympus or rival player you have seen and not killed yet, with where you saw them last. Homework.
 - **Stats.** Kills by class, by zone, by guild rank and by hour of the day, plus your nemesis, your biggest upset and the highest level you have dropped.
 - **A louder kill banner.** "Level 34 Dwarf Paladin, Captain. Stranglethorn Vale. Third time today."
 - **Tooltip tags.** Mouse over an Olympian and see what they're worth, how often you've already collected, and whether they are still on the hit list.
@@ -454,9 +456,14 @@ The dossier is built from what the game shows about a player you can see: their 
 
 Battleground kills mostly will not count. The game hides enemy identities from addons in instanced PvP. This is a world PvP addon. Go outside.
 
-## Which guilds count
+## What counts
 
-Any guild with "olympus" in the name, however they capitalise or disguise it (`0LYMPUS`, `OLYMPVS`, we see you). Plus a short list of network guilds that dodge the word, which lives in [`Godslayer/Data.lua`](Godslayer/Data.lua) next to the brag lines. Edit either list freely.
+Every player you kill counts one point. On top of that are two bonus rings:
+
+- **Your rival, three points.** `/godslayer rival <guild>` names one, or the addon nominates the guild with the most blood between you (your kills on them, and your deaths to them counted double). `/godslayer rival off` stops the nominating; the one-point baseline stays.
+- **Olympus, five points.** Any guild with "olympus" in the name, however they capitalise or disguise it (`0LYMPUS`, `OLYMPVS`, we see you), is the original and pays five; a short list of network guilds that dodge the word (in [`Godslayer/Data.lua`](Godslayer/Data.lua)) pays one. All dormant unless the network lands on your server, since it launched on the PvE ruleset. `/godslayer add <guild>` marks any guild as network by hand.
+
+The one way to score nothing is `/godslayer ignore <guild>`. Edit any of these lists freely.
 
 ## Is this allowed?
 

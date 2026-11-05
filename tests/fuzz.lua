@@ -374,9 +374,16 @@ for seed = 1, RUNS do
   local kills, points, uniques, kb, orig = 0, 0, 0, 0, 0
   for id, v in pairs(c.victims) do
     if v.tier then
-      if ns.Classify(v.guild) ~= v.tier then fail(seed, "victim tier out of date: " .. tostring(v.guild)) end
+      -- The Olympus rings are decided by the guild name and must still match it. The rival and
+      -- the open rings are decided by nomination, not by the name, so their stored tier need not
+      -- equal ns.Classify, and a victim whose ring changed over their history keeps the points
+      -- each kill was banked at. The guarantee is only the range: every kill is worth one point
+      -- to five, and the original-guild kills are worth five apiece.
+      if (v.tier == "original" or v.tier == "network") and ns.Classify(v.guild) ~= v.tier then
+        fail(seed, "victim tier out of date: " .. tostring(v.guild))
+      end
       local ok = v.ok or 0
-      if ok > v.kills or v.points ~= ok * 5 + (v.kills - ok) then fail(seed, "victim points wrong for " .. id) end
+      if ok > v.kills or v.points < ok * 5 + (v.kills - ok) or v.points > v.kills * 5 then fail(seed, "victim points wrong for " .. id) end
       kills, points, uniques, kb, orig = kills + v.kills, points + v.points, uniques + 1, kb + (v.kb or 0), orig + ok
     end
     if (v.kb or 0) > v.kills then fail(seed, "more killing blows than kills on " .. id) end
@@ -437,7 +444,11 @@ for seed = 1, RUNS do
   for _, v in pairs(c.victims) do if v.tier and v.kills >= 2 and (not nemesis or v.kills > nemesis.kills) then fail(seed, "nemesis is not the most killed") end end
   for _, k in ipairs(ns.HitList()) do
     local v = c.victims[k.id]
-    if (v and v.tier) or not ns.Classify(k.guild) then fail(seed, "hit list holds a killed or outside player") end
+    -- the hit list is built from the sighting table, which the core only writes for the named
+    -- rings (Olympus and the rival), never the open ring, so an entry is never an open-ring
+    -- random; it must also never be someone already dead to you
+    if v and v.tier then fail(seed, "hit list holds a player you already killed") end
+    if not ns.ClassifyWide(k.guild) then fail(seed, "hit list holds an ignored guild") end
   end
   -- the running totals must already equal what a recount from the victims gives
   local before = { c.kills, c.points, c.uniques, c.kb, c.orig }

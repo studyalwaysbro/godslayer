@@ -493,7 +493,7 @@ function Hype.Kills() return hunt and hunt.kills or 0 end
 -- What the hunt came to, in chat, once it is over.
 local function recap(h)
   local parts = { ("%d kills"):format(h.kills) }
-  if (h.points or 0) > 0 then parts[#parts + 1] = ("|cffffd100+%d|r off Olympus"):format(h.points) end
+  if (h.points or 0) > 0 then parts[#parts + 1] = ("|cffffd100+%d|r points"):format(h.points) end
   local run = multiFor(h.bestRun or 1)
   if run then parts[#parts + 1] = "best run " .. run[2] end
   if (h.denies or 0) > 0 then parts[#parts + 1] = h.denies .. (h.denies == 1 and " spell denied" or " spells denied") end
@@ -519,7 +519,7 @@ local function cardLine(h)
   local parts = { ("%d kills"):format(h.kills) }
   local run = multiFor(h.bestRun or 1)
   if run then parts[#parts + 1] = "|cffff7d0a" .. run[2] .. "|r" end
-  if (h.points or 0) > 0 then parts[#parts + 1] = ("|cffffd100+%d|r off Olympus"):format(h.points) end
+  if (h.points or 0) > 0 then parts[#parts + 1] = ("|cffffd100+%d|r points"):format(h.points) end
   local seconds = math.max(0, math.floor((h.last or GetTime()) - (h.started or GetTime())))
   parts[#parts + 1] = ("%d:%02d"):format(math.floor(seconds / 60), seconds % 60)
   return table.concat(parts, "    ")
@@ -814,9 +814,10 @@ local function announceGods(gods, huntKills, run, record)
   if record then lines[#lines + 1] = { pick("record"), 2 } end
   speak(lines)
   if top.info.king or (multi and multi[1] >= 3) or (ladder and ladder[1] >= 5) or record then roar() end
-  local title = top.info.king and "REGICIDE" or (ladder and ladder[3]) or (top.tier == "original" and "OLYMPUS BLEEDS" or "OLYMPIAN DOWN")
+  local title = top.info.king and "REGICIDE" or (ladder and ladder[3])
+      or (top.tier == "original" and "OLYMPUS BLEEDS" or top.tier == "rival" and "THE RIVAL BLEEDS" or "OLYMPIAN DOWN")
   local name = top.v and top.v.name
-  local parts = { (name or "An Olympian") .. (#gods > 1 and (" and " .. (#gods - 1) .. " more") or ""), "|cffffd100+" .. points .. "|r" }
+  local parts = { (name or (top.tier == "rival" and "A rival" or "An Olympian")) .. (#gods > 1 and (" and " .. (#gods - 1) .. " more") or ""), "|cffffd100+" .. points .. "|r" }
   local progress = progressLine()
   if top.moment and top.moment.tag then parts[#parts + 1] = "|cffff4040" .. top.moment.tag .. "|r" end
   if promoted then parts[#parts + 1] = "|cffff7d0aNew title: " .. promoted.info.rankUp .. "|r"
@@ -997,6 +998,24 @@ function Hype.Named(calledAs, id, name)
     end
   end
   return true
+end
+
+-- An open-ring kill scored: the generic call already spoke for it, so only the points move.
+-- They still belong to the hunt the kill was made in, for the recap and the grade.
+function Hype.Points(id, pts)
+  if hunt and id and hunt.ids[id] then hunt.points = (hunt.points or 0) + (tonumber(pts) or 0) end
+end
+
+-- A title reached off open-ring kills alone. The god script would be a lie on a random kill,
+-- and the banner belongs to whatever the generic call is already showing (a moment, a rung),
+-- so the title is spoken and queued, never seized onto the banner over the kill that earned it.
+function Hype.Promoted(rankIndex, rankName)
+  if not GodslayerDB then return end
+  local o = opts()
+  if not o.on then return end
+  local lines = { { pick("new_title"), 2, nil, "fanfare" } }
+  if rankIndex and clipLength("title_" .. rankIndex) then lines[#lines + 1] = { "title_" .. rankIndex, 2 } end
+  speak(lines)
 end
 
 -- The core has scored a kill on the Olympus network. If the kill is still waiting to be
@@ -1308,7 +1327,7 @@ function Hype.Ally(who, points)
   while log[1] and now - log[1] > 3600 do table.remove(log, 1) end
   if #log >= ALLY_SENDER_HOURLY or (log[#log] and now - log[#log] < ALLY_SENDER_GAP) then return end
   log[#log + 1] = now
-  ns.Print(("|cffffd100%s|r just took |cffffd100+%d|r off Olympus."):format(who, points))
+  ns.Print(("|cffffd100%s|r just banked |cffffd100+%d|r."):format(who, points))
   if hunt or Hype.Speaking() or now - lastAlly < ALLY_GAP then return end
   lastAlly = now
   speak({ { pick("ally"), 1 } })
@@ -1341,7 +1360,7 @@ local function say(msg) ns.Print(msg) end
 
 local SWITCHES = {
   voice = "Announcer", music = "Kill song", guild = "Guild kill calls", sfx = "Sound effects", spot = "Olympian spotter",
-  theme = "Hunt theme when you have no song of your own", multi = "Double, triple and rampage calls", asides = "Remarks after an Olympus kill",
+  theme = "Hunt theme when you have no song of your own", multi = "Double, triple and rampage calls", asides = "Remarks after a called kill",
   fx = "Banner light and motion", fuse = "The fuse under the banner", moments = "Revenge, domination and the other moments",
   barks = "A word on kills between rungs", duck = "Music steps back while the announcer speaks", deny = "DENIED on a spell you interrupt",
   duels = "Duel results", photo = "A screenshot of your biggest moments", clip = "A mark for your recorder when a hunt ends",
@@ -1604,7 +1623,7 @@ function Hype.Command(rest)
       onOff(o.engage), onOff(o.class), onOff(o.finishers), onOff(o.streaks), onOff(o.wheel)))
     print(("  Kills within %d seconds of each other: DOUBLE KILL, TRIPLE KILL, QUAD KILL, RAMPAGE (%s)."):format(MULTI_WINDOW, onOff(o.multi)))
     print("  Olympus kills have their own calls, and the points are read out. /godslayer hype test olympus plays one.")
-    print(("  Sound effects %s, Olympian spotter %s, remarks %s, hunt theme %s."):format(onOff(o.sfx), onOff(o.spot), onOff(o.asides), onOff(o.theme)))
+    print(("  Sound effects %s, enemy spotter %s, remarks %s, hunt theme %s."):format(onOff(o.sfx), onOff(o.spot), onOff(o.asides), onOff(o.theme)))
     print("  Your song: a file named kill.mp3 or kill.ogg in Interface\\AddOns\\GodslayerMusic. Restart the game after adding it.")
     print("  /godslayer hype pack | mix | audition [name] | say <line> | stop | on | off | window <seconds> | blows | all | channel <name> | probe")
     print("  /godslayer hype test [olympus | king | spot | king spot | moment <name> | duel | duel lost | denied | card | engage | engage god | finisher <kind> | sig <spell> | streak <kind>]")

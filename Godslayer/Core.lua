@@ -14,7 +14,7 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "2.6.0"
+ns.VERSION = "2.7.0"
 
 local DEDUPE_SECONDS = 10        -- the signals above can all describe the same death
 local MATCH_WINDOW = 8           -- honorable-kill credit and a seen death must be this close
@@ -216,9 +216,10 @@ end
 function ns.PointsFor(tier)
   if tier == "original" then return ns.ORIGINAL_POINTS end
   if tier == "rival" then return ns.RIVAL_POINTS or 3 end
-  -- The open ring is deliberately worth nothing: a random Alliance rogue should feel good to
-  -- kill and move no number. It is tracked and voiced, not scored.
-  if tier == "any" then return ns.ANY_POINTS or 0 end
+  -- Since 2.7.0 the open ring is the baseline: Olympus took the PvE ruleset at launch, so on
+  -- this megaserver every kill is an open-ring kill, and a point economy of zeroes starved the
+  -- titles and the leaderboard. One point a kill; the named tiers are the bonus on top.
+  if tier == "any" then return ns.ANY_POINTS or 1 end
   return ns.NETWORK_POINTS
 end
 
@@ -266,7 +267,8 @@ local function initDB()
 end
 
 local function newChar()
-  return { kills = 0, points = 0, uniques = 0, kb = 0, orig = 0, kings = 0, bestStreak = 0, victims = {}, guilds = {} }
+  return { kills = 0, points = 0, uniques = 0, kb = 0, orig = 0, kings = 0, bestStreak = 0, victims = {}, guilds = {},
+           schema = 27 }
 end
 
 local myName, myGUID, myFaction
@@ -286,7 +288,10 @@ local function initChar()
   local db = GodslayerDB
   db.chars[myName] = db.chars[myName] or newChar()
   local c = db.chars[myName]
-  for k, v in pairs(newChar()) do if c[k] == nil then c[k] = v end end
+  -- Back-fill the fields a brand-new character has, but never `schema`: a character written by
+  -- an older version has no schema, and that absence is exactly what tells PLAYER_LOGIN to run
+  -- the one-time recount. A new character already carries schema from newChar() above.
+  for k, v in pairs(newChar()) do if c[k] == nil and k ~= "schema" then c[k] = v end end
   local _, class = try(UnitClass, "player")
   c.class = plain(class) or c.class
   ns.char, ns.myName = c, myName
@@ -312,6 +317,7 @@ local seen, seenCount = {}, 0   -- this session: [id] = { name, guild, class, ho
 local nameId = {}               -- [full name] = id, for the rare signal that only has a name
 local pending = {}              -- kills waiting for a guild: [id] = record
 local recent = {}               -- last kill per victim: [id] = record
+local upgradable = {}           -- kills scored with no guild tag: [id] = record, until one shows up
 
 local knownCount = 0            -- entries in GodslayerDB.known, kept so the cap holds mid-session
 
@@ -327,7 +333,7 @@ local function pruneKnown()
   knownCount = #list - drop
 end
 
-local Score, noteDeathRef -- defined below
+local Score, noteDeathRef, upgradeScored -- defined below
 
 -- The PvP title in front of (or behind) a name, when the client shows one.
 local function pvpTitle(unit, name)
@@ -432,7 +438,10 @@ local function ObserveUnit(unit, mode)
   e.guild = guild
   e.rank = rank or e.rank
 
-  local tier = ns.Classify(guild)
+  -- The named tiers are worth remembering and spotting: Olympus, and since 2.7.0 the rival.
+  -- The open ring is everyone, and a table of everyone is not a hit list.
+  local wide = (ns.ClassifyWide or ns.Classify)(guild)
+  local tier = (wide == "original" or wide == "network" or wide == "rival") and wide or nil
   local known = GodslayerDB.known
   if tier then
     -- Written into the record that is already there rather than over it. The fields are the same
@@ -453,7 +462,8 @@ local function ObserveUnit(unit, mode)
     known[id] = nil -- they left the network
     knownCount = knownCount - 1
   end
-  resolvePending(id, guild, tier, e.class)
+  resolvePending(id, guild, wide, e.class)
+  if upgradeScored then upgradeScored(id, guild) end
   return id, guild
 end
 ns.ObserveUnit = ObserveUnit
@@ -755,11 +765,20 @@ function Score(id, name, guild, tier, rec, class)
   if king then c.kings = (c.kings or 0) + 1; v.king = true end
   local rankName, rankAfter = ns.RankFor(c.points)
 
-  ns.Log("score", v.name .. " <" .. guild .. "> +" .. pts .. (rec.kb and " kb" or ""))
+  ns.Log("score", v.name .. (guild ~= "" and (" <" .. guild .. ">") or "") .. " +" .. pts .. (rec.kb and " kb" or ""))
   local info = { king = king, streak = sameLife and s.streak or 1, rankUp = rankAfter > rankBefore and rankName or nil,
                  first = v.kills == 1, zone = rec.zone, sub = rec.sub, kb = rec.kb and true or false }
   -- true when the announcer is calling this one, so the plain chime stays out of its way
-  if ns.Hype then info.announced = hype("Olympus", id, v, tier, pts, info, rankAfter) and true or false end
+  if ns.Hype then
+    if tier == "any" then
+      -- the generic call already spoke for this kill; only the points and a title move
+      if ns.Hype.Points then ns.Hype.Points(id, pts) end
+      if info.rankUp and ns.Hype.Promoted then pcall(ns.Hype.Promoted, rankAfter, rankName) end
+      info.announced = rec.hyped and true or false
+    else
+      info.announced = hype("Olympus", id, v, tier, pts, info, rankAfter) and true or false
+    end
+  end
   if ns.OnScore then ns.OnScore(v, guild, tier, pts, info) end
 end
 
@@ -771,14 +790,81 @@ local function prune()
   for id, rec in pairs(recent) do
     if now - rec.t > PENDING_SECONDS then recent[id] = nil end
   end
+  for id, rec in pairs(upgradable) do
+    if now - rec.t > PENDING_SECONDS then upgradable[id] = nil end
+  end
 end
 
-local function retryPending(id)
+local function retryPending(id, final)
   if not pending[id] then return end
   findUnit(id) -- ObserveUnit settles the record if the victim is still visible
   if not pending[id] then return end
   local guild, class = lookup(id)
-  if guild then resolvePending(id, guild, ns.Classify(guild), class) end
+  if guild then
+    resolvePending(id, guild, (ns.ClassifyWide or ns.Classify)(guild), class)
+    return
+  end
+  if not final then return end
+  -- Six seconds and no tag. On this megaserver most victims have no guild at all, and for
+  -- three releases a kill with no tag was worth nothing. It scores as the open ring now; if
+  -- the tag turns up inside the window, upgradeScored moves the kill where it belongs.
+  local rec = pending[id]
+  pending[id] = nil
+  Score(id, (seen[id] and seen[id].name) or rec.name, "", "any", rec, class)
+  upgradable[id] = rec
+  if ns.Rival then ns.Rival.NoteKill(id, "", "any") end
+end
+
+-- A kill already scored as the open ring gets its guild after all. It is not scored again:
+-- the record moves to the right guild, the points move by the difference, and a tier the
+-- announcer cares about gets the late call it would have gotten at the kill.
+upgradeScored = function(id, guild)
+  local rec = upgradable[id]
+  if not rec then return end
+  if type(guild) ~= "string" or guild == "" then return end
+  upgradable[id] = nil
+  if GetTime() - rec.t > PENDING_SECONDS then return end
+  local c, v = ns.char, ns.char.victims[id]
+  if not v then return end
+  local tier = (ns.ClassifyWide or ns.Classify)(guild)
+  if not tier then
+    -- the late tag is an ignored guild: the player said this guild scores nothing, so the
+    -- open-ring kill is taken back off the books. Recount does the reversal consistently, the
+    -- same way the ignore command does, so a later recount cannot disagree with the running total.
+    v.guild = guild
+    ns.Recount()
+    if ns.OnChanged then ns.OnChanged() end
+    return
+  end
+  local was, now = ns.PointsFor("any"), ns.PointsFor(tier)
+  local delta = now - was
+  local old = c.guilds[""]
+  if old then
+    old.kills, old.points = old.kills - 1, old.points - was
+    if old.kills <= 0 then c.guilds[""] = nil end
+  end
+  local g = c.guilds[guild]
+  if not g then g = { kills = 0, points = 0 }; c.guilds[guild] = g end
+  g.kills, g.points, g.tier = g.kills + 1, g.points + now, tier
+  local _, rankBefore = ns.RankFor(c.points)
+  v.guild, v.tier = guild, tier
+  v.points = (v.points or 0) + delta
+  c.points = c.points + delta
+  if tier == "original" then v.ok = (v.ok or 0) + 1; c.orig = c.orig + 1 end
+  if rec.life == ns.session.life then ns.session.points = ns.session.points + delta end
+  local king = ns.IsKing(v.name, tier)
+  if king then c.kings = (c.kings or 0) + 1; v.king = true end
+  local rankName, rankAfter = ns.RankFor(c.points)
+  if ns.Rival and ns.Rival.NoteUpgrade then ns.Rival.NoteUpgrade(guild, tier) end
+  ns.Log("late", (v.name or id) .. " <" .. guild .. "> " .. (delta >= 0 and "+" or "") .. delta)
+  if tier ~= "any" and ns.Hype then
+    local info = { king = king, streak = 1, rankUp = rankAfter > rankBefore and rankName or nil,
+                   first = v.kills == 1, zone = rec.zone, sub = rec.sub, kb = rec.kb and true or false }
+    hype("Olympus", id, v, tier, now, info, rankAfter)
+  elseif rankAfter > rankBefore and ns.Hype and ns.Hype.Promoted then
+    pcall(ns.Hype.Promoted, rankAfter, rankName)
+  end
+  if ns.OnChanged then ns.OnChanged() end
 end
 
 -- A player died and we get credit. kb = it was our own killing blow. calledAs = the name the
@@ -849,7 +935,7 @@ local function RegisterKill(id, name, kb, source, calledAs)
   pending[id] = rec
   if source ~= "HK" and #credits > 0 then matchCredits() end
   C_Timer.After(1.5, function() retryPending(id) end)
-  C_Timer.After(6, function() retryPending(id) end)
+  C_Timer.After(6, function() retryPending(id, true) end)
 end
 ns.RegisterKill = RegisterKill
 
@@ -1196,6 +1282,12 @@ end
 function handlers.PLAYER_LOGIN()
   if ns.Rival then ns.Rival.OnLogin() end
   initChar()
+  -- 2.7.0: every player kill scores now, and the old recount wiped open-ring records.
+  -- One rebuild under the new rules closes any 0-point deficit this character banked.
+  if (ns.char.schema or 0) < 27 then
+    ns.char.schema = 27
+    ns.Recount()
+  end
   buildHonorPatterns()
   pruneKnown()
   local hk = plain(try(GetPVPSessionStats))
@@ -1327,25 +1419,44 @@ function ns.ResetCharacter()
   for k, v in pairs(newChar()) do c[k] = v end
   c.class = class
   ns.session = { kills = 0, points = 0, streak = 0, runs = {}, life = 1 }
-  pending, recent = {}, {}
+  pending, recent, upgradable = {}, {}, {}
 end
 
--- Rebuild totals after the guild rules change (add / ignore).
+-- Rebuild totals after the guild rules change (add / ignore), and once on upgrade to 2.7.0.
+-- Only the Olympus tiers are reclassified from the guild name: they are rules, not history.
+-- A rival kill keeps the tier and the points it was banked at, because the rival of that night
+-- was the rival; renaming the rival later must never rewrite what a kill was worth. The floor
+-- under every counted victim is one point a kill, which is what closes the 0-point deficits
+-- the 2.4.0 open ring banked and the old recount would have wiped.
 function ns.Recount()
   local c = ns.char
   c.kills, c.points, c.uniques, c.kb, c.orig, c.guilds = 0, 0, 0, 0, 0, {}
   -- regicides and the best streak are history, not totals, so they are left alone
   for id, v in pairs(c.victims) do
-    local tier = v.guild and ns.Classify(v.guild)
+    local tier
+    if v.guild and v.guild ~= "" then
+      tier = ns.Classify(v.guild)
+      if not tier then
+        if GodslayerDB.ignore[ns.NormGuild(v.guild)] then tier = nil
+        else tier = (v.tier == "rival" and "rival") or "any" end
+      end
+    else
+      tier = "any" -- a kill with no tag is an open-ring kill
+    end
     v.tier = tier -- nil keeps the record but leaves it out of the totals and lists
     if tier then
       local ok = math.min(v.ok or 0, v.kills)
-      v.points = ok * ns.ORIGINAL_POINTS + (v.kills - ok) * ns.NETWORK_POINTS
+      if tier == "original" or tier == "network" then
+        v.points = ok * ns.ORIGINAL_POINTS + (v.kills - ok) * ns.NETWORK_POINTS
+      else
+        v.points = math.max(v.points or 0, ok * ns.ORIGINAL_POINTS + (v.kills - ok) * (ns.ANY_POINTS or 1))
+      end
       c.kills, c.points, c.uniques = c.kills + v.kills, c.points + v.points, c.uniques + 1
       c.kb = c.kb + (v.kb or 0)
       c.orig = c.orig + ok
-      local g = c.guilds[v.guild]
-      if not g then g = { kills = 0, points = 0, tier = tier }; c.guilds[v.guild] = g end
+      local key = v.guild or ""
+      local g = c.guilds[key]
+      if not g then g = { kills = 0, points = 0, tier = tier }; c.guilds[key] = g end
       g.kills, g.points = g.kills + v.kills, g.points + v.points
     end
   end

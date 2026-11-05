@@ -102,7 +102,9 @@ local function sortedCounts(counts)
 end
 
 local function guildLabel(guild, tier)
+  if guild == "" then return GREY .. "no guild|r" end
   if tier == "original" then return GOLD .. guild .. " (x" .. ns.ORIGINAL_POINTS .. ")|r" end
+  if tier == "rival" then return ORANGE .. guild .. " (x" .. (ns.RIVAL_POINTS or 3) .. ")|r" end
   return guild
 end
 
@@ -116,11 +118,14 @@ local function phraseFacts()
   local prey = topKey(a.class)
   if prey then facts.prey = prey:sub(1, 1) .. prey:sub(2):lower() .. "s" end
   local today = ns.KillsToday()
-  if today >= 2 then facts.today = today .. " Olympus kills today" end
+  if today >= 2 then facts.today = today .. " kills today" end
   if a.upset and a.upset.up >= 2 then facts.up = tostring(a.upset.up) end
+  local w = GodslayerDB and GodslayerDB.wide
+  local f = w and w.rival and w.feud and w.feud[w.rival]
+  if f then facts.rival = chatSafe(f.name or w.rival) end
   return facts
 end
-local FACT_TOKENS = { "nemesis", "zone", "prey", "today", "up" }
+local FACT_TOKENS = { "nemesis", "zone", "prey", "today", "up", "rival" }
 
 local function renderPhrase(template, facts)
   local c = ns.char
@@ -128,10 +133,11 @@ local function renderPhrase(template, facts)
   facts = facts or phraseFacts()
   local words = {
     nemesis = facts.nemesis, zone = facts.zone, prey = facts.prey, today = facts.today, up = facts.up,
+    rival = facts.rival,
     n = n, p = p, u = u, o = o,
-    kills = n .. " Olympus " .. (n == 1 and "kill" or "kills"),
+    kills = n .. " " .. (n == 1 and "kill" or "kills"),
     points = p .. " " .. (p == 1 and "point" or "points"),
-    uniques = (u == 1) and "1 Olympian" or (u .. " different Olympians"),
+    uniques = (u == 1) and "1 player" or (u .. " different players"),
     orig = o .. " from the original OLYMPUS guild",
     rank = (ns.RankFor(p)),
     king = ((c.kings or 0) > 1) and ("the King himself " .. c.kings .. " times") or "the King himself",
@@ -139,6 +145,23 @@ local function renderPhrase(template, facts)
   return (template:gsub("{(%a+)}", words))
 end
 UI.RenderPhrase = renderPhrase
+
+-- The lines on offer: the war lines always, and the Olympus lines only when there is a real
+-- Olympus kill behind them. Nobody brags about a guild that is not even on the megaserver.
+local function phraseList()
+  local c = ns.char
+  local olympus = (c.orig or 0) > 0
+  if not olympus then
+    for _, g in pairs(c.guilds) do
+      if g.tier == "original" or g.tier == "network" then olympus = true break end
+    end
+  end
+  if not (olympus and ns.PHRASES_OLYMPUS) then return ns.PHRASES end
+  local list = {}
+  for _, t in ipairs(ns.PHRASES) do list[#list + 1] = t end
+  for _, t in ipairs(ns.PHRASES_OLYMPUS) do list[#list + 1] = t end
+  return list
+end
 
 local function phraseAllowed(template, facts)
   local c = ns.char
@@ -158,8 +181,8 @@ local function rollPhrase()
     phraseIndex = nil
     return
   end
-  local pool, facts = {}, phraseFacts()
-  for i, template in ipairs(ns.PHRASES) do
+  local pool, facts, list = {}, phraseFacts(), phraseList()
+  for i, template in ipairs(list) do
     if i ~= phraseIndex and phraseAllowed(template, facts) then pool[#pool + 1] = i end
   end
   phraseIndex = pool[math.random(#pool)] or 1
@@ -171,9 +194,9 @@ local function currentPhrase()
     if not phraseZero then rollPhrase() end
     return ns.PHRASES_ZERO[phraseZero]
   end
-  local facts = phraseFacts()
-  if not phraseIndex or not phraseAllowed(ns.PHRASES[phraseIndex], facts) then rollPhrase() end
-  return renderPhrase(ns.PHRASES[phraseIndex], facts)
+  local facts, list = phraseFacts(), phraseList()
+  if not phraseIndex or not list[phraseIndex] or not phraseAllowed(list[phraseIndex], facts) then rollPhrase() end
+  return renderPhrase(list[phraseIndex] or ns.PHRASES[1], facts)
 end
 UI.CurrentPhrase = currentPhrase
 
@@ -224,10 +247,10 @@ function UI.ShareTop()
     end
   end
   if #parts == 0 then
-    ns.Print("Nobody has an Olympus kill yet.")
+    ns.Print("Nobody has a kill on the board yet.")
     return
   end
-  sayGuild("Godslayer top " .. #parts .. " Olympus hunters: " .. table.concat(parts, ", "))
+  sayGuild("Godslayer top " .. #parts .. ": " .. table.concat(parts, ", "))
 end
 
 -- ---------------------------------------------------------------------------
@@ -370,7 +393,7 @@ local function guildRows()
   end
   local list = {}
   for guild, g in pairs(ns.char.guilds) do
-    local tier = ns.Classify(guild)
+    local tier = ns.Classify(guild) or g.tier -- the Olympus rules first, then what the kills were banked as
     if tier then list[#list + 1] = { guild = guild, tier = tier, kills = g.kills, points = g.points } end
   end
   table.sort(list, function(a, b)
@@ -401,17 +424,17 @@ local function boardRows()
 end
 
 local TABS = {
-  { label = "Kill Log", rows = victimRows, empty = "No Olympus kills yet. Go find one.",
+  { label = "Kill Log", rows = victimRows, empty = "No kills yet. Go find one.",
     cols = { { "#", 26, "RIGHT" }, { "Player", 168, "LEFT" }, { "Lvl", 30, "RIGHT" }, { "Guild", 170, "LEFT" },
              { "Kills", 46, "RIGHT" }, { "KB", 36, "RIGHT" }, { "Points", 54, "RIGHT" }, { "Last", 50, "RIGHT" } } },
-  { label = "Guilds", rows = guildRows, empty = "No Olympus guild has paid tribute yet.",
+  { label = "Guilds", rows = guildRows, empty = "No guild has paid tribute yet.",
     cols = { { "#", 26, "RIGHT" }, { "Guild", 280, "LEFT" }, { "Members killed", 110, "RIGHT" },
              { "Kills", 70, "RIGHT" }, { "Points", 70, "RIGHT" } } },
   { label = "Leaderboard", rows = boardRows, empty = "",
     cols = { { "#", 26, "RIGHT" }, { "Hunter", 160, "LEFT" }, { "Rung", 40, "RIGHT" }, { "Title", 120, "LEFT" },
              { "Kills", 40, "RIGHT" }, { "Unique", 46, "RIGHT" }, { "KB", 32, "RIGHT" }, { "OLYMPUS", 62, "RIGHT" },
              { "Points", 46, "RIGHT" } } },
-  { label = "Hit List", rows = hitRows, empty = "No Olympian seen and still breathing. Turn on enemy nameplates.",
+  { label = "Hit List", rows = hitRows, empty = "Nobody worth hunting seen and still breathing. Turn on enemy nameplates.",
     cols = { { "#", 26, "RIGHT" }, { "Player", 140, "LEFT" }, { "Lvl", 30, "RIGHT" }, { "Guild", 150, "LEFT" },
              { "Rank", 90, "LEFT" }, { "Seen in", 100, "LEFT" }, { "Seen", 40, "RIGHT" } } },
   { label = "Stats", rows = statsRows, empty = "",
@@ -482,7 +505,7 @@ local function buildMain()
     title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", 0, -6)
   end
-  title:SetText("Godslayer  |cff9d9d9dOlympus kill counter|r")
+  title:SetText("Godslayer  |cff9d9d9dkill counter|r")
 
   f.summary = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   f.summary:SetPoint("TOPLEFT", 16, -34)
@@ -619,8 +642,9 @@ end
 function UI.Refresh()
   if not main or not main:IsShown() then return end
   local c, s = ns.char, ns.session
-  local line = ("%sKills|r %s%d|r    %sPoints|r %s%d|r    %sUnique|r %s%d|r    %sKilling blows|r %s%d|r    %sOLYMPUS|r %s%d|r")
-    :format(GOLD, WHITE, c.kills, GOLD, WHITE, c.points, GOLD, WHITE, c.uniques, GOLD, WHITE, c.kb, GOLD, WHITE, c.orig)
+  local line = ("%sKills|r %s%d|r    %sPoints|r %s%d|r    %sUnique|r %s%d|r    %sKilling blows|r %s%d|r")
+    :format(GOLD, WHITE, c.kills, GOLD, WHITE, c.points, GOLD, WHITE, c.uniques, GOLD, WHITE, c.kb)
+  if (c.orig or 0) > 0 then line = line .. ("    %sOLYMPUS|r %s%d|r"):format(GOLD, WHITE, c.orig) end
   if s.kills > 0 then
     line = line .. ("    %sthis session +%d / +%d pts|r"):format(GREY, s.kills, s.points)
   end
@@ -797,24 +821,29 @@ local function killFeedback(name, class, guild, tier, pts, info, v)
   local c = ns.char
   local who = classColored(name, class)
   local facts = v and killFacts(v, info) or {}
+  local tag = (type(guild) == "string" and guild ~= "") and (" <" .. guild .. ">") or ""
   if opts.chat then
-    ns.Print(("%s <%s> down. +%d  (%d kills, %d points)"):format(who, guild, pts, c.kills, c.points))
+    ns.Print(("%s%s down. +%d  (%d kills, %d points)"):format(who, tag, pts, c.kills, c.points))
     if #facts > 0 then print("  " .. GREY .. table.concat(facts, ". ") .. ".|r") end
     if info.king then ns.Print(GOLD .. "REGICIDE.|r You killed the King of Olympus. Tell everyone.") end
     if info.rankUp then ns.Print("New title: " .. ORANGE .. info.rankUp .. "|r") end
   end
   if opts.toast then
-    local headline = ORANGE .. "Olympian down|r"
+    local headline = ORANGE .. "Enemy down|r"
     if info.king then
       headline = GOLD .. "REGICIDE: THE KING IS DEAD|r"
     elseif tier == "original" then
       headline = GOLD .. "OLYMPUS DOWN|r"
+    elseif tier == "network" then
+      headline = ORANGE .. "Olympian down|r"
+    elseif tier == "rival" then
+      headline = ORANGE .. "Rival down|r"
     end
     local extras = {}
     local streak = info.streak and info.streak > 1 and streakName(info.streak)
     if streak then extras[#extras + 1] = streak .. " (x" .. info.streak .. ")" end
     if info.rankUp then extras[#extras + 1] = "New title: " .. info.rankUp end
-    showToast(headline, ("%s  <%s>  %s+%d|r"):format(who, guild, GOLD, pts), table.concat(extras, "   "),
+    showToast(headline, ("%s%s  %s+%d|r"):format(who, tag ~= "" and ("  <" .. guild .. ">") or "", GOLD, pts), table.concat(extras, "   "),
       table.concat(facts, "    "))
   end
   -- the announcer has this one: a system chime under a shouted line is only noise
@@ -848,7 +877,7 @@ local function tooltipSummary(tt)
   local c = ns.char
   tt:AddLine("Godslayer")
   tt:AddLine((ns.RankFor(c.points)), 1, 0.49, 0.04)
-  tt:AddLine(("%d Olympus kills, %d points, %d unique"):format(c.kills, c.points, c.uniques), 1, 1, 1)
+  tt:AddLine(("%d kills, %d points, %d unique"):format(c.kills, c.points, c.uniques), 1, 1, 1)
   tt:AddLine("Click to open. Drag to move.", 0.6, 0.6, 0.6)
 end
 
@@ -958,8 +987,12 @@ local TOGGLES = { sound = "Kill sound", toast = "Kill banner", chat = "Kill line
 
 local function printStats()
   local c = ns.char
-  ns.Print(("%s: %d Olympus kills, %d points, %d unique players, %d killing blows, %d from the original OLYMPUS.")
-    :format((ns.RankFor(c.points)), c.kills, c.points, c.uniques, c.kb, c.orig))
+  local line = ("%s: %d kills, %d points, %d unique players, %d killing blows.")
+    :format((ns.RankFor(c.points)), c.kills, c.points, c.uniques, c.kb)
+  if (c.orig or 0) > 0 then
+    line = line:sub(1, -2) .. (", %d from the original OLYMPUS."):format(c.orig)
+  end
+  ns.Print(line)
 end
 
 local function printHelp()
@@ -967,7 +1000,7 @@ local function printHelp()
   print("  /godslayer            open or close the window")
   print("  /godslayer stats      your totals in chat (only you see it)")
   print("  /godslayer dossier <name>   everything on someone you killed (only you see it)")
-  print("  /godslayer nemesis    who you have killed most   /godslayer hitlist   Olympians seen, not killed yet")
+  print("  /godslayer nemesis    who you have killed most   /godslayer hitlist   Olympus and rivals seen, not killed yet")
   print("  /godslayer hype       your kill song and the announcer: test, on, off, window <seconds>")
   print("  /godslayer cds [name] what an enemy has spent and when it is back")
   print("  /godslayer dr         this build's diminishing groups, and the curve measured so far")
@@ -982,7 +1015,7 @@ local function printHelp()
   print("  /godslayer wheel      the chat wheel (or bind a key: Key Bindings, AddOns, Godslayer)   wheel list | wheel <number>")
   print("  /godslayer share      post a brag line to guild chat")
   print("  /godslayer top        post the top 3 to guild chat")
-  print("  /godslayer add <guild name>       count a guild that has no 'olympus' in its name")
+  print("  /godslayer add <guild name>       count a guild as Olympus network, whatever it is called")
   print("  /godslayer ignore <guild name>    stop counting a guild   (unignore to undo)")
   print("  /godslayer guilds     show the guilds you added or ignored")
   print("  /godslayer sound | toast | chat | tooltip | minimap     turn each on or off")
@@ -1023,7 +1056,7 @@ local function slash(input)
     if ns.Wheel then ns.Wheel.Command(rest:lower()) end
   elseif cmd == "hitlist" then
     local list = ns.HitList()
-    ns.Print(#list == 0 and "No Olympian seen and still unkilled." or (#list .. " seen and not killed yet. The most recent:"))
+    ns.Print(#list == 0 and "Nobody worth hunting seen and still unkilled." or (#list .. " seen and not killed yet. The most recent:"))
     for i = 1, math.min(10, #list) do
       local k = list[i]
       print(("  %s <%s>%s  %s ago"):format(classColored(k.name, k.class), k.guild,
@@ -1145,7 +1178,7 @@ local function slash(input)
     local added, ignored = {}, {}
     for _, name in pairs(db.custom) do added[#added + 1] = tostring(name) end
     for _, name in pairs(db.ignore) do ignored[#ignored + 1] = tostring(name) end
-    ns.Print("Counts any guild with 'olympus' in the name, plus a built-in list of affiliates.")
+    ns.Print("Every kill counts one point. A guild with 'olympus' in the name, or on the affiliate list, pays Olympus rates; your rival pays three; ignored guilds pay nothing.")
     print("  added: " .. (#added > 0 and table.concat(added, ", ") or "none"))
     print("  ignored: " .. (#ignored > 0 and table.concat(ignored, ", ") or "none"))
   elseif cmd == "demo" then

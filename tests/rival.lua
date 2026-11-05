@@ -32,23 +32,24 @@ local function kill(u) M.fire("PARTY_KILL", ME, u.guid) M.advance(1) end
 -- ---------------------------------------------------------------------------
 -- 1. The default: nothing changes
 -- ---------------------------------------------------------------------------
-eq(ns.ClassifyWide("Random Strangers"), nil, "a random guild is unscored while the hunt is closed")
+eq(ns.ClassifyWide("Random Strangers"), "any", "a random guild joins the open ring by default")
 eq(ns.ClassifyWide("OLYMPUS"), "original", "Olympus is still the original")
 eq(ns.ClassifyWide("OLYMPUS BETZ"), "network", "an Olympus network guild still classifies")
-eq(GodslayerDB.wide.on, nil, "the wider hunt starts closed")
+eq(GodslayerDB.wide.on, true, "the login at startup already opened the rings")
 
 eq(ns.PointsFor("original"), 5, "original is still 5 points")
 eq(ns.PointsFor("network"), 1, "network is still 1 point")
 eq(ns.PointsFor("rival"), 3, "a rival is worth 3")
-eq(ns.PointsFor("any"), 0, "the open ring is worth nothing on purpose")
+eq(ns.PointsFor("any"), 1, "the open ring is worth one point now")
 
-local before = c.kills
+local before, beforeP = c.kills, c.points
 kill(enemy("Nobody Special", "Random Strangers"))
-eq(c.kills, before, "a random guild's death does not score while the hunt is closed")
+eq(c.kills, before + 1, "a random guild's kill scores in the open ring")
+eq(c.points, beforeP + 1, "worth one point")
 
 kill(enemy("Zeus Guy", "OLYMPUS"))
-eq(c.kills, before + 1, "an Olympus kill still scores")
-eq(c.points, 5, "an Olympus kill is still worth 5")
+eq(c.kills, before + 2, "an Olympus kill still scores")
+eq(c.points, beforeP + 1 + 5, "an Olympus kill is still worth 5")
 
 -- ---------------------------------------------------------------------------
 -- 2. Gnomes
@@ -61,7 +62,7 @@ eq(ns.Rival.GnomeRank(7), "Machine Elf Whisperer", "seven gnomes and the machine
 eq(ns.Rival.GnomeRank(10000), "They Tell Stories About You In Tinkertown", "the top title sticks")
 
 kill(enemy("Tiny Problem", "Random Strangers", { race = "Gnome" }))
-eq(GodslayerDB.wide.race.Gnome, 1, "a gnome is counted even though the guild scored nothing")
+eq(GodslayerDB.wide.race.Gnome, 1, "a gnome is counted whatever ring the guild sits in")
 kill(enemy("Another Gnome", "OLYMPUS", { race = "Gnome" }))
 eq(GodslayerDB.wide.race.Gnome, 2, "gnomes in Olympus count as gnomes too")
 kill(enemy("Big Lad", "Random Strangers", { race = "Tauren" }))
@@ -89,19 +90,16 @@ eq(GodslayerDB.wide.race.Scourge, 1, "and does not disturb the ones that are")
 GodslayerDB.wide = nil                      -- a fresh realm
 ns.Rival.NoteKill(nil, nil, nil)            -- touch the table into existence
 GodslayerDB.wide.quiet = 0
-for i = 1, 2 do ns.Rival.OnLogin() end
-eq(GodslayerDB.wide.on, nil, "two quiet sessions is not yet enough")
-eq(GodslayerDB.wide.quiet, 2, "the quiet sessions are counted")
 ns.Rival.OnLogin()
-eq(GodslayerDB.wide.on, true, "three quiet sessions opens the hunt")
+eq(GodslayerDB.wide.on, true, "the rings open on the first login now")
+eq(GodslayerDB.wide.opened, 1, "and the open state is remembered so it is not reopened over an off")
 
--- Seeing Olympus again resets the count rather than leaving it armed.
-GodslayerDB.wide.on, GodslayerDB.wide.quiet = nil, 2
+-- The quiet count is still kept as a record of the realm; it just no longer gates anything.
+GodslayerDB.wide.quiet = 2
 ns.Rival.NoteKill("Player-1-0000D001", "OLYMPUS", "original")
-eq(GodslayerDB.wide.quiet, 0, "an Olympus sighting resets the quiet count")
+eq(GodslayerDB.wide.quiet, 0, "an Olympus sighting still resets the quiet count")
 ns.Rival.OnLogin()
-eq(GodslayerDB.wide.quiet, 0, "and the session that saw them does not count as quiet")
-eq(GodslayerDB.wide.on, nil, "so the hunt stays closed on a realm that has them")
+eq(GodslayerDB.wide.on, true, "and the hunt stays open whether or not Olympus is ever seen")
 
 -- ---------------------------------------------------------------------------
 -- 4. With the hunt open
@@ -117,7 +115,7 @@ eq(ns.ClassifyWide("Peace Treaty"), nil, "an ignored guild stays ignored even in
 local k0, p0 = c.kills, c.points
 kill(enemy("Open Ring Guy", "Some Other Guild"))
 eq(c.kills, k0 + 1, "an open-ring kill is counted")
-eq(c.points, p0, "and is worth no points")
+eq(c.points, p0 + 1, "and is worth one point")
 
 -- ---------------------------------------------------------------------------
 -- 5. Naming a rival
@@ -139,11 +137,11 @@ eq(GodslayerDB.wide.rivalLocked, nil, "and unlocks the automatic pick")
 eq(ns.ClassifyWide("The Big Bads"), "any", "they drop back to the open ring")
 
 say("rival off")
-eq(GodslayerDB.wide.on, nil, "off closes the hunt")
-eq(GodslayerDB.wide.off, true, "and remembers that you closed it")
-eq(ns.ClassifyWide("Some Other Guild"), nil, "so nothing but Olympus scores again")
+eq(GodslayerDB.wide.on, nil, "off stops the rival nomination")
+eq(GodslayerDB.wide.off, true, "and remembers that you turned it off")
+eq(ns.ClassifyWide("Some Other Guild"), "any", "but every kill still counts one point")
 ns.Rival.OnLogin() ns.Rival.OnLogin() ns.Rival.OnLogin() ns.Rival.OnLogin()
-eq(GodslayerDB.wide.on, nil, "a hunt you closed does not reopen itself")
+eq(GodslayerDB.wide.on, nil, "a nomination you turned off does not turn itself back on")
 
 -- ---------------------------------------------------------------------------
 -- 6. Picking a rival from the blood between you

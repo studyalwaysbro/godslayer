@@ -214,8 +214,10 @@ function Comm.handlers.CHAT_MSG_ADDON(prefix, text, channel, sender)
   elseif kind == "S" then
     local kills, points, uniques, kb, orig = count(a), count(b), count(c), count(d), count(e)
     if not (kills and points and uniques and kb and orig) then return end
-    -- totals that cannot come from the scoring rules are dropped
-    if points < kills or points > kills * ns.ORIGINAL_POINTS or uniques > kills or kb > kills or orig > kills then return end
+    -- Totals that cannot come from the scoring rules are dropped. Only inflation is a lie worth
+    -- catching: fewer points than kills is what a 2.4-2.6 client honestly reports after scoring
+    -- open-ring kills at zero, and rejecting it silently dropped those guildmates off the board.
+    if points > kills * ns.ORIGINAL_POINTS or uniques > kills or kb > kills or orig > kills then return end
     local guild = guildName()
     if not guild then return end
     local db = GodslayerDB

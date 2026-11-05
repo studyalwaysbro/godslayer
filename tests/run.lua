@@ -86,13 +86,14 @@ M.fire("PARTY_KILL", ME, cook.guid)
 eq(c.kills, 2, "late kb: no double count"); eq(c.kb, 2, "late kb: upgraded")
 eq(c.victims[cook.guid].kb, 1, "late kb: on the victim")
 
--- 6. a kill on somebody outside the network scores nothing ---------------------
+-- 6. a kill on somebody outside the network scores the open ring: one point ----
 M.advance(20)
 local rando = enemy("target", "Random Gnome", "Method")
 M.fire("PLAYER_TARGET_CHANGED")
 M.fire("PARTY_KILL", ME, rando.guid)
 M.advance(10)
-eq(c.kills, 2, "non-network kill ignored")
+eq(c.kills, 3, "open ring: kill counted"); eq(c.points, 7, "open ring: one point")
+eq(c.victims[rando.guid].tier, "any", "open ring: banked as any")
 
 -- 7. guild unknown at kill time, seen a moment later ---------------------------
 M.advance(20)
@@ -100,18 +101,24 @@ clearUnits()
 local ghost = enemy("hidden", "Late Tag", "OLYMPUS XLI")
 M.units.hidden = nil
 M.fire("PARTY_KILL", ME, ghost.guid)
-eq(c.kills, 2, "pending: not scored yet")
+eq(c.kills, 3, "pending: not scored yet")
 M.units.mouseover = ghost
 M.fire("UPDATE_MOUSEOVER_UNIT")
-eq(c.kills, 3, "pending: scored once the tag is seen"); eq(c.points, 7, "pending: points")
+eq(c.kills, 4, "pending: scored once the tag is seen"); eq(c.points, 8, "pending: points")
 eq(c.victims[ghost.guid].name, "Late Tag", "pending: name filled from the sighting")
--- and a kill whose guild never shows expires quietly
+-- a kill whose guild never shows scores as the open ring at the six-second retry,
+-- and a tag that only turns up after the window does not upgrade it any more
 M.advance(20); clearUnits()
 local nobody = enemy("hidden", "No Tag", nil); M.units.hidden = nil
 M.fire("PARTY_KILL", ME, nobody.guid)
 M.advance(16 * 60)
+eq(c.kills, 5, "no tag: scored as the open ring at the retry")
+eq(c.victims[nobody.guid].tier, "any", "no tag: banked as any")
+eq(c.points, 9, "no tag: one point")
 M.units.mouseover = nobody; nobody.guild = "OLYMPUS"; M.fire("UPDATE_MOUSEOVER_UNIT")
-eq(c.kills, 3, "pending: expired kill is not credited later")
+eq(c.kills, 5, "expired tag: no second credit")
+eq(c.points, 9, "expired tag: no upgrade after the window")
+eq(c.orig, 1, "expired tag: not counted as original")
 
 -- 8. secret values never error and never score ---------------------------------
 M.advance(20); clearUnits()
@@ -122,7 +129,7 @@ M.fire("NAME_PLATE_UNIT_ADDED", M.secret())
 M.fire("CHAT_MSG_ADDON", M.secret(), M.secret(), M.secret(), M.secret())
 enemy("target", "Secret Guy", "OLYMPUS", { secretGUID = true, secretGuild = true, secretName = true })
 M.fire("PLAYER_TARGET_CHANGED")
-eq(c.kills, 3, "secrets: nothing scored"); eq(ns.errors, nil, "secrets: no handler errors")
+eq(c.kills, 5, "secrets: nothing scored"); eq(ns.errors, nil, "secrets: no handler errors")
 
 -- 9. a group member's killing blow counts as a kill, not as my killing blow -----
 M.advance(20); clearUnits()
@@ -130,7 +137,7 @@ local mate = "Player-1-0000BBBB"; M.group[mate] = true
 local v9 = enemy("nameplate1", "Party Victim", "OLYMPUS BETZ")
 M.fire("NAME_PLATE_UNIT_ADDED", "nameplate1")
 M.fire("PARTY_KILL", mate, v9.guid)
-eq(c.kills, 4, "group kb: counted"); eq(c.kb, 3, "group kb: not mine")
+eq(c.kills, 6, "group kb: counted"); eq(c.kb, 5, "group kb: not mine")
 
 -- 10. a stranger's killing blow is not ours, and a death nobody credits is not either
 M.advance(20)
@@ -139,7 +146,7 @@ M.fire("NAME_PLATE_UNIT_ADDED", "nameplate2")
 M.fire("PARTY_KILL", "Player-1-0000CCCC", v10.guid)
 M.fire("UNIT_DIED", v10.guid)
 M.advance(10)
-eq(c.kills, 4, "stranger kill ignored")
+eq(c.kills, 6, "stranger kill ignored")
 
 -- 11. two deaths, one credit: exactly one kill ---------------------------------
 M.advance(20); clearUnits()
@@ -147,30 +154,30 @@ local a = enemy("nameplate1", "Twin A", "OLYMPUS II"); local b = enemy("nameplat
 M.fire("NAME_PLATE_UNIT_ADDED", "nameplate1"); M.fire("NAME_PLATE_UNIT_ADDED", "nameplate2")
 M.fire("UNIT_DIED", a.guid); M.advance(1); M.fire("UNIT_DIED", b.guid)
 hkCredit(); M.advance(6)
-eq(c.kills, 5, "two deaths one credit")
+eq(c.kills, 7, "two deaths one credit")
 check(c.victims[b.guid] ~= nil and c.victims[a.guid] == nil, "credit goes to the closest death")
 
 -- 12. killing the same player again later counts again -------------------------
 M.advance(60)
 M.units.target = asmon; M.fire("PLAYER_TARGET_CHANGED")
 M.fire("PARTY_KILL", ME, asmon.guid)
-eq(c.victims[asmon.guid].kills, 2, "rekill counts"); eq(c.uniques, 5, "uniques unchanged by rekill")
-eq(c.kills, 6, "total kills"); eq(c.points, 5 + 1 + 1 + 1 + 1 + 5, "total points"); eq(c.kb, 4, "total killing blows")
+eq(c.victims[asmon.guid].kills, 2, "rekill counts"); eq(c.uniques, 7, "uniques unchanged by rekill")
+eq(c.kills, 8, "total kills"); eq(c.points, 5 + 1 + 1 + 1 + 1 + 1 + 1 + 5, "total points"); eq(c.kb, 6, "total killing blows")
 
 -- 13. friendly-faction deaths are never matched to a credit --------------------
 M.advance(20); clearUnits()
 local friend = enemy("nameplate1", "Horde Olympian", "Olympus Horde Branch", { faction = "Horde" })
 M.fire("NAME_PLATE_UNIT_ADDED", "nameplate1")
 M.fire("UNIT_DIED", friend.guid); hkCredit(); M.advance(6)
-eq(c.kills, 6, "friendly death not counted")
+eq(c.kills, 8, "friendly death not counted")
 
 -- 14. named honor line (rare) --------------------------------------------------
 M.advance(20); clearUnits()
 local named = enemy("target", "Honor Line", "OLYMPUS GOD"); M.fire("PLAYER_TARGET_CHANGED")
 M.fire("CHAT_MSG_COMBAT_HONOR_GAIN", "Honor Line dies, honorable kill (Estimated Honor Points: 9)")
-eq(c.kills, 7, "named honor line counts"); check(c.victims[named.guid] ~= nil, "honor line resolved to the guid")
+eq(c.kills, 9, "named honor line counts"); check(c.victims[named.guid] ~= nil, "honor line resolved to the guid")
 M.fire("CHAT_MSG_COMBAT_HONOR_GAIN", "You have been awarded 9 honor points.")
-eq(c.kills, 7, "nameless honor line does nothing")
+eq(c.kills, 9, "nameless honor line does nothing")
 
 -- 15. guild sync ---------------------------------------------------------------
 M.advance(40)
@@ -187,7 +194,7 @@ check(sawHello, "hello sent after login"); check(sawStats, "stats broadcast afte
 -- position eleven where every older copy of the addon looks for it. That ordering is the whole
 -- reason the format could be widened at all, so it is asserted on the field index rather than on
 -- the end of the string.
-check(sawStats and sawStats:match("^S;1;7;15;6;4;2;MAGE;" .. ns.VERSION:gsub("%.", "%%.") .. ";2;%x%x%x%x%x%x;"), "stats payload: " .. tostring(sawStats))
+check(sawStats and sawStats:match("^S;1;9;17;8;6;2;MAGE;" .. ns.VERSION:gsub("%.", "%%.") .. ";2;%x%x%x%x%x%x;"), "stats payload: " .. tostring(sawStats))
 local fields = { strsplit(";", sawStats or "") }
 local myTag = fields[11]
 check(type(myTag) == "string" and myTag:match("^%x%x%x%x%x%x$"), "the token is the eleventh field: " .. tostring(myTag))
@@ -214,7 +221,7 @@ M.lockdown = true; before = #M.sentAddon
 M.units.target = asmon; M.fire("PLAYER_TARGET_CHANGED"); M.fire("PARTY_KILL", ME, asmon.guid); M.advance(40)
 eq(#M.sentAddon, before, "nothing sent during lockdown")
 M.lockdown = false; M.advance(40)
-check(#M.sentAddon > before and M.sentAddon[#M.sentAddon][2]:match("^S;1;8;20;"), "held broadcast sent after lockdown")
+check(#M.sentAddon > before and M.sentAddon[#M.sentAddon][2]:match("^S;1;10;22;"), "held broadcast sent after lockdown")
 -- throttle result code also retries
 M.addonResult = 3; before = #M.sentAddon
 ns.Comm.MarkDirty(); M.advance(20); eq(#M.sentAddon, before, "throttled send not counted as sent")
@@ -248,10 +255,17 @@ local function checkPhrases(label)
   for _ in pairs(seenLines) do count = count + 1 end
   return count
 end
-eq(checkPhrases("8 kills"), #ns.PHRASES, "every line is reachable with kills, original kills, a regicide and dossier data")
-check(#ns.PHRASES >= 65, "at least 65 lines shipped (" .. #ns.PHRASES .. ")")
-check(#ns.PHRASES >= 30, "at least 30 lines shipped (" .. #ns.PHRASES .. ")")
+-- a rival on the books makes the {rival} lines reachable; the character already has original
+-- kills and a regicide, so the Olympus table is on offer too and every line must come up
+local wdb = GodslayerDB.wide or {}; GodslayerDB.wide = wdb; wdb.feud = wdb.feud or {}
+wdb.rival = ns.NormGuild("Method"); wdb.feud[wdb.rival] = { name = "Method", mine = 2, theirs = 1 }
+eq(checkPhrases("8 kills"), #ns.PHRASES + #ns.PHRASES_OLYMPUS,
+   "every line is reachable with kills, original kills, a regicide, a rival and dossier data")
+wdb.rival = nil
+check(#ns.PHRASES + #ns.PHRASES_OLYMPUS >= 60, "at least 60 lines shipped (" .. (#ns.PHRASES + #ns.PHRASES_OLYMPUS) .. ")")
+check(#ns.PHRASES >= 30, "at least 30 war lines shipped (" .. #ns.PHRASES .. ")")
 for _, template in ipairs(ns.PHRASES) do check(#template <= 200, "template short enough: " .. template) end
+for _, template in ipairs(ns.PHRASES_OLYMPUS) do check(#template <= 200, "template short enough: " .. template) end
 
 M.sentChat = {}
 ns.UI.Share()
@@ -260,7 +274,7 @@ ns.UI.Share()
 eq(#M.sentChat, 1, "share is rate limited")
 M.advance(20); ns.UI.ShareTop()
 eq(#M.sentChat, 2, "top 3 posted")
-check(M.sentChat[2][1]:find("1. Brakka Ashmane 22 pts (10 kills), 2. Vesh Torchman 20 pts (8 kills), 3. Zul Embertusk 3 pts (3 kills)", 1, true), "top 3 text: " .. M.sentChat[2][1])
+check(M.sentChat[2][1]:find("Godslayer top 3: 1. Brakka Ashmane 22 pts (10 kills), 2. Vesh Torchman 22 pts (10 kills), 3. Zul Embertusk 3 pts (3 kills)", 1, true), "top 3 text: " .. M.sentChat[2][1])
 M.advance(20); M.lockdown = true; ns.UI.Share(); eq(#M.sentChat, 2, "no chat during lockdown"); M.lockdown = false
 M.inGuild = false; ns.UI.Share(); eq(#M.sentChat, 2, "no chat without a guild"); M.inGuild = true
 
@@ -271,14 +285,16 @@ for _, cmd in ipairs({ "help", "stats", "guilds", "demo", "log", "sound", "sound
 eq(ns.errors, nil, "no handler errors so far")
 for _, line in ipairs(M.printed) do check(not line:find("command failed", 1, true), "slash ok: " .. line) end
 slash("ignore OLYMPUS BETZ")
-eq(c.kills, 7, "ignore removes that guild's kills"); eq(ns.Classify("OLYMPUS BETZ"), nil, "ignored guild no longer matches")
+eq(c.kills, 9, "ignore removes that guild's kills"); eq(ns.Classify("OLYMPUS BETZ"), nil, "ignored guild no longer matches")
 slash("unignore OLYMPUS BETZ")
-eq(c.kills, 8, "unignore restores them"); eq(c.points, 20, "points restored")
+eq(c.kills, 10, "unignore restores them"); eq(c.points, 22, "points restored")
 slash("add Method")
 eq(ns.Classify("Method"), "network", "custom guild counts")
 M.advance(20); M.units.target = rando; M.fire("PLAYER_TARGET_CHANGED"); M.fire("PARTY_KILL", ME, rando.guid)
-eq(c.kills, 9, "kill on a custom guild counts")
-slash("remove Method"); eq(c.kills, 8, "removing the custom guild recounts")
+eq(c.kills, 11, "kill on a custom guild counts")
+slash("remove Method")
+eq(c.kills, 11, "removing the custom guild keeps the kills in the open ring")
+eq(c.victims[rando.guid].tier, "any", "they fall back to the open ring")
 
 -- 18. tooltip ------------------------------------------------------------------
 local snapshot = {}
@@ -338,7 +354,9 @@ check(ns.session.streak > 0, "streak running"); M.fire("PLAYER_DEAD"); eq(ns.ses
 M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;10;22;8;4;3;WARRIOR;1.0.0;2", "GUILD", "Brakka Ashmane")
 M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;4;4;2;1;0;MAGE;|cffff0000x|r;9", "GUILD", "Pipe|cffff0000 Guy|r")
 local board2 = ns.Comm.Leaderboard()
-eq(board2[1].kings, 2, "regicides arrive over sync")
+local brakka
+for _, r in ipairs(board2) do if r.name == "Brakka Ashmane" then brakka = r end end
+eq(brakka and brakka.kings, 2, "regicides arrive over sync")
 for _, r in ipairs(board2) do
   check(not r.name:find("|", 1, true), "no escape codes in roster names: " .. r.name)
   if r.name:find("Pipe", 1, true) then eq(r.kings, 0, "regicides cannot exceed original-guild kills") end
@@ -456,7 +474,8 @@ do
   for _, n in pairs(a.class) do byClass = byClass + n end
   for hour, n in pairs(a.hour) do byHour = byHour + n end
   for _, n in pairs(a.zone) do byZone = byZone + n end
-  eq(byClass, c.kills, "every kill has a class here"); eq(byHour, a.timed, "hours add up"); eq(byZone, a.zoned, "zones add up")
+  -- one kill in this scenario never shows its victim, so the open ring scores it with no class
+  eq(byClass, c.kills - 1, "every seen kill has a class here"); eq(byHour, a.timed, "hours add up"); eq(byZone, a.zoned, "zones add up")
   check(a.highest and a.highest.level == 60, "highest level kill"); check(a.upset and a.upset.up == 30, "biggest upset")
   check(a.rank["Guild Master"] == A.kills, "kills by guild rank")
   clearUnits()
@@ -578,7 +597,7 @@ end
 -- 19. zero state and reset ------------------------------------------------------
 slash("reset confirm")
 eq(c.kills, 0, "reset wipes kills"); eq(next(c.victims), nil, "reset wipes victims")
-check(ns.UI.CurrentPhrase():find("0") or ns.UI.CurrentPhrase():find("No Olympus") or ns.UI.CurrentPhrase():find("Zero"), "zero-kill line used")
+check(ns.UI.CurrentPhrase():find("zero") or ns.UI.CurrentPhrase():find("0") or ns.UI.CurrentPhrase():find("No kills"), "zero-kill line used")
 M.advance(20); M.units.target = cook; M.fire("PLAYER_TARGET_CHANGED"); M.fire("PARTY_KILL", ME, cook.guid)
 eq(c.kills, 1, "counting resumes after reset")
 checkPhrases("1 kill")
@@ -1239,7 +1258,7 @@ do
   M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;10;22;8;4;3;WARRIOR;1.3.0", "GUILD", "Feed Tester")
   check(not table.concat(M.printed, "\n"):find("Feed Tester", 1, true), "the first time we hear from someone is not a kill")
   M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;11;27;8;4;4;WARRIOR;1.3.0", "GUILD", "Feed Tester") M.advance(6)
-  check(table.concat(M.printed, "\n"):find("Feed Tester|r just took |cffffd100+5|r off Olympus", 1, true), "five more points is announced in chat")
+  check(table.concat(M.printed, "\n"):find("Feed Tester|r just banked |cffffd100+5|r", 1, true), "five more points is announced in chat")
   eq(groups(), "ally", "and spoken")
   A.played = {}
   M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;12;28;8;4;4;WARRIOR;1.3.0", "GUILD", "Feed Tester") M.advance(6)
