@@ -91,7 +91,12 @@ def main():
     song = sys.argv[1]
     here = os.path.dirname(os.path.abspath(__file__))
     lines = sys.argv[2] if len(sys.argv) > 2 else os.path.join(here, "..", "Godslayer", "Sounds")
+    # kill.mp3 tunes the flat voice folder; a rotation song (kill2 .. kill9) gets its own
+    # voice/<name> folder, and the addon plays the set matching whichever song is on.
+    base = os.path.splitext(os.path.basename(song))[0]
     out = os.path.join(os.path.dirname(os.path.abspath(song)), "voice")
+    if base != "kill":
+        out = os.path.join(out, base)
     tonic, mode, score = song_key(decode(song, seconds=240))
     print("Song key: %s %s (match %.2f)" % (NOTES[tonic], mode, score))
     if score < 0.5:

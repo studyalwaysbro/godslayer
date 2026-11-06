@@ -47,7 +47,12 @@ ns.Hype = Hype
 
 local SOUNDS = "Interface\\AddOns\\Godslayer\\Sounds\\"
 local OWN = "Interface\\AddOns\\GodslayerMusic\\"
-local SONGS = { OWN .. "kill.mp3", OWN .. "kill.ogg" }
+-- kill.mp3 (or .ogg), and kill2 to kill9 beside it: every name found joins the rotation
+local SONGS = {}
+for i = 1, 9 do
+  local base = i == 1 and "kill" or "kill" .. i
+  SONGS[#SONGS + 1] = { OWN .. base .. ".mp3", OWN .. base .. ".ogg" }
+end
 local FADE_MS = 2500
 local CALL_DELAY = 0.45    -- kills landing together get one call, for where the count ended up
 local OVERLAP = 0.5        -- the next line starts this long before the last one's hall has died away
@@ -121,7 +126,8 @@ local hunt          -- { kills, turn, run, bestRun, points, gods, started }
 local fight         -- a fight with a player is on, or was a moment ago: { started, turn, god }
 local track         -- the music this addon started: { music = "music" | handle, theme, phase }; a fight or a hunt holds it
 local engageGen = 0 -- moves on whenever a fight ends, so a word still waiting to be said about it is not
-local songPath      -- the song found this session; false once we know there is none
+local songs         -- every song found this session; false once we know there are none
+local lastSong      -- the last one that opened a fight: with a choice, never the same twice running
 local banner
 local voiceNow      -- the announcer speaking: the chosen one, or in the mix the one this hunt drew
 
@@ -278,10 +284,20 @@ local function pick(group)
 end
 Hype.Pick = pick
 
+-- The announcer follows the song. tune_announcer.py writes voice\ in the key of kill.mp3
+-- and voice\kill2 ... voice\kill9 in the key of each rotation song, so the lines for the
+-- song now playing come first, then the kill.mp3 set, then the built-in voices.
+local function voiceDir()
+  local base = lastSong and lastSong:match("GodslayerMusic\\(kill%d)%.")
+  return base and (OWN .. "voice\\" .. base .. "\\")
+end
+
 local function playNow(clip, pack)
   local channel = opts().channel
-  -- lines re-pitched to your own song (tools/tune_announcer.py writes them) come first
-  local own, handle = try(PlaySoundFile, OWN .. "voice\\" .. pack .. "\\" .. clip .. ".ogg", channel)
+  local own, handle
+  local dir = voiceDir()
+  if dir then own, handle = try(PlaySoundFile, dir .. pack .. "\\" .. clip .. ".ogg", channel) end
+  if not plain(own) then own, handle = try(PlaySoundFile, OWN .. "voice\\" .. pack .. "\\" .. clip .. ".ogg", channel) end
   if not plain(own) then own, handle = try(PlaySoundFile, SOUNDS .. pack .. "\\" .. clip .. ".ogg", channel) end
   return plain(handle)
 end
@@ -406,25 +422,43 @@ local function hush()
 end
 
 -- THE SONG ----------------------------------------------------------------------
--- Finds the player's own song the first time it is needed. A file that is not there simply
--- does not play, which is how we know.
+-- Finds the player's own songs the first time one is needed. A file that is not there simply
+-- does not play, which is how we know. For each name, .mp3 is tried first, then .ogg.
 local function findSong()
-  if songPath ~= nil then return songPath end
-  songPath = false
-  for _, path in ipairs(SONGS) do
-    local willPlay, handle = try(PlaySoundFile, path, "Master")
-    if plain(willPlay) then
-      if plain(handle) then try(StopSound, handle, 0) end
-      songPath = path
-      break
+  if songs ~= nil then return songs end
+  songs = false
+  local found = {}
+  for _, pair in ipairs(SONGS) do
+    for _, path in ipairs(pair) do
+      local willPlay, handle = try(PlaySoundFile, path, "Master")
+      if plain(willPlay) then
+        if plain(handle) then try(StopSound, handle, 0) end
+        found[#found + 1] = path
+        break
+      end
     end
   end
-  return songPath
+  if #found > 0 then songs = found end
+  return songs
+end
+
+-- One of the songs, at random, never the one that just played when there is a choice --
+-- and an Olympian always gets your signature: the first song, kill.mp3, the one you chose first.
+local function pickSong()
+  local list = findSong()
+  if not list then return nil end
+  local i = 1
+  if not (fight and fight.god) then
+    i = math.random(#list)
+    if #list > 1 and list[i] == lastSong then i = i % #list + 1 end
+  end
+  lastSong = list[i]
+  return list[i]
 end
 
 local function startMusic()
   if not opts().music or not soundOn() then return nil end
-  local path, theme = findSong(), false
+  local path, theme = pickSong(), false
   -- no song of your own: the hunt theme that comes with the addon
   if not path and opts().theme and ns.MUSIC and ns.MUSIC.hunt then path, theme = SOUNDS .. "music\\hunt.ogg", true end
   if not path then return nil end
@@ -1624,7 +1658,7 @@ function Hype.Command(rest)
     print(("  Kills within %d seconds of each other: DOUBLE KILL, TRIPLE KILL, QUAD KILL, RAMPAGE (%s)."):format(MULTI_WINDOW, onOff(o.multi)))
     print("  Olympus kills have their own calls, and the points are read out. /godslayer hype test olympus plays one.")
     print(("  Sound effects %s, enemy spotter %s, remarks %s, hunt theme %s."):format(onOff(o.sfx), onOff(o.spot), onOff(o.asides), onOff(o.theme)))
-    print("  Your song: a file named kill.mp3 or kill.ogg in Interface\\AddOns\\GodslayerMusic. Restart the game after adding it.")
+    print("  Your songs: kill.mp3 or kill.ogg in Interface\\AddOns\\GodslayerMusic, and kill2 to kill9 beside it for a rotation, a different one each fight. Restart the game after adding one.")
     print("  /godslayer hype pack | mix | audition [name] | say <line> | stop | on | off | window <seconds> | blows | all | channel <name> | probe")
     print("  /godslayer hype test [olympus | king | spot | king spot | moment <name> | duel | duel lost | denied | card | engage | engage god | finisher <kind> | sig <spell> | streak <kind>]")
     print("  /godslayer hype music | voice | guild | sfx | spot | multi | asides | theme | fx | fuse | moments | barks | duck | deny | duels | photo | clip | engage | class | finishers | streaks | wheel  on|off")
