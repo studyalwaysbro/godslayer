@@ -324,6 +324,9 @@ def prune(folder, cap):
 
 # ---------------------------------------------------------------- the recorder
 
+SUSPECT = {"recorder": False}   # a save returned nothing: the recorder is lying about being alive
+
+
 def recorder_pid():
     """The recorder we started: found by the raw folder on its command line, never by name alone."""
     for p in Path("/proc").iterdir():
@@ -515,6 +518,7 @@ def save_hunt(cfg, mark, taken, saved, shot=None):
     raw, asked = save_replay(want + (time.time() - taken), cfg["buffer_seconds"])
     if raw is None:
         log("the recorder gave nothing back")
+        SUSPECT["recorder"] = True   # a running recorder that saves nothing must be relaunched, not trusted
         return
     try:
         length = duration(raw)
@@ -657,6 +661,7 @@ def run():
         sys.exit(f"Set wow_dir in {CONFIG}")
     seen = set(shots_dir.glob("*")) if shots_dir.is_dir() else set()
     proc, audio, since, retry_at, pending = None, None, 0, 0, {}
+    verify_at, probe_fails = 0, 0
     saved = {"t": 0, "kills": -1}       # the last clip, so the two triggers never double up
     clog = new_combatlog()
     log("watching", shots_dir)
@@ -683,6 +688,7 @@ def run():
                 log("the game's own sound was not found; recording desktop sound")
             if audio:
                 proc = start_recorder(cfg, audio)
+                verify_at = time.time() + 30   # long enough for the portal grab; then prove it captures
         elif proc is not None and (not game or proc.poll() is not None):
             if game:
                 log("the recorder stopped (see", LOG, "); trying again in two minutes")
@@ -692,7 +698,31 @@ def run():
             proc, since = None, 0
         if not game:
             since = 0
-        write_state(recording=proc is not None, game=game, audio=audio, at=time.time())
+        if proc is not None and SUSPECT["recorder"]:
+            # A save came back empty while the process looked alive: the screen grab is dead
+            # (a failed portal restore leaves the recorder waiting on a picker nobody sees).
+            # Tonight that cost a hunt; relaunch now, not when the game exits.
+            SUSPECT["recorder"] = False
+            log("a save came back empty; relaunching the recorder")
+            stop_recorder(proc)
+            proc, verify_at, retry_at = None, 0, 0
+        if proc is not None and verify_at and time.time() >= verify_at:
+            verify_at = 0
+            probe, _ = save_replay(2, cfg["buffer_seconds"])
+            if probe is not None:
+                probe.unlink(missing_ok=True)
+                probe_fails = 0
+                log("recorder verified: capturing")
+            else:
+                probe_fails += 1
+                log("the recorder is up but gave no frames back; relaunching")
+                if probe_fails == 1:
+                    notify(cfg, "The recorder is not capturing (screen grab failed). If this repeats, run: wow-clipper setup")
+                stop_recorder(proc)
+                proc = None
+                retry_at = time.time() + (10 if probe_fails == 1 else 120)
+        write_state(recording=proc is not None, verified=bool(proc is not None and not verify_at and not probe_fails),
+                    game=game, audio=audio, at=time.time())
         if proc is None:
             clog["hunt"], clog["pending"] = None, None   # do not carry a hunt across a stopped recorder
             time.sleep(5)
