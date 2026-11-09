@@ -10,6 +10,7 @@ Nothing here touches the game: it reads the Screenshots folder and the process l
 
   wow_clipper.py run | setup | status | list | keep <clip> | short <clip> [zoom|mid|fit]
 """
+import csv
 import json
 import os
 import re
@@ -50,6 +51,21 @@ DEFAULTS = {
     "screenshot_seconds": 60,     # any other screenshot; 0 = ignore them
     "min_kills": 1,
     "notify": True,
+    # The combat log is the second way a hunt is caught. The game writes every kill
+    # and death to Logs/WoWCombatLog.txt live (GodslayerLog keeps logging on), so a
+    # hunt is clipped even on a client that refuses the screenshot the mark rides on.
+    "combatlog": True,
+    # Forever starts a NEW dated file every session (WoWCombatLog-MMDDYY_HHMMSS.txt),
+    # so we watch the Logs folder and tail the newest match, not one fixed name.
+    "combatlog_dir": "Logs",
+    "combatlog_glob": "WoWCombatLog*.txt",
+    "combatlog_file": None,       # set to pin one exact path (relative to wow_dir) instead of the newest match
+    "combatlog_quiet": 20,        # seconds with no death before a burst is cut
+    "combatlog_grace": 6,         # wait this long for a screenshot to claim the hunt first
+    "combatlog_min_kills": 10,    # enemies that must fall in one burst before it is worth a clip
+    "combatlog_min_player_kills": 1,  # a burst holding a PLAYER kill is PvP: one gank is already a clip
+    "player_guid": None,          # pin your character's GUID; null = learn it (your own blows dominate your log)
+    "dedupe_seconds": 15,         # a burst the screenshot path just clipped is not clipped again
 }
 
 # Hype.lua's ladder, by place. test_clipper.py checks this against the addon.
@@ -131,7 +147,131 @@ def decode_mark(image_path):
     return None
 
 
-# ---------------------------------------------------------------- the library
+# ---------------------------------------------------------------- the combat log
+#
+# The screenshot is one way to learn a hunt ended; this is the other. With combat
+# logging on, the client writes every event to a dated WoWCombatLog file as it
+# happens. We tail the newest one, count the player's OWN killing blows (on players
+# or mobs: a frozen pack melted down is as much a highlight as a duel), notice when
+# they die or the kills go quiet, and build the same kind of mark the squares carry
+# so the rest of the pipeline does not know the difference. A burst the screenshot
+# already saved is skipped (the screenshot's mark is richer, so it wins).
+
+# Hype.lua's LADDER: the fewest kills that reach each rung, matched to LADDER above.
+RUNG_AT = [(50, 12), (40, 11), (30, 10), (25, 9), (20, 8), (15, 7),
+           (10, 6), (7, 5), (5, 4), (3, 3), (2, 2), (1, 1)]
+
+
+def rung_place(kills):
+    """The place on the ladder (1..12) a hunt of this many kills stands on; 0 for none."""
+    for need, place in RUNG_AT:
+        if kills >= need:
+            return place
+    return 0
+
+
+def cl_payload(line):
+    """The part of a combat-log line after its 'M/D HH:MM:SS.mmm  ' timestamp, or None."""
+    line = line.rstrip("\r\n")
+    for sep in ("  ", "\t"):
+        i = line.find(sep)
+        if i != -1:
+            return line[i + len(sep):]
+    return None
+
+
+def parse_cl_event(payload):
+    """('kill', src_guid, dest_guid) for a killing blow, ('died', dest_guid) for a
+    death, else None. Robust to the quoted, comma-separated advanced-log fields."""
+    try:
+        f = next(csv.reader([payload]))
+    except Exception:
+        return None
+    if not f:
+        return None
+    ev = f[0]
+    if ev == "PARTY_KILL" and len(f) >= 6:
+        return ("kill", f[1], f[5])
+    if ev in ("UNIT_DIED", "UNIT_DESTROYED", "UNIT_DISSIPATES") and len(f) >= 6:
+        return ("died", f[5])
+    return None
+
+
+def new_combatlog():
+    return {"fh": None, "ino": None, "pos": 0, "path": None, "player": None,
+            "src_counts": {}, "hunt": None, "pending": None, "serial": 0}
+
+
+def hunt_mark(clog, kind, taken, cfg):
+    """Turn the tracked hunt into a mark dict shaped exactly like parse_mark's, or None."""
+    h = clog["hunt"]
+    if not h:
+        return None
+    need = cfg.get("combatlog_min_kills", cfg["min_kills"])
+    if h.get("pkills"):
+        # PvP: a burst holding an enemy player's death does not have to melt like a
+        # ten-mob pack. One gank is already the content.
+        need = min(need, cfg.get("combatlog_min_player_kills", 1))
+    if h["kills"] < need:
+        return None
+    clog["serial"] = (clog["serial"] + 1) % 256
+    place = rung_place(h["kills"])
+    return {
+        "kind": kind, "kills": h["kills"],
+        "seconds": max(0, int(round(taken - h["first"]))),
+        "since": max(0, int(round(taken - h["last"]))),
+        "rung": LADDER[place - 1] if place else "", "run": 1,
+        "grade": "", "points": 0,
+        "pretend": False, "record": False, "king": False,
+        "flawless": kind == "quiet" and h["kills"] >= 10,
+        "peak": max(0, int(round(taken - h["peak"]))), "serial": clog["serial"],
+    }
+
+
+def feed_combatlog(clog, ev, now, cfg):
+    """Advance the hunt state with one parsed event. Returns ('end', kind, taken)
+    when a hunt just finished and should be clipped, else None. Pure: the tests
+    drive this directly with synthetic events.
+
+    PARTY_KILL teaches us who WE are (in your own log your killing blows
+    dominate, so the most frequent Player source is you; a pinned player_guid wins)
+    and, when its victim is an enemy player, flags the burst as PvP so one gank
+    clips without needing a ten-mob melt.
+    The hunt is counted from deaths, because in an AoE pull a groupmate often lands
+    the final blow on a mob you set up, so the pack melting on your screen is the
+    real content, not only your own last hits. Your own death ends the hunt."""
+    kind = ev[0]
+    if kind == "kill":
+        src = ev[1]
+        if src.startswith("Player-"):
+            c = clog["src_counts"]
+            c[src] = c.get(src, 0) + 1
+            clog["player"] = cfg.get("player_guid") or max(c, key=c.get)
+        dest = ev[2]
+        me = cfg.get("player_guid") or clog["player"]
+        if dest.startswith("Player-") and dest != me:
+            # A killing blow we or the party landed on an enemy PLAYER. The death line
+            # can hit the log on either side of this one, so the hunt may not exist yet.
+            h = clog["hunt"]
+            if h is None:
+                h = {"kills": 0, "first": now, "last": now, "peak": now}
+                clog["hunt"] = h
+            h["pkills"] = h.get("pkills", 0) + 1
+            h["last"] = now
+    elif kind == "died":
+        dead = ev[1]
+        if clog["player"] and dead == clog["player"]:        # WE died: the hunt is over
+            return ("end", "died", now) if clog["hunt"] else None
+        if dead.startswith("Creature-") or dead.startswith("Player-"):  # an enemy in our pull dropped
+            h = clog["hunt"]
+            if h is None:
+                clog["hunt"] = {"kills": 1, "first": now, "last": now, "peak": now}
+            else:
+                h["kills"] += 1
+                h["last"] = now
+                h["peak"] = now
+    return None
+
 
 def library(cfg):
     """(folder, cap in GB) to write to now, or (None, why)."""
@@ -357,18 +497,10 @@ def notify(cfg, text):
                         "Godslayer clipper", text], check=False)
 
 
-def handle_shot(cfg, shot):
-    try:
-        mark = decode_mark(shot)
-    except Exception as e:  # a half-written or odd file is just a screenshot with no mark
-        log("could not read", shot.name, e)
-        mark = None
-    taken = shot.stat().st_mtime
-    if mark is None and not cfg["screenshot_seconds"]:
-        return
-    if mark and mark["kind"] != "manual" and mark["kills"] < cfg["min_kills"]:
-        log("hunt under min_kills, skipped")
-        return
+def save_hunt(cfg, mark, taken, saved, shot=None):
+    """The one place a clip is written, from either trigger. `taken` is when the hunt
+    ended; `shot` is the marked screenshot when there was one (it becomes the still).
+    `saved` is the shared record of the last clip, so the two triggers do not double up."""
     folder, cap = library(cfg)
     if folder is None:
         log("not saved:", cap)
@@ -382,7 +514,7 @@ def handle_shot(cfg, shot):
         want = mark["seconds"] + cfg["lead_in"] + 5
     raw, asked = save_replay(want + (time.time() - taken), cfg["buffer_seconds"])
     if raw is None:
-        log("the recorder gave nothing back for", shot.name)
+        log("the recorder gave nothing back")
         return
     try:
         length = duration(raw)
@@ -394,16 +526,123 @@ def handle_shot(cfg, shot):
             return
         if peak:
             cut(raw, [peak], out.with_name(out.stem + "_peak.mp4"))
-        if mark:
+        if shot:
             shutil.move(str(shot), str(out.with_suffix(".jpg")))  # the marked screenshot is the clip's still
         with open(folder / "index.jsonl", "a") as f:
             f.write(json.dumps({"clip": str(out.relative_to(folder)), "taken": when.isoformat(timespec="seconds"),
                                 "seconds": round(duration(out), 1), "mark": mark}) + "\n")
         log("saved", out, f"{out.stat().st_size / 1e6:.0f} MB")
-        notify(cfg, "Saved " + out.stem.split("_", 1)[1].replace("_", " "))
+        notify(cfg, "Saved " + out.stem.split("_", 1)[-1].replace("_", " "))
+        if mark:
+            saved["t"], saved["kills"] = taken, mark["kills"]
         prune(folder, cap)
     finally:
         raw.unlink(missing_ok=True)
+
+
+def handle_shot(cfg, shot, saved):
+    try:
+        mark = decode_mark(shot)
+    except Exception as e:  # a half-written or odd file is just a screenshot with no mark
+        log("could not read", shot.name, e)
+        mark = None
+    if mark is None and not cfg["screenshot_seconds"]:
+        return
+    if mark and mark["kind"] != "manual" and mark["kills"] < cfg["min_kills"]:
+        log("hunt under min_kills, skipped")
+        return
+    save_hunt(cfg, mark, shot.stat().st_mtime, saved, shot=shot)
+
+
+def arm_pending(clog, kind, taken, cfg):
+    """A hunt ended in the log. Hold it for a moment: if its screenshot lands in that
+    window the richer screenshot clip wins and this one is dropped."""
+    mark = hunt_mark(clog, kind, taken, cfg)
+    clog["hunt"] = None
+    if mark:
+        clog["pending"] = {"mark": mark, "taken": taken, "due": time.time() + cfg["combatlog_grace"]}
+
+
+def newest_combatlog(cfg):
+    """The combat log to tail. Forever opens a new dated file each session, so take the
+    most recently written WoWCombatLog*.txt; combatlog_file pins one exact path instead."""
+    if cfg.get("combatlog_file"):
+        p = Path(cfg["wow_dir"]) / cfg["combatlog_file"]
+        return p if p.exists() else None
+    d = Path(cfg["wow_dir"]) / cfg.get("combatlog_dir", "Logs")
+    try:
+        files = [p for p in d.glob(cfg.get("combatlog_glob", "WoWCombatLog*.txt")) if p.is_file()]
+    except OSError:
+        return None
+    return max(files, key=lambda p: p.stat().st_mtime) if files else None
+
+
+def poll_combatlog(cfg, clog, saved):
+    """Read whatever the game has appended to the combat log and advance the hunt."""
+    if not cfg["combatlog"]:
+        return
+    path = newest_combatlog(cfg)
+    if path is None:                     # logging off or no file yet: nothing to tail
+        if clog["fh"]:
+            try: clog["fh"].close()
+            except Exception: pass
+        clog.update(fh=None, ino=None, pos=0, path=None, hunt=None, pending=None)
+        return
+    try:
+        st = path.stat()
+    except OSError:
+        if clog["fh"]:
+            try: clog["fh"].close()
+            except Exception: pass
+        clog.update(fh=None, ino=None, pos=0, path=None, hunt=None, pending=None)
+        return
+    if clog["fh"] is None or clog["path"] != str(path) or clog["ino"] != st.st_ino or st.st_size < clog["pos"]:
+        if clog["fh"]:
+            try: clog["fh"].close()
+            except Exception: pass
+        try:
+            fh = open(path, "r", encoding="utf-8", errors="replace")
+        except OSError:
+            clog.update(fh=None, ino=None, pos=0, path=None, hunt=None, pending=None)
+            return
+        if clog["path"] != str(path):
+            log("combat log: tailing", path.name)
+        fh.seek(0, os.SEEK_END)          # live tail: ignore the backlog, only new kills
+        clog.update(fh=fh, ino=st.st_ino, pos=fh.tell(), path=str(path), hunt=None, pending=None)
+    fh = clog["fh"]
+    now = time.time()
+    while True:
+        line = fh.readline()
+        if not line:
+            break
+        clog["pos"] = fh.tell()
+        payload = cl_payload(line)
+        if not payload:
+            continue
+        ev = parse_cl_event(payload)
+        if not ev:
+            continue
+        done = feed_combatlog(clog, ev, now, cfg)
+        if done:
+            arm_pending(clog, done[1], done[2], cfg)
+    h = clog["hunt"]
+    if h and now - h["last"] >= cfg["combatlog_quiet"]:   # survived, then went quiet
+        arm_pending(clog, "quiet", h["last"] + cfg["combatlog_quiet"], cfg)
+
+
+def flush_pending(cfg, clog, saved):
+    p = clog.get("pending")
+    if not p or time.time() < p["due"]:
+        return
+    clog["pending"] = None
+    mark, taken = p["mark"], p["taken"]
+    # the two triggers count differently (the mark's kills vs deaths), so dedupe on time
+    # alone: a hunt can only end after a quiet gap, so two real bursts are never this close.
+    if abs(taken - saved.get("t", 0)) < cfg["dedupe_seconds"]:
+        log("combat log: a screenshot already clipped this moment; skipping")
+        return
+    log(f"combat log: {mark['kind']} burst, {mark['kills']} down, no screenshot -> clipping")
+    save_hunt(cfg, mark, taken, saved)
 
 
 def write_state(**state):
@@ -418,7 +657,13 @@ def run():
         sys.exit(f"Set wow_dir in {CONFIG}")
     seen = set(shots_dir.glob("*")) if shots_dir.is_dir() else set()
     proc, audio, since, retry_at, pending = None, None, 0, 0, {}
+    saved = {"t": 0, "kills": -1}       # the last clip, so the two triggers never double up
+    clog = new_combatlog()
     log("watching", shots_dir)
+    if cfg["combatlog"]:
+        found = newest_combatlog(cfg)
+        where = found if found else Path(cfg["wow_dir"]) / cfg.get("combatlog_dir", "Logs") / cfg.get("combatlog_glob", "WoWCombatLog*.txt")
+        log("watching", where)
 
     def stop(*_):
         stop_recorder(proc)
@@ -449,6 +694,7 @@ def run():
             since = 0
         write_state(recording=proc is not None, game=game, audio=audio, at=time.time())
         if proc is None:
+            clog["hunt"], clog["pending"] = None, None   # do not carry a hunt across a stopped recorder
             time.sleep(5)
             if shots_dir.is_dir():
                 seen = set(shots_dir.glob("*"))
@@ -463,11 +709,16 @@ def run():
                     seen.add(shot)
                     pending.pop(shot, None)
                     try:
-                        handle_shot(cfg, shot)
+                        handle_shot(cfg, shot, saved)
                     except Exception as e:
                         log("clip failed:", repr(e))
                 else:
                     pending[shot] = size
+            try:
+                poll_combatlog(cfg, clog, saved)
+                flush_pending(cfg, clog, saved)
+            except Exception as e:
+                log("combat log error:", repr(e))
 
 
 # ---------------------------------------------------------------- commands
