@@ -14,7 +14,7 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "2.8.0"
+ns.VERSION = "2.9.0"
 
 local DEDUPE_SECONDS = 10        -- the signals above can all describe the same death
 local MATCH_WINDOW = 8           -- honorable-kill credit and a seen death must be this close
@@ -31,8 +31,13 @@ local HEALTH_GAP = 1             -- one unit is asked whether it is dead at most
 local IDLE_RETRY = 2             -- the idle sweep re-reads a plate with no guild yet this often
 local IDLE_SETTLED = 30          -- ... and one whose guild it already has, this often
 local ELSEWHERE, OTHER_RANKS = "Elsewhere", "Other ranks"
+-- PARTY_KILL can keep the source GUID readable while replacing the victim GUID with a secret
+-- value. PvP credit proves that the hidden victim was a player; these labels keep every field
+-- that needs an identity honest while the kill itself still advances the score and the hunt.
+local UNKNOWN_ID, UNKNOWN_NAME, UNKNOWN_GUILD = "unknown:hidden-victim", "Unknown victim", "Unknown"
 ns.HIST_CAP, ns.ZONE_CAP, ns.RANK_CAP, ns.DETAIL_CAP, ns.KNOWN_CAP = HIST_CAP, ZONE_CAP, RANK_CAP, DETAIL_CAP, KNOWN_CAP
 ns.ELSEWHERE, ns.OTHER_RANKS = ELSEWHERE, OTHER_RANKS
+ns.UNKNOWN_VICTIM_ID, ns.UNKNOWN_VICTIM_NAME, ns.UNKNOWN_VICTIM_GUILD = UNKNOWN_ID, UNKNOWN_NAME, UNKNOWN_GUILD
 
 local issecret = issecretvalue or function() return false end
 -- the bare global is only a deprecation shim on this client
@@ -770,13 +775,14 @@ function Score(id, name, guild, tier, rec, class)
                  first = v.kills == 1, zone = rec.zone, sub = rec.sub, kb = rec.kb and true or false }
   -- true when the announcer is calling this one, so the plain chime stays out of its way
   if ns.Hype then
+    local callId = rec.callId or id
     if tier == "any" then
       -- the generic call already spoke for this kill; only the points and a title move
-      if ns.Hype.Points then ns.Hype.Points(id, pts) end
+      if ns.Hype.Points then ns.Hype.Points(callId, pts) end
       if info.rankUp and ns.Hype.Promoted then pcall(ns.Hype.Promoted, rankAfter, rankName) end
       info.announced = rec.hyped and true or false
     else
-      info.announced = hype("Olympus", id, v, tier, pts, info, rankAfter) and true or false
+      info.announced = hype("Olympus", callId, v, tier, pts, info, rankAfter) and true or false
     end
   end
   if ns.OnScore then ns.OnScore(v, guild, tier, pts, info) end
@@ -872,6 +878,20 @@ end
 local claimCalled
 local deaths, credits = {}, {}
 local matchCredits
+
+local function killRecord(name, kb)
+  local rec = { t = GetTime(), kb = kb and true or false, name = name, life = ns.session.life }
+  -- Where and when are taken at the kill signal. Identity may arrive later, or never.
+  local wall = time()
+  local hour, myLevel = tonumber((try(date, "%H", wall))), plain(try(UnitLevel, "player"))
+  local day = try(date, "%Y%m%d", wall)
+  rec.wall, rec.day = wall, type(day) == "string" and day or nil
+  rec.hour = hour and hour >= 0 and hour <= 23 and math.floor(hour) or nil
+  rec.zone, rec.sub = clean((try(GetRealZoneText))), clean((try(GetSubZoneText)))
+  rec.myLevel = type(myLevel) == "number" and myLevel >= 1 and math.floor(myLevel) or nil
+  return rec
+end
+
 local function RegisterKill(id, name, kb, source, calledAs)
   if type(id) ~= "string" or id == "" then return end
   local now = GetTime()
@@ -897,15 +917,7 @@ local function RegisterKill(id, name, kb, source, calledAs)
   findUnit(id)
   local guild, class, seenName = lookup(id)
   name = seenName or name
-  rec = { t = now, kb = kb and true or false, name = name, life = ns.session.life }
-  -- where and when, taken now: a kill waiting for its guild tag is scored later
-  local wall = time()
-  local hour, myLevel = tonumber((try(date, "%H", wall))), plain(try(UnitLevel, "player"))
-  local day = try(date, "%Y%m%d", wall)
-  rec.wall, rec.day = wall, type(day) == "string" and day or nil
-  rec.hour = hour and hour >= 0 and hour <= 23 and math.floor(hour) or nil
-  rec.zone, rec.sub = clean((try(GetRealZoneText))), clean((try(GetSubZoneText)))
-  rec.myLevel = type(myLevel) == "number" and myLevel >= 1 and math.floor(myLevel) or nil
+  rec = killRecord(name, kb)
   recent[id] = rec
   if source ~= "HK" then
     -- this kill's own honor credit must find it, whatever noteDeath thinks of the victim
@@ -954,7 +966,15 @@ end
 -- ---------------------------------------------------------------------------
 
 local ANON_AFTER, anonCount = 1.2, 0 -- seconds a credit waits for its death before it is called without a name
+local HIDDEN_MATCH_WINDOW = 3       -- PARTY_KILL and its PvP credit normally land together
 local lastHK, lastCreditEvent = nil, 0
+local hiddenKills = {}              -- attributable PARTY_KILL events whose victim GUID was secret
+
+local function pruneHidden(now)
+  for i = #hiddenKills, 1, -1 do
+    if now - hiddenKills[i].t > MATCH_WINDOW + 2 then table.remove(hiddenKills, i) end
+  end
+end
 
 -- An enemy player died near us. Two events can report the same death.
 local function noteDeath(guid)
@@ -998,6 +1018,57 @@ claimCalled = function()
   end
 end
 
+-- The source on a hidden PARTY_KILL says whose blow it was, but cannot say whether the victim
+-- was a player or a creature. A nearby PvP-credit event supplies that missing fact. Keeping the
+-- two signals separate is what lets hidden players count without turning a dungeon pull into a
+-- PvP streak.
+local function attachHidden(credit)
+  if credit.hidden then return credit.hidden end
+  local best, bestGap
+  for _, hidden in ipairs(hiddenKills) do
+    local gap = math.abs(hidden.t - credit.t)
+    if not hidden.used and gap <= HIDDEN_MATCH_WINDOW and (not bestGap or gap < bestGap) then
+      best, bestGap = hidden, gap
+    end
+  end
+  if best then
+    best.used, credit.hidden = true, best
+    return best
+  end
+end
+
+local function callUnknown(credit)
+  local hidden = attachHidden(credit)
+  local kb = hidden and hidden.mine or false
+  local mode = GodslayerDB.opts.hype and GodslayerDB.opts.hype.mode
+  local shouldHype = kb or mode ~= "blows"
+  if not credit.called then
+    anonCount = anonCount + 1
+    credit.called = "anon:" .. anonCount
+    if ns.Hype and shouldHype then
+      credit.hyped = true
+      hype("Kill", nil, kb and true or false, credit.called)
+    end
+  elseif ns.Hype and shouldHype and not credit.hyped then
+    -- The PvP credit may have been called before its hidden killing-blow event arrived. This is
+    -- the first moment blows-only mode knows that the kill belongs in the hunt.
+    credit.hyped = true
+    hype("Kill", nil, true, credit.called)
+  end
+  return kb
+end
+
+local function scoreUnknown(credit)
+  local kb = callUnknown(credit)
+  local rec = credit.rec or killRecord(UNKNOWN_NAME, kb)
+  rec.name, rec.kb = UNKNOWN_NAME, kb and true or false
+  rec.hyped, rec.callId = credit.hyped and true or false, credit.called
+  ns.Log("kill", UNKNOWN_NAME .. " via HK (identity hidden)" .. (kb and " kb" or ""))
+  -- One durable record is deliberate: unique victims, guild attribution and killing blows have
+  -- no identity to split on, so they aggregate under explicit unknown labels instead.
+  Score(UNKNOWN_ID, UNKNOWN_NAME, UNKNOWN_GUILD, "any", rec)
+end
+
 function matchCredits()
   local now = GetTime()
   for i = #deaths, 1, -1 do
@@ -1006,9 +1077,11 @@ function matchCredits()
   for i = #credits, 1, -1 do
     if now - credits[i].t > MATCH_WINDOW + 2 then table.remove(credits, i) end
   end
+  pruneHidden(now)
   local c = 1
   while c <= #credits do
     local credit = credits[c]
+    attachHidden(credit)
     local ct, best, bestGap, bestWeight, already = credit.t, nil, nil, -1, nil
     for _, d in ipairs(deaths) do
       local gap = math.abs(d.t - ct)
@@ -1029,17 +1102,31 @@ function matchCredits()
     if d then
       d.used = true
       table.remove(credits, c)
-      if not already then RegisterKill(d.id, nameFromGUID(d.id), false, "HK", credit.called) end
+      if not already then RegisterKill(d.id, nameFromGUID(d.id), credit.hidden and credit.hidden.mine or false, "HK", credit.called) end
     else
       -- credit for a kill nobody saw die (too far, behind a wall, a crowd): it is still a kill, and
-      -- the announcer says so now. If the death turns up in the next seconds it gets its name then.
-      if not credit.called and now - ct >= ANON_AFTER and ns.Hype then
-        anonCount = anonCount + 1
-        credit.called = "anon:" .. anonCount
-        ns.Log("kill", "unseen victim via HK")
-        hype("Kill", nil, false, credit.called)
+      -- the announcer says so now. If the death turns up in the next seconds it gets its name;
+      -- only after the whole matching window expires is it banked under the unknown bucket.
+      if credit.hidden and now - ct >= ANON_AFTER then callUnknown(credit) end
+      if credit.hidden and now - ct > MATCH_WINDOW then
+        table.remove(credits, c)
+        scoreUnknown(credit)
+      else
+        -- An honorable-kill credit with no PARTY_KILL still gets the long-standing anonymous
+        -- hunt call, but no durable identity record. This lane only changes kills attributable
+        -- to us or our group through PARTY_KILL; a bystander's killing blow remains unassigned.
+        if not credit.hidden and not credit.called and now - ct >= ANON_AFTER then
+          anonCount = anonCount + 1
+          credit.called = "anon:" .. anonCount
+          ns.Log("kill", "unseen victim via HK")
+          local mode = GodslayerDB.opts.hype and GodslayerDB.opts.hype.mode
+          if ns.Hype and mode ~= "blows" then
+            credit.hyped = true
+            hype("Kill", nil, false, credit.called)
+          end
+        end
+        c = c + 1
       end
-      c = c + 1
     end
   end
 end
@@ -1117,21 +1204,26 @@ ns.parseHonorLine = parseHonorLine
 local handlers = {}
 
 function handlers.PARTY_KILL(attackerGUID, targetGUID)
-  local secret = issecret(attackerGUID) or issecret(targetGUID)
+  local attackerSecret, targetSecret = issecret(attackerGUID), issecret(targetGUID)
   attackerGUID, targetGUID = plain(attackerGUID), plain(targetGUID)
-  if type(targetGUID) ~= "string" then
-    -- the client hides creatures' identities, so every dungeon pull would write this: say it once
-    if secret and not ns.hiddenLogged then ns.hiddenLogged = true ns.Log("party_kill", "victim hidden by the client (logged once per session)") end
-    return
-  end
-  if targetGUID:sub(1, 7) ~= "Player-" then return end
   if type(attackerGUID) ~= "string" then attackerGUID = nil end
 
   local mine = attackerGUID and (attackerGUID == myGUID or attackerGUID == plain(try(UnitGUID, "pet")))
   if not mine and not (attackerGUID and plain(try(IsGUIDInGroup, attackerGUID))) then
-    ns.Log("party_kill", "not ours" .. (secret and " (attacker hidden)" or ""))
+    ns.Log("party_kill", "not ours" .. (attackerSecret and " (attacker hidden)" or ""))
     return
   end
+  if type(targetGUID) ~= "string" or targetGUID == "" then
+    -- The source remains attributable, but the hidden victim may be a creature. Hold it until a
+    -- PvP-credit event proves that a player died; creature kills expire without changing anything.
+    local now = GetTime()
+    pruneHidden(now) -- continuous PvE can emit this all day; keep only the matchable few seconds
+    hiddenKills[#hiddenKills + 1] = { t = now, mine = mine and true or false }
+    if targetSecret and not ns.hiddenLogged then ns.hiddenLogged = true ns.Log("party_kill", "victim hidden by the client (logged once per session)") end
+    if #credits > 0 then matchCredits() end
+    return
+  end
+  if targetGUID:sub(1, 7) ~= "Player-" then return end
   RegisterKill(targetGUID, nameFromGUID(targetGUID), mine and true or false, "PARTY_KILL")
   -- the killing blow is also a death seen: the honor credit for it must not be called as a second kill
   noteDeath(targetGUID)
@@ -1192,7 +1284,7 @@ function handlers.PLAYER_PVP_KILLS_CHANGED(unit)
     gained = (now - lastCreditEvent > 0.5) and 1 or 0
   end
   lastCreditEvent = now
-  for _ = 1, gained do credits[#credits + 1] = { t = now } end
+  for _ = 1, gained do credits[#credits + 1] = { t = now, rec = killRecord(nil, false) } end
   if gained > 0 then
     -- the death and the killing blow can arrive just after the credit
     C_Timer.After(0.6, matchCredits)
@@ -1261,6 +1353,7 @@ end
 function handlers.PLAYER_ENTERING_WORLD()
   for token in pairs(plates) do plates[token] = nil end
   for token in pairs(healthRead) do healthRead[token] = nil end
+  hiddenKills = {}
 end
 
 function handlers.PLAYER_TARGET_CHANGED() ObserveUnit("target") end

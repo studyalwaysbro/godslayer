@@ -450,11 +450,11 @@ Every line is in `tools/voice_script.json`: six packs, five scripts, and the cha
 
 ## How a kill counts
 
-You get credit when you land the killing blow, when someone in your group does, or when you earn honorable-kill credit for an enemy who dies next to you. The same death never counts twice. A kill scores once the addon has seen the victim's guild tag, so if you one-shot someone from stealth it may take a mouseover of the corpse to register.
+You get credit when you land the killing blow, when someone in your group does, or when you earn honorable-kill credit for an enemy who dies next to you. The same death never counts twice. When the client shows the victim, the addon keeps the full name, guild and dossier. When Forever seals the victim on `PARTY_KILL`, the readable source and the PvP-credit counter still let the kill advance the hunt and score; identity-dependent totals go into explicit **Unknown victim** and **Unknown** guild buckets.
 
-The dossier is built from what the game shows about a player you can see: their nameplate, your target, your mouseover. The game is allowed to hide any of it, and then that line of the dossier is simply missing. Kills made before version 1.1 keep their counts but have no per-kill details.
+The dossier is built from what the game shows about a player you can see: their nameplate, your target, your mouseover. The game is allowed to hide any of it, and then that line of the dossier is simply missing. A completely sealed identity is never guessed or retroactively assigned to someone who merely happened to be nearby. Kills made before version 1.1 keep their counts but have no per-kill details.
 
-Battleground kills mostly will not count. The game hides enemy identities from addons in instanced PvP. This is a world PvP addon. Go outside.
+In places where Forever seals enemy identities, attributable killing blows can therefore count without a name; they cannot earn a guild bonus or a unique named dossier unless the client supplies the identity on that event.
 
 ## What counts
 
