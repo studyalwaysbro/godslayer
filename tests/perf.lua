@@ -33,7 +33,7 @@ M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torch
 
 local ns = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua",
   "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua",
-  "Field.lua", "Flag.lua", "Control.lua", "Death.lua", "Threat.lua", "Comm.lua", "Rival.lua",
+  "Field.lua", "Flag.lua", "Control.lua", "Death.lua", "Threat.lua", "Comm.lua", "Hunters.lua", "Rival.lua",
   "Wheel.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "Godslayer")
 M.fire("PLAYER_LOGIN")

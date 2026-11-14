@@ -15,6 +15,8 @@ Made by **The True Torchmen**. For the Horde.
 - **Counts your kills.** Every unique player, which guild they wore, how many times, how many were your killing blow.
 - **Scores them.** One point for any player. Three for a member of the guild you name your rival. Five for a member of the original `OLYMPUS`, and one for any other guild in its network (Olympus Kitchen, OLYMPUS BETZ, OLYMPUS LXX), if the network is even on your server.
 - **Guild leaderboard.** Every guildmate running Godslayer shows up, ranked by points. No setup.
+- **The Hunters board.** Next to the guild board: every Godslayer user on your faction and ruleset, across realms, ranked by points, for all time or this week. A player only ranks once their own copy has sent you their score directly, so nobody can post a score for someone else. See [The Hunters board](#the-hunters-board) for exactly what it shares and how to turn it off.
+- **Its own volume.** `/godslayer volume 0-100`, or the slider in Options, AddOns, Godslayer.
 - **60+ brag lines.** One click posts your numbers to guild chat in a new way each time. Some of them now name your nemesis or your rival. There is also a button that posts one victim's whole record. The Olympus-flavoured lines keep themselves in reserve until you actually land an Olympus kill.
   > Zeus called. He wants his 14 guildies back. They're still running from the graveyard.
 - **Titles.** Start as an Unlit Torch. Work up through Heretic, Temple Robber, Thief of Fire and Pantheon Problem to Godslayer. There is one title above Godslayer. You will have to earn it to read it.
@@ -51,6 +53,9 @@ Made by **The True Torchmen**. For the Horde.
 - **Where the flag is while the map is shut.** Forever pins the flags on both maps, and a pin is a
   texture that exists only while the map is open. This gives the yards, the turn to make as a
   clock face, the speed, and how far a carrier is from scoring.
+- **Flag calls that keep their head.** Taken, dropped, captured, returned: called from the
+  battleground's own messages, with a fumbled flag (dropped and grabbed again within 2.5 seconds)
+  never called and each flag's drop and return calls spaced 30 seconds apart.
 - **What has hold of you, and what you can still cast.** Forever's own Loss of Control display shows one effect at a time — the highest priority, longest remaining — and only when the `lossOfControl` CVar is on. The data under it carries no secrecy annotation anywhere, so this reads all of it at once. Get Counterspelled and you are told which *school* is locked, for how long, and which of your own spells are still live. That last part is the one nothing else answers: Frostfire Bolt is in two schools at once, so a Counterspell on it takes your Fireball with it, and no icon on screen will tell you that.
 - **Who is in this battleground.** The scoreboard's numbers are sealed for the whole match on this client, but the ranks are not. Walk into a battleground and the addon tells you what you have walked into: both sides' rosters, each side's position on the fourteen rungs, who is highest and should not be opened on alone, how many of them can heal, and which of them you have killed before. When it ends the numbers unseal and you get the whole thing, including where you placed among all forty.
 
@@ -304,6 +309,49 @@ at the bottom of the report, because a silent drop is the bug you never find.
 The leaderboard also carries a **Rung** column now — everyone's place on the fourteen, which rides
 along on the same message the totals do.
 
+## The Hunters board
+
+The guild board only knows your guild. The Hunters board is everyone else: every player running
+Godslayer on your faction and ruleset, whatever their guild or realm. Leaderboard tab, **Hunters**,
+then **Lifetime** or **This week**.
+
+**How a row gets on it.** Your copy asks other copies for their score, one whispered question at a
+time, and a row ranks only when it came straight from the player it belongs to. Nobody can hand you
+somebody else's score, and nothing is relayed. Scores are still self-reported: the board says so at
+the top, and it ranks you among the hunters *your client* has confirmed, because that is what it is.
+It starts empty after you update and fills over your first session as the copies find each other.
+
+**How copies find each other.** Godslayer joins a hidden chat channel, `GodslayerHunters`, and reads
+its member list. The channel is never added to a chat window and nothing is ever posted in it: on
+Forever an addon cannot send data on a custom channel, so every message is an addon whisper.
+Guildmates and group members on 3.0 are found too. All of it is paced (at most ten messages a
+minute, never in combat, never in an instance), and the game's "No player named ..." line for a
+whisper to someone who just logged off is hidden.
+
+**This week** follows the game's weekly reset. A week you started tracking part way through is
+listed under "tracking began mid-week" instead of being ranked against full weeks, so your first
+week after updating ranks from the next reset.
+
+**What it shares, and with whom.** Your character name, class, kills, points, killing blows, Olympus
+kills, regicides, rung, this week's kills and points, and your Godslayer version, sent by hidden
+addon whisper to Godslayer users of your faction and ruleset who ask for them. Their copies keep your row for
+up to seven days. No guild, no level, no location.
+
+**Turning it off.** `/godslayer hunters off`, or untick **Share on the Hunters board** in Options,
+AddOns, Godslayer. Your copy stops sending and answering at once and leaves the channel. It cannot
+erase rows other players' copies already hold; those expire on their own within seven days.
+`/godslayer hunters on` turns it back on, `/godslayer hunters status` says what it is doing.
+
+## Volume
+
+`/godslayer volume 0-100`, or the slider in Options, AddOns, Godslayer, sets how loud the
+announcer, its effects and the chat wheel are. The game gives addons no volume control for their
+own sound files, so below 100 Godslayer sets your Dialog volume (Ambience, if Dialog is off) to
+that level while one of its lines plays, and puts yours back when the last one ends. Move that
+slider yourself in the meantime and your setting wins. An NPC speaking at that moment plays at
+Godslayer's level. At 100 nothing is touched. Your kill song is game music and follows the music
+slider, as before.
+
 ## Where the flag is
 
 Forever already draws the flags. Both maps get them:
@@ -329,8 +377,27 @@ Theirs flag is 48 yards from the cap.
 ```
 
 Distance in yards, the turn to make as a clock face, how fast it is moving, and how far it is from
-scoring. It calls out a flag taken, a flag dropped and a flag home, and the line about the cap
-goes on the end of the battleground report.
+scoring. The line about the cap goes on the end of the battleground report.
+
+**The calls do not come from the pins.** A pin seems to exist only for a carried flag and moves
+every few seconds, so a flag that vanished from the map looked dropped when it was not, and a
+scrum over a flag turned into a stream of calls. Since 3.0 the calls come from the battleground's
+own system messages ("The Alliance flag was picked up by ...") and its score widgets, which say
+when a flag is being carried. A flag dropped and picked up again within 2.5 seconds is a fumble and
+is not called at all. Out of the box only four calls speak: a flag taken, the first drop, a
+capture, and your flag returned; drop and return calls for the same flag then wait 30 seconds.
+Every call still shows its banner.
+
+| Command | What it does |
+|---|---|
+| `/godslayer flag calls important` | The four calls above speak (default) |
+| `/godslayer flag calls all` | Every call speaks |
+| `/godslayer flag calls off` | No flag calls at all |
+| `/godslayer flag voice off` | Banners only, no voice |
+| `/godslayer flag repeat <10-120>` | Seconds between drop and return calls for one flag |
+
+The same settings are in Options, AddOns, Godslayer. A flag message the addon does not recognise is
+written to its log once, so a wording Forever changes can be found and taught to it.
 
 **Both coordinate systems are flipped, and that is where this goes wrong quietly.** The engine
 answers positions in normalised map space, and a distance does not exist there: the same 0.1 is a
@@ -439,7 +506,9 @@ Every line is in `tools/voice_script.json`: six packs, five scripts, and the cha
 | `/godslayer control` | What has hold of you, which school is locked and what is still castable. `control open` for your book by school |
 | `/godslayer death` | The last seconds of your life, hit by hit. `death who` for what keeps killing you |
 | `/godslayer threat` | Who the guild keeps dying to. `threat <name>` for one of them, `threat guilds` for whose they are |
-| `/godslayer flag` | Where the flag is with the map shut: yards, bearing, speed, distance to the cap. `flag watch` toggles the callouts |
+| `/godslayer flag` | Where the flag is with the map shut: yards, bearing, speed, distance to the cap. `flag calls important\|all\|off`, `flag voice on\|off`, `flag repeat <10-120>` |
+| `/godslayer hunters` | What the Hunters board is doing. `hunters off` stops sharing, `hunters on` starts it again |
+| `/godslayer volume <0-100>` | Godslayer's own volume |
 | `/godslayer share` | Post a brag line to guild chat |
 | `/godslayer top` | Post the top 3 to guild chat |
 | `/godslayer demo` | Preview the kill banner |

@@ -1,10 +1,10 @@
--- Randomised soak test: lua tests/fuzz.lua [runs] [events per run]
+-- Randomised soak test: lua tests/fuzz.lua [runs] [events per run] [first seed]
 -- Throws random event storms (including secret values and garbage addon messages) at a
 -- fresh copy of the addon and checks the books still balance afterwards.
 package.path = "tests/?.lua;" .. package.path
 local M = require("mock")
-local RUNS, EVENTS = tonumber(arg[1]) or 1000, tonumber(arg[2]) or 250
-local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Flag.lua", "Control.lua", "Death.lua", "Threat.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
+local RUNS, EVENTS, FIRST_SEED = tonumber(arg[1]) or 1000, tonumber(arg[2]) or 250, tonumber(arg[3]) or 1
+local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Sound.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Flag.lua", "Control.lua", "Death.lua", "Threat.lua", "Comm.lua", "Hunters.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
 local ME, MATE, STRANGER = "Player-1-0000AAAA", "Player-1-0000BBBB", "Player-1-0000CCCC"
 local GUILDS = { "OLYMPUS", "OLYMPUS", "Olympus Kitchen", "OLYMPUS BETZ", "OLYMPUS XIlI", "HOELYMPUS", "The Enclave",
                  "0lympus", "Method", "The True Torchmen", "Olympic Swim Team", "", "x|cffff0000y|r", "Olympus;S;1", false }
@@ -77,7 +77,7 @@ local function fail(seed, msg)
   if failures <= 20 then M.realPrint(("FAIL seed %d: %s"):format(seed, msg)) end
 end
 
-for seed = 1, RUNS do
+for seed = FIRST_SEED, FIRST_SEED + RUNS - 1 do
   math.randomseed(seed)
   local R = math.random
   -- fresh client
@@ -89,6 +89,13 @@ for seed = 1, RUNS do
   -- battleground or lockout is not a fresh client
   M.bg, M.bgRequests, M.loc, M.known, M.knowAll = nil, 0, {}, {}, R(3) == 1
   M.recaps, M.recapMax = {}, 0
+  M.widgets, M.settings, M.arenaFaction, M.secretArenaFaction = {}, { categories = {}, controls = {} }, R(0, 1), nil
+  M.setSpoken(nil)
+  M.audio.files, M.audio.lengths, M.audio.played, M.audio.stopped, M.audio.kits = {}, {}, {}, {}, {}
+  M.audio.music, M.audio.musicStops, M.audio.next = nil, 0, 0
+  M.audio.sets, M.audio.cvarWrites, M.audio.playerValues, M.audio.lockCVars = 0, {}, {}, nil
+  M.audio.cvars = { Sound_EnableAllSound = "1", Sound_EnableMusic = "1", Sound_EnableDialog = "1",
+    Sound_DialogVolume = "0.8", Sound_AmbienceVolume = "0.7", Sound_MusicVolume = "0.8" }
   GodslayerDB, GodslayerFrame, GodslayerWindow, GodslayerMinimapButton, M.failTemplate = nil, nil, nil, nil, R(10) == 1
   local inherited = 0
   if R(3) == 1 then GodslayerDB, inherited = oldDatabase(R); migrated = migrated + 1 end
@@ -106,10 +113,21 @@ for seed = 1, RUNS do
   scrub = realScrub
   M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
   -- every announcer line exists on disk, so the voice really queues and plays in this soak
-  M.audio.files, M.audio.played, M.audio.music = {}, {}, nil
   for id, pack in pairs(ns.VOICE) do
-    for clip in pairs(pack.clips) do M.audio.files["Interface\\AddOns\\Godslayer\\Sounds\\" .. id .. "\\" .. clip .. ".ogg"] = true end
+    for clip, length in pairs(pack.clips) do
+      local path = "Interface\\AddOns\\Godslayer\\Sounds\\" .. id .. "\\" .. clip .. ".ogg"
+      M.audio.files[path], M.audio.lengths[path] = true, length
+    end
   end
+  for clip, length in pairs(ns.WHEEL.clips) do
+    local path = "Interface\\AddOns\\Godslayer\\Sounds\\wheel\\" .. clip .. ".ogg"
+    M.audio.files[path], M.audio.lengths[path] = true, length
+  end
+  for name, length in pairs(ns.SFX) do
+    local path = "Interface\\AddOns\\Godslayer\\Sounds\\sfx\\" .. name .. ".ogg"
+    M.audio.files[path], M.audio.lengths[path] = true, length
+  end
+  GodslayerDB.opts.volume = ({ 0, 25, 50, 100 })[R(4)]
   if R(2) == 1 then M.audio.files["Interface\\AddOns\\GodslayerMusic\\kill.mp3"] = true end
   local c = ns.char
   local players, opportunities = {}, inherited
@@ -133,6 +151,12 @@ for seed = 1, RUNS do
   end
   for _ = 1, EVENTS do
     local e = R(43)
+    if R(120) == 1 then
+      local cvar = R(2) == 1 and "Sound_DialogVolume" or "Sound_AmbienceVolume"
+      local value = ({ 0.13, 0.37, 0.64, 0.91 })[R(4)]
+      SetCVar(cvar, value)
+      M.audio.playerValues[cvar] = value
+    end
     if e <= 4 then
       local token = TOKENS[R(#TOKENS)]
       M.units[token] = (R(4) == 1) and nil or players[R(#players)]
@@ -353,17 +377,47 @@ for seed = 1, RUNS do
       M.fire("PLAYER_ENTERING_WORLD"); M.fire("PLAYER_GUILD_UPDATE", "player")
     end
   end
-  M.advance(30)
+  -- Quiesce every local file-sound producer, then let the current longest clip and any already
+  -- scheduled flag fumble finish. Merely advancing a busy client is not quiescence: recurring
+  -- discovery timers can keep feeding the announcer indefinitely.
+  ns.Hype.Command("off")
+  ns.Wheel.Hush()
+  M.advance(15)
   totalEvents = totalEvents + EVENTS
 
   -- the books must balance
   if ns.errors then fail(seed, "handler errors: " .. tostring(ns.errors)) end
+  local soundActive = ns.Sound.Active()
+  if soundActive or GodslayerDB.volumeSwap then
+    fail(seed, "volume swap survived after all sounds ended")
+    if soundActive and failures <= 20 then
+      local pending = {}
+      for _, rec in pairs(soundActive.sounds or {}) do
+        local played
+        for _, item in ipairs(M.audio.played) do if item.handle == rec.handle then played = item break end end
+        pending[#pending + 1] = ("handle=%s ends=%.2f playing=%s path=%s at=%s length=%s"):format(
+          tostring(rec.handle), tonumber(rec.ends) or -1, tostring(rec.handle and C_Sound.IsPlaying(rec.handle)),
+          tostring(played and played.path), tostring(played and played.at), tostring(played and played.length))
+      end
+      M.realPrint(("  now=%.2f cvar=%s current=%s ours=%s pending=[%s]"):format(
+        M.now, tostring(soundActive.cvar), tostring(M.audio.cvars[soundActive.cvar]),
+        tostring(soundActive.ours), table.concat(pending, "; ")))
+    end
+  end
+  local ours = (GodslayerDB.opts.volume or 100) / 100
+  for _, cvar in ipairs({ "Sound_DialogVolume", "Sound_AmbienceVolume" }) do
+    local value = tonumber(M.audio.cvars[cvar])
+    if GodslayerDB.opts.volume < 100 and math.abs((value or -1) - ours) <= 0.005
+       and M.audio.playerValues[cvar] ~= value then
+      fail(seed, cvar .. " was left at Godslayer's value")
+    end
+  end
   if #ns.Hype.Queued() > 7 then fail(seed, "the announcer queue grew past its cap: " .. #ns.Hype.Queued()) end
   -- no two lines start closer together than the first one's length allows
   local prev
   for _, p in ipairs(M.audio.played) do
     local pack, clip = p.path:match("Sounds\\(%a+)\\([%w_]+)%.ogg$")
-    if clip then
+    if clip and ns.VOICE[pack] then
       -- a line cut short for a kill call (a fight starting, a guildmate's news) has stopped, and may be talked over
       if prev and not M.audio.stopped[prev.handle] and p.at - prev.at < prev.length - 0.5 - 0.02 then fail(seed, "two announcer lines overlapped: " .. prev.clip .. " then " .. clip) end
       prev = { at = p.at, clip = clip, length = ns.VOICE[pack].clips[clip], handle = p.handle }
@@ -492,6 +546,6 @@ for seed = 1, RUNS do
   if #M.sentAddon > 8 + (M.now - 1000) / 5 then fail(seed, "addon channel spam: " .. #M.sentAddon .. " in " .. (M.now - 1000) .. "s") end
   totalKills = totalKills + c.kills
 end
-M.realPrint(("%d runs (%d from a 1.0.0 database, %d on a client with no scrub), %d events, %d kills scored, %d dossiers checked, %d failures")
-  :format(RUNS, migrated, noScrub, totalEvents, totalKills, dossiers, failures))
+M.realPrint(("%d runs from seed %d (%d from a 1.0.0 database, %d on a client with no scrub), %d events, %d kills scored, %d dossiers checked, %d failures")
+  :format(RUNS, FIRST_SEED, migrated, noScrub, totalEvents, totalKills, dossiers, failures))
 os.exit(failures == 0 and 0 or 1)

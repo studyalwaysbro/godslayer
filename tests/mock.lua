@@ -2,7 +2,8 @@
 local M = { now = 1000, wall = 1791400000, timers = {}, units = {}, guids = {}, group = {},
             sentAddon = {}, sentChat = {}, printed = {}, events = {}, frames = {}, lockdown = false,
             inGuild = true, myGuild = "The True Torchmen", hk = 0, addonResult = 0,
-            zone = "Stranglethorn Vale", subzone = "Nesingwary's Expedition", myLevel = 30 }
+            zone = "Stranglethorn Vale", subzone = "Nesingwary's Expedition", myLevel = 30,
+            region = "US", ruleset = "pvp", hardcore = false, channelRoster = {}, chatFilters = {} }
 
 -- secret values: any use other than passing them around blows up
 local secretMT = {
@@ -73,12 +74,26 @@ function scrub(...)
 end
 
 function GetTime() return M.now end
+function debugprofilestop() return M.now * 1000 end
 -- Whole seconds, like the client's. The mock clock drifts fractional because timers are
 -- scheduled at fractions of a second and M.advance moves the wall by whatever the next one is
 -- due in, but the game's time() is a Unix timestamp and has never had a fraction in it. Handing
 -- the addon a float here is not a harsher test, it is a different client: os.date refuses one,
 -- the addon's try() swallows the error, and every kill silently loses its day and its hour.
 function time() return math.floor(M.wall) end
+function GetServerTime() return time() end
+function GetCurrentRegionName() return M.region end
+function GetCurrentRegion() return ({ US=1, KR=2, EU=3, TW=4, CN=5 })[M.region] end
+function GetRealmName() return M.realmName or "Classic Beta PvP" end
+function GetNormalizedRealmName() return (GetRealmName():gsub("[^%w]", "")) end
+function IsInInstance() return M.inInstance == true, M.inInstance and "pvp" or "none" end
+C_DateAndTime = {
+  GetSecondsUntilWeeklyReset = function()
+    if M.weekUntil ~= nil then return M.weekUntil end
+    local phase = (time() - 1700000000) % 604800
+    return 604800 - phase
+  end,
+}
 -- like the client's date(): a format and an optional time; UTC here so runs are repeatable.
 -- A fractional time is counted as well as rejected, because try() eats the error and the damage
 -- otherwise shows up as a missing day three hundred assertions later.
@@ -102,23 +117,53 @@ function Ambiguate(n) return (n:gsub("%-.*$", "")) end
 UNKNOWNOBJECT = "Unknown"
 RAID_CLASS_COLORS = { WARRIOR = { r = 0.78, g = 0.61, b = 0.43 }, MAGE = { r = 0.25, g = 0.78, b = 0.92 } }
 SOUNDKIT = { RAID_WARNING = 8959 }
-function PlaySound() end
+function PlaySound(id) M.audio.kits[#M.audio.kits + 1] = { id = id, legacy = true } return true end
 -- sound files and music: M.audio.files names the files that exist on disk
-M.audio = { files = {}, played = {}, stopped = {}, music = nil, musicStops = 0, cvars = { Sound_EnableAllSound = "1", Sound_EnableMusic = "1" }, next = 0 }
+M.audio = { files = {}, lengths = {}, played = {}, stopped = {}, kits = {}, music = nil, musicStops = 0,
+  cvars = { Sound_EnableAllSound = "1", Sound_EnableMusic = "1", Sound_EnableDialog = "1",
+    Sound_DialogVolume = "0.8", Sound_AmbienceVolume = "0.7", Sound_MusicVolume = "0.8" }, next = 0,
+  cvarWrites = {} }
 function PlaySoundFile(path, channel)
-  assert(type(path) == "string" and (channel == "Master" or channel == "Dialog" or channel == "SFX"), "PlaySoundFile(path, channel)")
+  assert(type(path) == "string" and (channel == "Master" or channel == "Dialog" or channel == "SFX" or channel == "Ambience"), "PlaySoundFile(path, channel)")
   M.audio.channel = channel
   if not M.audio.files[path] then return false end
   M.audio.next = M.audio.next + 1
-  M.audio.played[#M.audio.played + 1] = { path = path, handle = M.audio.next, at = M.now }
+  local length = M.audio.lengths[path] or 1.5
+  M.audio.played[#M.audio.played + 1] = { path = path, handle = M.audio.next, at = M.now, length = length }
   return true, M.audio.next
 end
 function StopSound(handle, fade) assert(type(handle) == "number") M.audio.stopped[handle] = fade or 0 end
 function PlayMusic(path) assert(M.audio.files[path], "PlayMusic on a missing file") M.audio.music = path end
 function StopMusic() if M.audio.music then M.audio.musicStops = M.audio.musicStops + 1 end M.audio.music = nil end
 function GetCVar(name) return M.audio.cvars[name] end
-function SetCVar(name, value) if M.audio.lockCVars then return end M.audio.cvars[name] = tostring(value) M.audio.sets = (M.audio.sets or 0) + 1 end
-M.audio.cvars.Sound_MusicVolume = "0.8"
+function SetCVar(name, value)
+  if M.audio.lockCVars then return end
+  M.audio.cvars[name] = tostring(value)
+  M.audio.sets = (M.audio.sets or 0) + 1
+  M.audio.cvarWrites[#M.audio.cvarWrites + 1] = { name, tostring(value), M.now }
+end
+C_Sound = {
+  IsPlaying = function(handle)
+    if M.audio.stopped[handle] ~= nil then return false end
+    for _, p in ipairs(M.audio.played) do
+      if p.handle == handle then return M.now < p.at + p.length end
+    end
+    return false
+  end,
+  PlaySoundWithOptions = function(params)
+    assert(type(params) == "table" and type(params.soundKitID) == "number", "PlaySoundWithOptions(params)")
+    M.audio.next = M.audio.next + 1
+    M.audio.kits[#M.audio.kits + 1] = { id = params.soundKitID, volume = params.volumeOverride }
+    return true, M.audio.next
+  end,
+}
+function M.setSpoken(playing, errors)
+  if playing == nil then Spoken = nil; return end
+  Spoken = { IsPlaying = function()
+    if errors then error("Spoken failed") end
+    return playing == true
+  end }
+end
 M.shots = 0
 function Screenshot() M.shots = M.shots + 1 end
 function UnitHealth(t) if M.secretHealth then return M.secret() end return t == "player" and (M.myHealth or 100) or 100 end
@@ -183,6 +228,11 @@ Enum = {
   DamageMeterSourceDisplayType = { None = 0, Ally = 1, Enemy = 2 },
   PvPMatchState = { Inactive = 0, Waiting = 1, StartUp = 2, Engaged = 3, PostRound = 4, Complete = 5 },
   SpellBookSpellBank = { Player = 0, Pet = 1 },
+  GameRule = {},
+}
+C_GameRules = {
+  IsHardcoreActive = function() return M.hardcore == true end,
+  IsGameRuleActive = function() return false end,
 }
 for i = 1, 14 do Enum.PvPRanks["Rank_" .. i] = i + 4 end
 TooltipDataProcessor = { AddTooltipPostCall = function(kind, fn) M.tooltipHook = fn end }
@@ -208,6 +258,21 @@ function M.advance(seconds)
   end
   M.wall = M.wall + (target - M.now)
   M.now = target
+end
+
+-- Run exactly one timer so a test can mutate a cooperative job's input between frames.
+function M.runNextTimer()
+  local best
+  for i, t in ipairs(M.timers) do
+    if not best or t.at < M.timers[best].at then best = i end
+  end
+  if not best then return false end
+  local t = table.remove(M.timers, best)
+  M.wall = M.wall + (t.at - M.now)
+  M.now = t.at
+  if t.period then M.timers[#M.timers + 1] = { at = t.at + t.period, fn = t.fn, period = t.period } end
+  t.fn()
+  return true
 end
 
 -- units ---------------------------------------------------------------------
@@ -268,6 +333,10 @@ function GetRealZoneText() if M.secretZone then return M.secret() end return M.z
 function GetSubZoneText() if M.secretZone then return M.secret() end return M.subzone end
 function UnitClass(t) local u = U(t) if not u then return nil end return "Class", u.class or "WARRIOR" end
 function UnitFactionGroup(t) local u = U(t) if not u then return nil end return u.faction or "Alliance" end
+function GetBattlefieldArenaFaction()
+  if M.secretArenaFaction then return M.secret() end
+  return M.arenaFaction
+end
 function UnitCanAttack(a, t) local u = U(t) return u and (u.faction or "Alliance") ~= "Horde" end
 C_PartyInfo = { IsGUIDInGroup = function(g) return M.group[g] == true end }
 function UnitIsDeadOrGhost(t) tally("UnitIsDeadOrGhost") local u = U(t) return u and u.dead == true or false end
@@ -613,6 +682,23 @@ C_PvP.GetBattlefieldFlagPosition = function(index, uiMapID)
   return x, y, f.texture
 end
 
+-- Battleground score widgets. States 2 and 3 carry the enemy flag; state 1 does not. Tests can
+-- change one with M.widget and fire UPDATE_UI_WIDGET with the same payload shape as the client.
+M.widgets = {}
+function M.widget(id, state, text, extra)
+  local row = { state = state, text = text or "0" }
+  for k, v in pairs(extra or {}) do row[k] = v end
+  M.widgets[id] = row
+  return row
+end
+C_UIWidgetManager = {
+  GetIconAndTextWidgetVisualizationInfo = function(id)
+    local row = M.widgets[id]
+    if row and row.secret then return M.secret() end
+    return row
+  end,
+}
+
 -- C_Spell.GetSchoolString: the client joins a mask into one string, and it is the only call that
 -- knows how the game itself words a two-school lockout.
 function GetSchoolStringMock(mask)
@@ -727,11 +813,81 @@ function IsInGuild() return M.inGuild end
 function M.addUnit(token, u) M.units[token] = u if u.guid then M.guids[u.guid] = u end return u end
 
 C_ChatInfo = {
-  RegisterAddonMessagePrefix = function(p) M.prefix = p return 0 end,
+  RegisterAddonMessagePrefix = function(p) M.prefixes = M.prefixes or {}; M.prefixes[p] = true; M.prefix = p return 0 end,
   InChatMessagingLockdown = function() return M.lockdown end,
-  SendAddonMessage = function(prefix, msg, channel) if M.lockdown then return 11 end if M.addonResult ~= 0 then return M.addonResult end M.sentAddon[#M.sentAddon + 1] = { prefix, msg, channel, M.now } return 0 end,
+  SendAddonMessage = function(prefix, msg, channel, target)
+    if M.lockdown then return 11 end
+    if M.syncOffline and target and M.syncOffline[target] then
+      M.fire("CHAT_MSG_SYSTEM", "No player named '" .. target .. "' is currently playing.")
+    end
+    if M.addonResult ~= 0 then return M.addonResult end
+    M.sentAddon[#M.sentAddon + 1] = { prefix, msg, channel, M.now, target }
+    if M.addonRouter then return M.addonRouter(prefix, msg, channel, target) end
+    return 0
+  end,
   SendChatMessage = function(msg, channel) M.sentChat[#M.sentChat + 1] = { msg, channel } end,
+  GetChannelRosterInfo = function(index, at)
+    local row = M.channelRoster[at]
+    if type(row) == "table" then return row.name, false, false, row.guid end
+    return row
+  end,
 }
+
+ERR_CHAT_PLAYER_NOT_FOUND_S = "No player named '%s' is currently playing."
+local function addChatFilter(event, fn)
+  M.chatFilters[event] = M.chatFilters[event] or {}
+  M.chatFilters[event][#M.chatFilters[event] + 1] = fn
+end
+ChatFrameUtil = { AddMessageEventFilter = addChatFilter }
+ChatFrame_AddMessageEventFilter = addChatFilter
+
+-- The client invokes one filter once for each chat frame. Return how many frames hid the line.
+function M.applyChatFilters(event, message, frames, ...)
+  local hidden = 0
+  for _ = 1, frames or 1 do
+    for _, fn in ipairs(M.chatFilters[event] or {}) do
+      local ok, result = pcall(fn, {}, event, message, ...)
+      if not ok then error(result) end
+      if result == true then hidden = hidden + 1 break end
+    end
+  end
+  return hidden
+end
+
+function securecall(fn, ...)
+  M.secureCalls = (M.secureCalls or 0) + 1
+  return fn(...)
+end
+
+function GetChannelList()
+  if not M.channelJoined then return end
+  return 9, "GodslayerHunters", M.channelSuspended == true
+end
+function JoinChannelByName(name, password, frameID, hasVoice)
+  M.joinCalls = (M.joinCalls or 0) + 1
+  M.joinArgs = { name, password, frameID, hasVoice }
+  if M.channelRefused then return false end
+  if name == "GodslayerHunters" then M.channelJoined = true return 9 end
+  return false
+end
+function LeaveChannelByName(name)
+  M.leaveCalls = (M.leaveCalls or 0) + 1
+  if name == "GodslayerHunters" then M.channelJoined = false return true end
+  return false
+end
+function GetNumDisplayChannels() return M.channelJoined and 2 or 1 end
+function GetChannelDisplayInfo(index)
+  if index == 1 then return "General", false, false, 1, 20, true, "CHANNEL_CATEGORY_WORLD", "CHANNEL_TYPE_SYSTEM" end
+  if index == 2 and M.channelJoined and not M.channelSuspended then
+    return "GodslayerHunters", false, false, 9, M.channelRosterCount or #M.channelRoster, true, "CHANNEL_CATEGORY_CUSTOM", "CHANNEL_TYPE_CUSTOM"
+  end
+end
+function SetSelectedDisplayChannel(index)
+  M.selectedDisplay = index
+  M.selectedDisplays = M.selectedDisplays or {}
+  M.selectedDisplays[#M.selectedDisplays + 1] = index
+  return true
+end
 
 -- frames --------------------------------------------------------------------
 local frameMT = {}
@@ -751,7 +907,8 @@ frameMT.__index = function(self, key)
     GetText = function(f) return f.__text end,
     GetName = function(f) return f.__name end,
     GetParent = function(f) return f.__parent end,
-    GetWidth = function() return 140 end,
+    GetWidth = function(f) return f.__width or 140 end,
+    GetHeight = function(f) return f.__height or 0 end,
     GetCenter = function() return 0, 0 end,
     GetEffectiveScale = function() return 1 end,
     CreateFontString = function(f) return M.newFrame("FontString", nil, f) end,
@@ -764,6 +921,14 @@ frameMT.__index = function(self, key)
     SetAlpha = function(f, a) f.__alpha = a end,
     GetAlpha = function(f) return f.__alpha or 1 end,
     SetWidth = function(f, w) f.__width = w end,
+    SetHeight = function(f, h) f.__height = h end,
+    SetSize = function(f, w, h) f.__width, f.__height = w, h end,
+    SetWordWrap = function(f, value) f.__wordWrap = value == true end,
+    SetPoint = function(f, ...)
+      f.__points = f.__points or {}
+      f.__points[#f.__points + 1] = { ... }
+    end,
+    ClearAllPoints = function(f) f.__points = {} end,
     SetTexture = function(f, path) if M.failTexture then error("no texture") end f.__texture = path end,
     SetVertexColor = function(f, r, g, b) f.__color = { r, g, b } end,
     SetTextColor = function(f, r, g, b) f.__color = { r, g, b } end,
@@ -789,6 +954,50 @@ WorldFrame = M.newFrame("Frame", "WorldFrame")
 function GetPhysicalScreenSize() return 2560, 1440 end
 Minimap = M.newFrame("Frame", "Minimap")
 GameTooltip = M.newFrame("GameTooltip", "GameTooltip")
+
+-- The modern Settings surface used by the add-on page. Controls retain their proxy setting so a
+-- test can exercise exactly the getter/setter registered with the client.
+M.settings = { categories = {}, controls = {} }
+Settings = {
+  VarType = { Number = "number", Boolean = "boolean", String = "string" },
+  RegisterVerticalLayoutCategory = function(name)
+    local category, layout = { name = name }, { initializers = {} }
+    function layout:AddInitializer(initializer) self.initializers[#self.initializers + 1] = initializer end
+    category.layout = layout
+    M.settings.categories[#M.settings.categories + 1] = category
+    return category, layout
+  end,
+  RegisterAddOnCategory = function(category) category.registered = true end,
+  RegisterProxySetting = function(category, variable, kind, name, default, get, set)
+    local setting = { category = category, variable = variable, kind = kind, name = name, default = default, get = get, set = set }
+    category.settings = category.settings or {}
+    category.settings[#category.settings + 1] = setting
+    return setting
+  end,
+  CreateSliderOptions = function(min, max, step) return { min = min, max = max, step = step } end,
+  CreateSlider = function(category, setting, options, tooltip)
+    local control = { type = "slider", category = category, setting = setting, options = options, tooltip = tooltip }
+    M.settings.controls[#M.settings.controls + 1] = control
+    return control
+  end,
+  CreateCheckbox = function(category, setting, tooltip)
+    local control = { type = "checkbox", category = category, setting = setting, tooltip = tooltip }
+    M.settings.controls[#M.settings.controls + 1] = control
+    return control
+  end,
+  CreateDropdown = function(category, setting, options, tooltip)
+    local control = { type = "dropdown", category = category, setting = setting, options = options, tooltip = tooltip }
+    M.settings.controls[#M.settings.controls + 1] = control
+    return control
+  end,
+  CreateControlTextContainer = function()
+    local c = { rows = {} }
+    function c:Add(value, label) self.rows[#self.rows + 1] = { value = value, label = label } end
+    function c:GetData() return self.rows end
+    return c
+  end,
+}
+function CreateSettingsListSectionHeaderInitializer(text) return { type = "header", text = text } end
 
 function M.fire(event, ...)
   for _, f in ipairs(M.frames) do

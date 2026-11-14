@@ -36,7 +36,9 @@ local heardHandle -- a groupmate's line in the air, which your own kill call may
 local function play(n)
   if not (ns.WHEEL and ns.WHEEL.clips["wheel_" .. n]) then return false end
   if plain(try(GetCVar, "Sound_EnableAllSound")) == "0" then return false end
-  local ok, handle = try(PlaySoundFile, SOUNDS .. "wheel_" .. n .. ".ogg", opts().channel or "Master")
+  local length = ns.WHEEL.clips["wheel_" .. n]
+  local playFile = ns.Sound and ns.Sound.PlayFile or PlaySoundFile
+  local ok, handle = try(playFile, SOUNDS .. "wheel_" .. n .. ".ogg", opts().channel or "Master", length)
   return plain(ok) and true or false, plain(handle)
 end
 

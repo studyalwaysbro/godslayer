@@ -3,7 +3,7 @@
 Written by `tools/build_secrecy_map.lua` from the client's own generated API documentation.
 Do not edit by hand.
 
-Interface source: `9dc84f0 1.60.1 (70862)`. Newest client data in the cache: `1.60.1.70862`.
+Interface source: `bebcb6b 1.60.1 (70938)`. Newest client data in the cache: `1.60.1.70938`.
 642 documentation tables loaded from 642 files.
 
 The interface source lags the installed client. A function added since the commit above will

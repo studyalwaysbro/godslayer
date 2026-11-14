@@ -14,7 +14,7 @@ M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torch
                       race = "Scourge", sex = 2, faction = "Horde", isMe = true })
 M.spells = { [11366] = "Pyroblast", [133] = "Fireball", [2948] = "Scorch", [348] = "Immolate" }
 local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua",
-                "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua",
+                "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Hunters.lua",
                 "Rival.lua", "Wheel.lua", "UI.lua" }
 local ns = M.load("Godslayer", FILES)
 M.fire("ADDON_LOADED", "Godslayer")

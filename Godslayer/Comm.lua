@@ -43,12 +43,19 @@ end
 
 local function statsMessage()
   local c = ns.char
+  local stats = ns.Hunters and ns.Hunters.OwnStats and ns.Hunters.OwnStats() or c
+  local uniques = math.min(math.max(0, math.floor(tonumber(c.uniques) or 0)), stats.kills or 0)
   -- The rung goes on the END, after the token. A copy of an older version destructures eleven
   -- fields and finds its own token at position eleven exactly as before, so it still drops its
   -- own echo; the twelfth is simply thrown away. Appending is the only safe way to widen this.
   local rung = ns.Rank and tonumber(ns.Rank.Level and ns.Rank.Level()) or nil
-  return table.concat({ "S", PROTO, c.kills, c.points, c.uniques, c.kb, c.orig, c.class or "",
-                        ns.VERSION, c.kings or 0, token, rung or "" }, ";")
+  local fields = { "S", PROTO, stats.kills, stats.points, uniques, stats.kb, stats.orig, c.class or "",
+                   ns.VERSION, stats.kings, token, rung or "" }
+  -- Schema 3 is an appended tail. The first twelve fields never move, so a 1.x/2.x client still
+  -- finds its echo token at eleven and simply ignores the fields it does not know.
+  local tail = ns.Hunters and ns.Hunters.GuildTail and ns.Hunters.GuildTail()
+  if tail then for i = 1, #tail do fields[#fields + 1] = tail[i] end end
+  return table.concat(fields, ";")
 end
 
 local function broadcast()
@@ -159,6 +166,38 @@ function Comm.Threat(name, class, guild, zone)
 end
 Comm.PendingThreats = function() return #pendingThreats end
 
+-- Inbound K reports are untrusted guild traffic. A healthy sender can emit at most one every
+-- THREAT_GAP seconds, so twelve reports of burst room is generous; after that the bucket refills
+-- at exactly the legitimate outbound cadence. Exact replays get a separate short dedupe window.
+local INBOUND_THREAT_BURST, INBOUND_THREAT_REFILL = 12, THREAT_GAP
+local INBOUND_THREAT_DEDUPE, INBOUND_SENDER_KEEP = 30, 3600
+local inboundThreat = {}
+local function acceptThreat(who, a, b, c, d)
+  local now = plain(try(GetTime))
+  if type(now) ~= "number" then return false end
+  for sender, old in pairs(inboundThreat) do
+    if now - old.last > INBOUND_SENDER_KEEP then inboundThreat[sender] = nil end
+  end
+  local state = inboundThreat[who]
+  if not state then
+    state = { tokens = INBOUND_THREAT_BURST, last = now, seen = {} }
+    inboundThreat[who] = state
+  else
+    state.tokens = math.min(INBOUND_THREAT_BURST,
+      state.tokens + math.max(0, now - state.last) / INBOUND_THREAT_REFILL)
+    state.last = now
+  end
+  local key = table.concat({ a or "", b or "", c or "", d or "" }, "\031")
+  for report, when in pairs(state.seen) do
+    if now - when >= INBOUND_THREAT_DEDUPE then state.seen[report] = nil end
+  end
+  if state.seen[key] then return false end
+  if state.tokens < 1 then return false end
+  state.tokens = state.tokens - 1
+  state.seen[key] = now
+  return true
+end
+
 -- The chat wheel, for the people you are grouped with: their Godslayer plays the same line.
 function Comm.Wheel(n)
   if not (C_ChatInfo and C_ChatInfo.SendAddonMessage) or lockedDown() then return false end
@@ -181,12 +220,14 @@ function Comm.handlers.CHAT_MSG_ADDON(prefix, text, channel, sender)
   local who = shortName(sender):gsub("|", ""):sub(1, 48) -- no escape codes in the roster
   if who == ns.myName or sender == ns.myName then return end -- our own message echoed back
 
-  local kind, proto, a, b, c, d, e, class, ver, kings, tag, rung = strsplit(";", text)
+  local fields = { strsplit(";", text) }
+  local kind, proto, a, b, c, d, e, class, ver, kings, tag, rung = unpack(fields, 1, 12)
   if tonumber(proto) ~= PROTO then return end
   -- the group hears the wheel; everything else is the guild's
   if (kind == "W") ~= (channel ~= "GUILD") then return end
   if kind == "K" then
     if e == token then return end
+    if not acceptThreat(who, a, b, c, d) then return end
     if ns.Threat then
       local ok, err = pcall(ns.Threat.Heard, who, a, b, c, d)
       if not ok then ns.errors = (ns.errors or 0) + 1 ns.Log("error", "threat: " .. tostring(err)) end
@@ -218,6 +259,24 @@ function Comm.handlers.CHAT_MSG_ADDON(prefix, text, channel, sender)
     -- catching: fewer points than kills is what a 2.4-2.6 client honestly reports after scoring
     -- open-ring kills at zero, and rejecting it silently dropped those guildmates off the board.
     if points > kills * ns.ORIGINAL_POINTS or uniques > kills or kb > kills or orig > kills then return end
+    local incomingKings = math.min(count(kings) or 0, orig)
+    local schema3
+    if fields[13] ~= nil then
+      -- Same rule as the first twelve: later schemas only append. A newer client's message keeps
+      -- fields 13-20 as they are here, so read those and leave whatever follows to its own version.
+      local schema = tonumber(fields[13])
+      if not schema or schema < 3 or schema ~= math.floor(schema) or #fields < 20
+         or not (ns.Hunters and ns.Hunters.Unbase36) then return end
+      local un = ns.Hunters.Unbase36
+      local gen, seq, made, week = un(fields[14]), un(fields[15]), un(fields[16]), un(fields[17])
+      local complete, wkKills, wkPoints = un(fields[18], 1), un(fields[19], 1e7), un(fields[20], 1e7)
+      local server = type(GetServerTime) == "function" and tonumber(plain(try(GetServerTime))) or time()
+      if not (gen and seq and made and week and complete and wkKills and wkPoints)
+         or made > server + 300 or wkKills > kills or wkPoints > points then return end
+      schema3 = { gen=gen, seq=seq, made=made, week=week, complete=complete, wkKills=wkKills, wkPoints=wkPoints }
+    elseif #fields > 12 then
+      return
+    end
     local guild = guildName()
     if not guild then return end
     local db = GodslayerDB
@@ -225,6 +284,20 @@ function Comm.handlers.CHAT_MSG_ADDON(prefix, text, channel, sender)
     -- their score went up since we last heard from them: that is a kill worth knowing about.
     -- A first sighting or a stale record is not, or logging in would announce everyone.
     local before = db.roster[guild][who]
+    -- Once a schema-3 row exists, an old laptop cannot replace it with an unordered legacy row.
+    -- Equal tuples refresh only when every statistic agrees; a higher sequence in one generation
+    -- must keep lifetime totals monotone. A higher generation is the explicit-reset escape hatch.
+    if before and before.schema == 3 then
+      if not schema3 then return end
+      if schema3.gen < before.gen or (schema3.gen == before.gen and schema3.seq < before.seq) then return end
+      if schema3.gen == before.gen and schema3.seq == before.seq then
+        if kills ~= before.kills or points ~= before.points or uniques ~= before.uniques or kb ~= before.kb
+           or orig ~= before.orig or incomingKings ~= before.kings or class ~= before.class
+           or tonumber(rung) ~= before.rung or schema3.week ~= before.week or schema3.complete ~= before.complete
+           or schema3.wkKills ~= before.wkKills or schema3.wkPoints ~= before.wkPoints then return end
+      elseif schema3.gen == before.gen and (kills < before.kills or points < before.points or uniques < before.uniques
+          or kb < before.kb or orig < before.orig or incomingKings < before.kings) then return end
+    end
     local gained = before and time() - (before.t or 0) < 6 * 3600 and points - (before.points or 0) or 0
     local newKills = before and kills - (before.kills or 0) or 0
     -- points with no kills behind them, or more than a handful at once, are a recount or a lie, not a kill
@@ -232,16 +305,22 @@ function Comm.handlers.CHAT_MSG_ADDON(prefix, text, channel, sender)
       local ok, err = pcall(ns.Hype.Ally, who, gained)
       if not ok then ns.errors = (ns.errors or 0) + 1 ns.Log("error", "hype ally: " .. tostring(err)) end
     end
-    db.roster[guild][who] = {
+    local stored = {
       kills = kills, points = points, uniques = uniques, kb = kb, orig = orig,
       class = (type(class) == "string" and class:match("^%u+$")) and class or nil,
       ver = type(ver) == "string" and ver:match("^[%w%.%-]+$") and ver:sub(1, 12) or nil,
-      kings = math.min(count(kings) or 0, orig),
+      kings = incomingKings,
       -- fourteen rungs, and anything outside them is not this ladder, so it is not kept
       rung = (function(v) v = tonumber(v) return (v and v >= 0 and v <= 14 and v == math.floor(v)) and v or nil end)(rung),
       t = time(),
     }
-    noteVersion(db.roster[guild][who].ver)
+    if schema3 then
+      stored.schema, stored.gen, stored.seq, stored.made = 3, schema3.gen, schema3.seq, schema3.made
+      stored.week, stored.complete, stored.wkKills, stored.wkPoints = schema3.week, schema3.complete, schema3.wkKills, schema3.wkPoints
+      if ns.Hunters then ns.Hunters.NoteCandidate(who, "guild") end
+    end
+    db.roster[guild][who] = stored
+    noteVersion(stored.ver)
     if ns.OnChanged then ns.OnChanged() end
   end
 end

@@ -124,7 +124,7 @@ end
 
 local hunt          -- { kills, turn, run, bestRun, points, gods, started }
 local fight         -- a fight with a player is on, or was a moment ago: { started, turn, god }
-local track         -- the music this addon started: { music = "music" | handle, theme, phase }; a fight or a hunt holds it
+local track         -- the music this addon started: { music = "music" | handle, path, theme, phase }; fight/hunt holds it
 local engageGen = 0 -- moves on whenever a fight ends, so a word still waiting to be said about it is not
 local songs         -- every song found this session; false once we know there are none
 local lastSong      -- the last one that opened a fight: with a choice, never the same twice running
@@ -258,7 +258,8 @@ Hype.ClipLength = clipLength
 -- A sound under the voice: the crowd, a horn, a fanfare. Never needed, so never an error.
 local function sfx(name)
   if not name or not opts().sfx or not soundOn() or not (ns.SFX and ns.SFX[name]) then return false end
-  return plain(try(PlaySoundFile, SOUNDS .. "sfx\\" .. name .. ".ogg", opts().channel)) and true or false
+  local play = ns.Sound and ns.Sound.PlayFile or PlaySoundFile
+  return plain(try(play, SOUNDS .. "sfx\\" .. name .. ".ogg", opts().channel, ns.SFX[name])) and true or false
 end
 Hype.Sfx = sfx
 
@@ -295,10 +296,12 @@ end
 local function playNow(clip, pack)
   local channel = opts().channel
   local own, handle
+  local length = clipLength(clip, pack)
+  local play = ns.Sound and ns.Sound.PlayFile or PlaySoundFile
   local dir = voiceDir()
-  if dir then own, handle = try(PlaySoundFile, dir .. pack .. "\\" .. clip .. ".ogg", channel) end
-  if not plain(own) then own, handle = try(PlaySoundFile, OWN .. "voice\\" .. pack .. "\\" .. clip .. ".ogg", channel) end
-  if not plain(own) then own, handle = try(PlaySoundFile, SOUNDS .. pack .. "\\" .. clip .. ".ogg", channel) end
+  if dir then own, handle = try(play, dir .. pack .. "\\" .. clip .. ".ogg", channel, length) end
+  if not plain(own) then own, handle = try(play, OWN .. "voice\\" .. pack .. "\\" .. clip .. ".ogg", channel, length) end
+  if not plain(own) then own, handle = try(play, SOUNDS .. pack .. "\\" .. clip .. ".ogg", channel, length) end
   return plain(handle)
 end
 
@@ -352,7 +355,9 @@ pump = function()
   end
   local item = table.remove(queue, 1)
   -- said late is worse than not said: the voice never trails the fight
-  while item and GetTime() - (item[5] or GetTime()) > (item[2] < 2 and STALE_REMARK or STALE) do item = table.remove(queue, 1) end
+  while item and GetTime() - (item[5] or GetTime()) > (item[7] or (item[2] < 2 and STALE_REMARK or STALE)) do
+    item = table.remove(queue, 1)
+  end
   if not item then return end
   local length = clipLength(item[1], item[3]) or 1.5
   sfx(item[4])
@@ -406,9 +411,9 @@ function Hype.Speaking() return #queue > 0 or GetTime() < busyUntil end
 
 -- One line asked for by another part of the addon. A pack with no such clip stays silent,
 -- which is what lets a new call ship with its banner before its voice is built.
-function Hype.Say(clip, weight)
+function Hype.Say(clip, weight, maxAge)
   if type(clip) ~= "string" then return false end
-  speak({ { clip, tonumber(weight) or 2 } })
+  speak({ { clip, tonumber(weight) or 2, nil, nil, nil, nil, tonumber(maxAge) } })
   return true
 end
 function Hype.Queued()
@@ -466,11 +471,11 @@ local function startMusic()
   if plain(try(GetCVar, "Sound_EnableMusic")) ~= "0" and type(PlayMusic) == "function" then
     -- a client that says no plays it as a sound instead, below
     local ok, will = pcall(PlayMusic, path)
-    if ok and plain(will) ~= false then return "music", theme end
+    if ok and plain(will) ~= false then return "music", theme, path end
   end
   -- music is switched off in the options: play it as an ordinary sound instead
   local willPlay, handle = try(PlaySoundFile, path, "Master")
-  if plain(willPlay) and plain(handle) then return handle, theme end
+  if plain(willPlay) and plain(handle) then return handle, theme, path end
   return nil
 end
 
@@ -490,9 +495,9 @@ end
 -- Written down while it plays, so a reload or a crash mid-fight cannot leave your song on forever.
 local function holdMusic()
   if track then return track end
-  local music, theme = startMusic()
+  local music, theme, path = startMusic()
   if music then
-    track = { music = music, theme = theme, phase = 1 }
+    track = { music = music, path = path, theme = theme, phase = 1 }
     if music == "music" then opts().playing = true end
   end
   return track
@@ -504,6 +509,23 @@ local function dropMusic()
   local t = track
   track = nil
   stopMusic(t.music)
+end
+
+-- A fight may start before the target's guild tag is readable. Once that existing fight first
+-- becomes Olympian, the signature is no longer a future-song choice: replace the rotation track
+-- through the same drop/hold path, which preserves the music option, duck restore and sound fade.
+local function switchToSignature()
+  if not track then return end
+  local list = findSong()
+  local signature = list and list[1]
+  if not signature or track.path == signature then return end
+  local volume = musicVolume()
+  local keepDucked = ducked and volume and math.abs(volume - ducked[2]) <= 0.02
+  local now = plain(try(GetTime))
+  local duckFor = keepDucked and type(now) == "number" and math.max(0.2, busyUntil - now + OVERLAP) or nil
+  dropMusic()
+  holdMusic() -- fight.god is already true, so pickSong selects the signature
+  if duckFor and track then duck(duckFor) end
 end
 
 local function settle()
@@ -1123,7 +1145,7 @@ function Hype.Engage(info, pretend)
   local god = info.tier ~= nil and not fight.god
   -- the fight goes on: only an Olympian joining it is news
   if not fresh and not god then return true end
-  if god then fight.god = true end
+  if god then fight.god = true; switchToSignature() end
   if hunt and not hunt.pretend and not pretend then return true end -- a hunt is on: it has the music and the voice already
   local before = track
   holdMusic()
@@ -1445,7 +1467,11 @@ function Hype.Command(rest)
   word, value = word:lower(), value:lower()
   if word == "on" or word == "off" then
     o.on = word == "on"
-    if not o.on then waiting = {} auditionTurn = auditionTurn + 1 fight = nil endHunt("off") settle() end
+    if not o.on then
+      waiting = {}; auditionTurn = auditionTurn + 1; fight = nil
+      hush() -- queued lines must not wake up after the global announcer switch has been turned off
+      endHunt("off"); settle()
+    end
     hushed = false
     say("Kill song and announcer " .. (o.on and "on." or "off."))
   elseif SWITCHES[word] then

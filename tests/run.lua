@@ -10,7 +10,7 @@ local function eq(a, b, label) check(a == b, label .. " (got " .. tostring(a) ..
 local ME = "Player-1-0000AAAA"
 M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE", race = "Scourge", sex = 2, faction = "Horde" })
 
-local ns = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
+local ns = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Sound.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Hunters.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "SomethingElse")
 check(GodslayerDB == nil, "ignores other addons loading")
 M.fire("PARTY_KILL", ME, "Player-1-00000001") -- before init: must not error
@@ -181,7 +181,7 @@ eq(c.kills, 9, "nameless honor line does nothing")
 
 -- 15. guild sync ---------------------------------------------------------------
 M.advance(40)
-check(M.prefix == "Godslayer", "prefix registered")
+check(M.prefixes and M.prefixes.Godslayer and M.prefixes.GodslayerG, "guild and Hunters prefixes registered")
 local sawHello, sawStats = false, false
 for _, m in ipairs(M.sentAddon) do
   if m[2]:match("^H;1") then sawHello = true end
@@ -198,7 +198,7 @@ check(sawStats and sawStats:match("^S;1;9;17;8;6;2;MAGE;" .. ns.VERSION:gsub("%.
 local fields = { strsplit(";", sawStats or "") }
 local myTag = fields[11]
 check(type(myTag) == "string" and myTag:match("^%x%x%x%x%x%x$"), "the token is the eleventh field: " .. tostring(myTag))
-check(#fields == 12, "and the rung is the twelfth (" .. #fields .. " fields)")
+check(#fields == 20 and fields[13] == "3", "schema-3 guild tail follows the original twelve fields (" .. #fields .. " fields)")
 M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;400;400;400;0;0;MAGE;1.0.0;0;" .. myTag, "GUILD", "Vesh")  -- own echo under a shorter name
 M.fire("CHAT_MSG_ADDON", "Godslayer", "H;1;" .. myTag, "GUILD", "Vesh")
 M.fire("CHAT_MSG_ADDON", "Godslayer", "S;1;10;22;8;4;3;WARRIOR;1.0.0", "GUILD", "Brakka Ashmane")
@@ -606,7 +606,7 @@ checkPhrases("1 kill")
 local saved = GodslayerDB
 M.frames, M.timers = { UIParent, Minimap, GameTooltip }, {}
 GodslayerFrame, GodslayerMinimapButton = nil, nil
-local ns2 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
+local ns2 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Hunters.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
 check(GodslayerDB == saved and ns2.char.kills == 1, "totals reload from saved variables")
 eq(GodslayerDB.version, 2, "data version")
@@ -624,7 +624,7 @@ do
   }
   M.frames, M.timers = { UIParent, Minimap, GameTooltip }, {}
   GodslayerFrame, GodslayerWindow, GodslayerMinimapButton, M.failTemplate = nil, nil, nil, nil
-  local ns3 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
+  local ns3 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Hunters.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer"); M.fire("PLAYER_LOGIN")
   local c3 = ns3.char
   eq(GodslayerDB.version, 2, "old data is marked as migrated"); eq(c3.kills, 2, "old kills kept"); eq(c3.points, 10, "old points kept")
@@ -654,11 +654,11 @@ do
   local mine
   for _, m in ipairs(M.sentAddon) do if m[2]:match("^S;1;") then mine = m[2] end end
   local fields = { strsplit(";", mine) }
-  -- Twelve since 2.6.0, and the twelfth is the only one that may be added: the token has to stay
-  -- at eleven or every 1.0.0 copy on the realm stops recognising its own echo and starts counting
-  -- itself as a guildmate.
-  eq(#fields, 12, "our stats message is the 1.0.0 shape plus the appended rung")
+  -- The schema-3 tail follows the legacy twelve. The token stays at eleven, so a 1.0.0 copy still
+  -- recognises its own echo and ignores everything after the fields it knows.
+  eq(#fields, 20, "our stats message is the legacy shape plus the schema-3 tail")
   check(fields[11]:match("^%x%x%x%x%x%x$"), "the token is still the eleventh field")
+  eq(fields[13], "3", "guild tail identifies schema 3")
 
   -- thousands of victims: only the newest feuds keep kill-by-kill history, every total stays
   local victims, extra = c3.victims, ns3.DETAIL_CAP + 120
@@ -703,7 +703,7 @@ do
   local OWN = "Interface\\AddOns\\GodslayerMusic\\"
   local SONG = OWN .. "kill.mp3"
   M.frames = {} -- one client, one copy of the addon: the copies loaded earlier in this file stop listening
-  local ns4 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
+  local ns4 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Hunters.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer") M.fire("PLAYER_LOGIN")
   local H = ns4.Hype
   local realToday, realPoints = ns4.KillsToday, ns4.char.points
@@ -951,6 +951,9 @@ do
   for _, clip in ipairs(H.Queued()) do if clip:find("^godslayer") or clip:find("^beyond_godlike") or clip:find("^unstoppable") then hasCall = true end end
   check(hasCall, "a new kill's call gets in ahead of older points: " .. table.concat(H.Queued(), ","))
   check(#H.Queued() <= 7, "without growing the queue")
+  say("hype off")
+  eq(#H.Queued(), 0, "the global off switch discards lines already waiting in the announcer queue")
+  say("hype on")
 
   -- switching it off while a kill is waiting to be called
   reset()
@@ -1213,7 +1216,7 @@ do
   ns4.KillsToday, ns4.char.points = realToday, realPoints
   A.files[SONG] = true
   M.frames = {}
-  local ns5 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
+  local ns5 = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Hunters.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
   M.fire("ADDON_LOADED", "Godslayer") M.fire("PLAYER_LOGIN")
   H = ns5.Hype
   A.played, A.stopped, A.music, A.musicStops = {}, {}, nil, 0
@@ -1342,6 +1345,219 @@ do
   eq(ns5.errors, nil, "no errors in the hype section") eq(ns4.errors, nil, "nor in the first copy")
   ns2 = ns5
 end
+
+-- Focused regressions for the post-2.9 review. Each copy starts with an empty client so event
+-- ordering, saved-data migration and comm throttles cannot inherit state from the long scenario.
+local REGRESSION_FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Sound.lua", "Stage.lua", "Clip.lua", "Hype.lua",
+  "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Flag.lua", "Control.lua",
+  "Death.lua", "Threat.lua", "Comm.lua", "Hunters.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
+local function freshRegression()
+  M.now, M.wall, M.timers, M.units, M.guids, M.group = 1000, 1791400000, {}, {}, {}, {}
+  M.frames, M.sentAddon, M.sentChat, M.printed = { UIParent, Minimap, GameTooltip }, {}, {}, {}
+  M.inGuild, M.lockdown, M.inCombat, M.hk, M.dk, M.renown = true, false, false, 0, 0, nil
+  M.zone, M.subzone, M.myLevel = "Stranglethorn Vale", "Nesingwary's Expedition", 30
+  M.audio.played, M.audio.stopped, M.audio.music, M.audio.musicStops = {}, {}, nil, 0
+  GodslayerDB, GodslayerFrame, GodslayerWindow, GodslayerMinimapButton, GodslayerHypeBanner = nil, nil, nil, nil, nil
+  M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torchmen", class = "MAGE",
+                        race = "Scourge", sex = 2, faction = "Horde", isMe = true })
+  local copy = M.load("Godslayer", REGRESSION_FILES)
+  M.fire("ADDON_LOADED", "Godslayer")
+  M.fire("PLAYER_LOGIN")
+  return copy
+end
+
+-- Regression 1: late hidden PARTY_KILL upgrades the credit already matched to this victim.
+do
+  local copy = freshRegression()
+  copy.Hype.Opts().mode = "blows"
+  local victim = M.addUnit("target", { name = "Late Hidden Blow", guid = "Player-1-00AA0001", guild = "OLYMPUS",
+                                       class = "WARRIOR", faction = "Alliance" })
+  M.fire("PLAYER_TARGET_CHANGED")
+  M.hk = M.hk + 1
+  M.fire("PLAYER_PVP_KILLS_CHANGED", "player")
+  M.advance(0.1)
+  M.fire("UNIT_DIED", victim.guid)
+  eq(copy.char.kills, 1, "regression 1 setup: credit and death score one kill")
+  eq(copy.char.kb, 0, "regression 1 setup: it is not a killing blow yet")
+  check(not copy.Hype.Active(), "regression 1 setup: blows-only hunt has not started")
+  M.advance(0.1)
+  M.fire("PARTY_KILL", ME, M.secret())
+  eq(copy.char.kills, 1, "regression 1: late hidden PARTY_KILL never counts a second kill")
+  eq(copy.char.kb, 1, "regression 1: late hidden PARTY_KILL upgrades the matched victim")
+  check(copy.Hype.Active() and copy.Hype.Kills() == 1, "regression 1: late hidden PARTY_KILL starts blows-only hunt")
+end
+
+-- Regression 2: a hidden event is not proof of a killing blow when the window has another
+-- plausible event or more than one hidden candidate.
+do
+  local copy = freshRegression()
+  copy.Hype.Opts().mode = "blows"
+  M.fire("PARTY_KILL", ME, M.secret()) -- this can be the creature the player killed just before
+  M.advance(0.1)
+  local victim = M.addUnit("target", { name = "Groupmate Victim", guid = "Player-1-00AA0002", guild = "OLYMPUS",
+                                       class = "WARRIOR", faction = "Alliance" })
+  M.fire("PLAYER_TARGET_CHANGED")
+  M.fire("UNIT_DIED", victim.guid)
+  M.hk = M.hk + 1
+  M.fire("PLAYER_PVP_KILLS_CHANGED", "player")
+  M.advance(0.7)
+  eq(copy.char.kills, 1, "regression 2 setup: the groupmate credit still scores its visible victim")
+  eq(copy.char.kb, 0, "regression 2: hidden creature plus visible death is not a killing blow")
+  check(not copy.Hype.Active(), "regression 2: ambiguous visible match does not start blows-only hunt")
+
+  copy = freshRegression()
+  copy.Hype.Opts().mode = "blows"
+  M.fire("PARTY_KILL", ME, M.secret())
+  M.advance(0.1)
+  M.fire("PARTY_KILL", ME, M.secret())
+  M.advance(0.1)
+  M.hk = M.hk + 1
+  M.fire("PLAYER_PVP_KILLS_CHANGED", "player")
+  M.advance(9)
+  local unknown = copy.char.victims[copy.UNKNOWN_VICTIM_ID]
+  eq(unknown and unknown.kills, 1, "regression 2: one credit among hidden candidates still scores one kill")
+  eq(unknown and unknown.kb, 0, "regression 2: multiple hidden candidates are not a killing blow")
+  check(not copy.Hype.Active(), "regression 2: multiple candidates do not start blows-only hunt")
+end
+
+local function latestStats()
+  local found
+  for _, sent in ipairs(M.sentAddon) do if sent[2]:match("^S;1;") then found = sent[2] end end
+  return found
+end
+
+-- Regression 3: every successful change to an exported total or rung dirties guild sync.
+do
+  local copy = freshRegression()
+  local victim = M.addUnit("target", { name = "Late Export Tag", guid = "Player-1-00AA0003", guild = nil,
+                                       class = "WARRIOR", faction = "Alliance" })
+  M.fire("PLAYER_TARGET_CHANGED")
+  M.fire("PARTY_KILL", ME, victim.guid)
+  M.advance(20) -- score as open ring, then let that one-point stats message leave
+  eq(copy.char.points, 1, "regression 3 setup: untagged kill first exports one point")
+  M.sentAddon = {}
+  victim.guild = "OLYMPUS"
+  M.fire("PLAYER_TARGET_CHANGED")
+  eq(copy.char.points, 5, "regression 3 setup: late guild tag upgrades the total")
+  M.advance(10)
+  local stats = latestStats()
+  check(stats and stats:match("^S;1;1;5;"), "regression 3: late score upgrade marks guild sync dirty")
+
+  copy = freshRegression()
+  M.renown = { renownLevel = 6, renownReputationEarned = 100, renownLevelThreshold = 3000 }
+  copy.Rank.Check(false)
+  M.advance(20)
+  M.sentAddon = {}
+  M.renown = { renownLevel = 7, renownReputationEarned = 0, renownLevelThreshold = 4000 }
+  M.fire("PLAYER_PVP_RANK_CHANGED")
+  eq(GodslayerDB.rank.level, 7, "regression 3 setup: changed PvP rung is recorded")
+  M.advance(10)
+  stats = latestStats()
+  local fields = stats and { strsplit(";", stats) } or {}
+  eq(fields[12], "7", "regression 3: changed PvP rung marks guild sync dirty")
+end
+
+-- Regression 4: hostile guild-addon replays cannot inflate or monopolise the threat pool.
+do
+  local copy = freshRegression()
+  local function report(from, name, zone)
+    M.fire("CHAT_MSG_ADDON", "Godslayer",
+      table.concat({ "K", 1, name, "ROGUE", "Bad Guild", zone or "Warsong Gulch", "ffffff" }, ";"),
+      "GUILD", from)
+  end
+  local function entriesFrom(who)
+    local pool, n = copy.Threat.Pool(), 0
+    for _, rec in pairs(pool or {}) do if rec.who and rec.who[who] then n = n + 1 end end
+    return n
+  end
+
+  report("Replay Sender", "Replay Target")
+  report("Replay Sender", "Replay Target")
+  eq(copy.Threat.Of("Replay Target").n, 1, "regression 4: identical inbound threat report is deduped")
+
+  for i = 1, 17 do report("Burst Sender", "Burst Target " .. i) end
+  eq(entriesFrom("Burst Sender"), 12, "regression 4: inbound threat reports have a per-sender token bucket")
+  M.advance(8)
+  report("Burst Sender", "Burst Refilled")
+  eq(entriesFrom("Burst Sender"), 13, "regression 4: threat token bucket refills at the outbound cadence")
+
+  for i = 1, 21 do
+    report("Pool Filler", "Pool Target " .. i)
+    M.advance(8)
+  end
+  eq(entriesFrom("Pool Filler"), 20, "regression 4: one sender can create only twenty pool entries per window")
+  report("Other Reporter", "Other Reporter's Target")
+  eq(entriesFrom("Other Reporter"), 1, "regression 4: one sender's pool cap does not block another sender")
+end
+
+-- Regression 5: old one-off dossiers are compacted into fixed aggregates without shrinking any
+-- lifetime total; Olympus, regicide and repeat-victim records remain addressable.
+do
+  local copy = freshRegression()
+  local c, cap = copy.char, copy.VICTIM_CAP or 10000
+  for i = 1, cap + 5 do
+    c.victims["Player-8-" .. i] = {
+      kills = 1, points = 1, kb = i % 2, first = 1700000000 + i, last = 1700000000 + i,
+      guild = "Ordinary Guild", tier = "any", name = "One Off " .. i, class = "ROGUE",
+      zones = { ["Old Zone"] = 1 }, ranks = { Recruit = 1 }, hours = { [3] = 1 },
+    }
+  end
+  c.victims["Player-8-OLYMPUS"] = { kills = 1, points = 5, kb = 1, ok = 1, first = 1, last = 1,
+    guild = "OLYMPUS", tier = "original", name = "Permanent Olympian", class = "WARRIOR" }
+  c.victims["Player-8-KING"] = { kills = 1, points = 1, kb = 1, first = 2, last = 2,
+    guild = "Ordinary Guild", tier = "any", name = "Permanent King", class = "WARRIOR", king = true }
+  c.victims["Player-8-REPEAT"] = { kills = 2, points = 2, kb = 0, first = 3, last = 3,
+    guild = "Ordinary Guild", tier = "any", name = "Permanent Repeat", class = "MAGE" }
+  copy.Recount()
+  local before = { kills = c.kills, points = c.points, uniques = c.uniques, kb = c.kb, orig = c.orig }
+  M.fire("PLAYER_LOGIN")
+  local records = 0
+  for _ in pairs(c.victims) do records = records + 1 end
+  check(records <= cap, "regression 5: victim records are capped at ten thousand")
+  check(c.victims["Player-8-1"] == nil, "regression 5: least-recently-seen ordinary victim is evicted")
+  check(c.victims["Player-8-OLYMPUS"] and c.victims["Player-8-KING"] and c.victims["Player-8-REPEAT"],
+    "regression 5: Olympus, regicide and repeat-victim records are permanent")
+  copy.Recount()
+  for field, value in pairs(before) do eq(c[field], value, "regression 5: lifetime " .. field .. " survives compaction") end
+  local aggregate = copy.Aggregates()
+  eq(aggregate.kills, c.kills, "regression 5: fixed aggregates retain every compacted kill")
+  check((aggregate.class.ROGUE or 0) >= cap, "regression 5: class aggregate retains evicted victims")
+  check((aggregate.zone["Old Zone"] or 0) >= cap, "regression 5: zone aggregate retains evicted victims")
+
+  local killsBefore, uniquesBefore = c.kills, c.uniques
+  M.addUnit("target", { name = "One Off 1", guid = "Player-8-1", guild = "Ordinary Guild",
+                        class = "ROGUE", faction = "Alliance" })
+  M.fire("PLAYER_TARGET_CHANGED")
+  M.fire("PARTY_KILL", ME, "Player-8-1")
+  eq(c.kills, killsBefore + 1, "regression 5: an evicted victim can be scored again")
+  eq(c.uniques, uniquesBefore, "regression 5: re-killing an evicted GUID does not double the unique total")
+end
+
+-- Regression 6: learning that an existing rotation-song fight is Olympian switches it to the
+-- signature kill.mp3 through the normal stop/start music lifecycle.
+do
+  local own = "Interface\\AddOns\\GodslayerMusic\\"
+  M.audio.files = { [own .. "kill.mp3"] = true, [own .. "kill2.mp3"] = true }
+  local copy = freshRegression()
+  local realRandom = math.random
+  math.random = function(n) return n and n or 0.5 end -- pick the second (rotation) song
+  copy.Hype.Engage({ name = "Unknown Fighter" })
+  eq(M.audio.music, own .. "kill2.mp3", "regression 6 setup: ordinary fight starts on rotation song")
+  copy.Hype.Engage({ name = "Late Olympian", guild = "OLYMPUS", tier = "original" })
+  eq(M.audio.music, own .. "kill.mp3", "regression 6: late Olympian identification switches to signature kill.mp3")
+  eq(M.audio.musicStops, 1, "regression 6: signature switch uses the existing music stop path")
+  math.random = realRandom
+
+  M.audio.files = { [own .. "kill.mp3"] = true, [own .. "kill2.mp3"] = true }
+  copy = freshRegression()
+  copy.Hype.Opts().music = false
+  copy.Hype.Engage({ name = "Muted Fighter" })
+  copy.Hype.Engage({ name = "Muted Olympian", guild = "OLYMPUS", tier = "original" })
+  eq(M.audio.music, nil, "regression 6: late Olympian switch respects disabled kill music")
+end
+
+require("phase1")(M, check, eq, ME)
+require("hunters")(M, check, eq, ME)
 
 for _, line in ipairs(GodslayerDB.log) do if line:find(" error: ", 1, true) then check(false, "logged error: " .. line) end end
 -- the version the addon reports is the version on the box

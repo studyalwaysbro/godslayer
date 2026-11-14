@@ -234,6 +234,8 @@ function Rank.Check(announce)
   r.points, r.threshold = now.points, now.threshold
   if (now.level or 0) > (r.best or 0) then r.best = now.level end
   if was == nil or was == now.level then return nil end
+  if ns.Comm then ns.Comm.MarkDirty() end
+  if ns.Hunters then ns.Hunters.LocalChanged() end
 
   local up = now.level > was
   local faction = plain(try(UnitFactionGroup, "player"))

@@ -23,7 +23,7 @@ M.audio.files[OWN .. "kill3.mp3"] = true
 M.audio.files[OWN .. "kill3.ogg"] = true
 M.audio.files[OWN .. "kill10.mp3"] = true
 
-local ns = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
+local ns = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Hunters.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "Godslayer")
 M.fire("PLAYER_LOGIN")
 local function say(text) SlashCmdList["GODSLAYER"](text) end
@@ -64,7 +64,7 @@ M.advance(3)
 -- The announcer follows the song: with kill2 the only song, its tuned lines come first.
 M.audio.files, M.audio.played, M.audio.music = {}, {}, nil
 local S = "Interface\\AddOns\\Godslayer\\Sounds\\"
-ns = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
+ns = M.load("Godslayer", { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua", "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua", "Control.lua", "Death.lua", "Comm.lua", "Hunters.lua", "Rival.lua", "Wheel.lua", "UI.lua" })
 M.fire("ADDON_LOADED", "Godslayer")
 M.fire("PLAYER_LOGIN")
 for pack, v in pairs(ns.VOICE) do

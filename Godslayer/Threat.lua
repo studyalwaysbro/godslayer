@@ -45,6 +45,8 @@ local NAME_MAX = 32         -- what a field may carry onto the wire, and off it
 local GUILD_MAX = 32
 local ZONE_MAX = 40
 local SAY_GAP = 600         -- seconds before the same name is called out under your cursor again
+local NEW_ENTRY_WINDOW = 600
+local NEW_ENTRIES_PER_SENDER = 20 -- even a very bad ten minutes should not let one sender own the 200-name pool
 
 local GOLD, RED, GREY = { 1, 0.82, 0 }, { 1, 0.19, 0.19 }, { 0.6, 0.6, 0.6 }
 
@@ -52,6 +54,7 @@ local GOLD, RED, GREY = { 1, 0.82, 0 }, { 1, 0.19, 0.19 }, { 0.6, 0.6, 0.6 }
 local unvouched = 0
 local said = {}
 local lastLife = nil
+local remoteEntries = {}
 
 --------------------------------------------------------------------------------
 -- The pool
@@ -98,7 +101,7 @@ local function trim(pool)
 end
 
 -- One report folded in, whoever it came from. `from` is the Torchman who died; nil means you.
-function Threat.Fold(from, name, class, guild, zone)
+function Threat.Fold(from, name, class, guild, zone, limitNew)
   local pool = db()
   if not pool then return nil end
   name = clean(short(name), NAME_MAX)
@@ -108,6 +111,19 @@ function Threat.Fold(from, name, class, guild, zone)
 
   local r = pool[name]
   if not r then
+    if limitNew then
+      local now = plain(try(GetTime))
+      if type(now) ~= "number" then return nil end
+      local state = remoteEntries[from]
+      if not state or now - state.started >= NEW_ENTRY_WINDOW then
+        state = { started = now, names = {}, n = 0 }
+        remoteEntries[from] = state
+      end
+      if not state.names[name] then
+        if state.n >= NEW_ENTRIES_PER_SENDER then return nil end
+        state.names[name], state.n = true, state.n + 1
+      end
+    end
     r = { n = 0, who = {}, mine = 0 }
     pool[name] = r
   end
@@ -198,7 +214,7 @@ end
 
 -- A guildmate's report, routed here by Comm.
 function Threat.Heard(from, name, class, guild, zone)
-  if not Threat.Fold(from, name, class, guild, zone) then return false end
+  if not Threat.Fold(from, name, class, guild, zone, true) then return false end
   if ns.OnChanged then ns.OnChanged() end
   return true
 end

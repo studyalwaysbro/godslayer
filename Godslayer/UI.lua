@@ -15,6 +15,7 @@ local SHARE_GAP = 15 -- seconds between guild chat posts
 local opts
 local main, toast, minimapButton
 local currentTab, offset = 1, 0
+local boardKind, hunterPeriod = "guild", "lifetime"
 local dossierId -- the victim whose dossier is open over the kill log, if any
 local phraseIndex, phraseZero
 local lastShare = -SHARE_GAP
@@ -388,8 +389,12 @@ end
 
 local function guildRows()
   local members = {}
+  local archived = ns.char.victimArchive
+  for guild, g in pairs(type(archived) == "table" and archived.guilds or {}) do
+    if type(g) == "table" then members[guild] = tonumber(g.uniques) or 0 end
+  end
   for _, v in pairs(ns.char.victims) do
-    if v.tier and v.guild then members[v.guild] = (members[v.guild] or 0) + 1 end
+    if v.tier and v.guild and not v.archived then members[v.guild] = (members[v.guild] or 0) + 1 end
   end
   local list = {}
   for guild, g in pairs(ns.char.guilds) do
@@ -421,6 +426,33 @@ local function boardRows()
                 (ns.RankFor(r.points)), r.kills, r.uniques, r.kb, r.orig, r.points }
   end
   return rows
+end
+
+local HUNTER_COLS = {
+  { "#", 24, "RIGHT" }, { "Hunter", 132, "LEFT" }, { "Rung", 36, "RIGHT" }, { "Title", 92, "LEFT" },
+  { "Kills", 40, "RIGHT" }, { "KB", 32, "RIGHT" }, { "OLYMPUS", 60, "RIGHT" },
+  { "Points", 46, "RIGHT" }, { "Confirmed", 62, "RIGHT" },
+}
+
+local function hunterRows()
+  if not ns.Hunters then return {}, false, 0 end
+  local snapshot, building, confirmed = ns.Hunters.Board(hunterPeriod)
+  if not snapshot then return {}, building, confirmed end
+  local rows, partial = {}, false
+  for _, r in ipairs(snapshot) do
+    if r.partial and not partial then
+      partial = true
+      rows[#rows + 1] = { "", GREY .. "tracking began mid-week|r", "", "", "", "", "", "", "" }
+    end
+    local name = classColored(r.name, r.class)
+    if (r.kings or 0) > 0 then name = name .. GOLD .. " [Kingslayer]|r" end
+    if r.me then name = name .. GREY .. " (you)|r" end
+    local kills = hunterPeriod == "week" and (r.wkKills or 0) or (r.kills or 0)
+    local points = hunterPeriod == "week" and (r.wkPoints or 0) or (r.points or 0)
+    rows[#rows + 1] = { r.rank or "", name, tostring(r.rung or 0), (ns.RankFor(r.points or 0)),
+      kills, r.kb or 0, r.orig or 0, points, r.me and "now" or ago(r.confirmed), me=r.me }
+  end
+  return rows, building, confirmed
 end
 
 local TABS = {
@@ -529,6 +561,30 @@ local function buildMain()
     f.tabs[i] = b
   end
 
+  -- The leaderboard's two switches live on their own line. They are hidden on every other tab,
+  -- so the existing five-tab surface and its click targets do not move.
+  f.boardButtons = {}
+  local switches = {
+    { "Guild", function() boardKind, offset = "guild", 0 end },
+    { "Hunters", function() boardKind, offset = "hunters", 0 end },
+    { "Lifetime", function() hunterPeriod, offset = "lifetime", 0 end },
+    { "This week", function() hunterPeriod, offset = "week", 0 end },
+  }
+  for i, spec in ipairs(switches) do
+    local b = makeButton(f, spec[1], i < 3 and 76 or 90)
+    b:SetPoint("TOPLEFT", 16 + ({ 0, 80, 360, 454 })[i], -101)
+    b:SetScript("OnClick", function() spec[2](); UI.Refresh() end)
+    b:Hide()
+    f.boardButtons[i] = b
+  end
+
+  f.boardHeader = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  f.boardHeader:SetPoint("TOPLEFT", 16, -126)
+  f.boardHeader:SetPoint("TOPRIGHT", -16, -126)
+  f.boardHeader:SetJustifyH("LEFT")
+  f.boardHeader:SetWordWrap(false)
+  f.boardHeader:Hide()
+
   local list = CreateFrame("Frame", nil, f)
   list:SetPoint("TOPLEFT", 16, -104)
   list:SetPoint("TOPRIGHT", -16, -104)
@@ -543,6 +599,24 @@ local function buildMain()
   -- under the list, on the left: what the open tab is showing
   f.guildNote = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   f.guildNote:SetPoint("TOPLEFT", list, "BOTTOMLEFT", 0, -2)
+  f.guildNote:SetWidth(360)
+  f.guildNote:SetWordWrap(false)
+
+  f.boardNotice = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  f.boardNotice:SetPoint("TOPLEFT", 16, -150)
+  f.boardNotice:SetPoint("TOPRIGHT", -16, -150)
+  f.boardNotice:SetHeight(150)
+  f.boardNotice:SetJustifyH("LEFT")
+  f.boardNotice:SetJustifyV("TOP")
+  f.boardNotice:SetWordWrap(true)
+  f.boardNotice:Hide()
+  f.dismissBoardNotice = makeButton(f, "Dismiss notice", 120)
+  f.dismissBoardNotice:SetPoint("TOPLEFT", 14, -315)
+  f.dismissBoardNotice:SetScript("OnClick", function()
+    if ns.Hunters then ns.Hunters.AcknowledgeBoardNotice() end
+    UI.Refresh()
+  end)
+  f.dismissBoardNotice:Hide()
 
   local function wheel(_, delta)
     offset = offset - delta * 3
@@ -672,12 +746,22 @@ function UI.Refresh()
   end
   -- a dossier covers the kill log until Back, another tab, or the victim's record going away
   if dossierId and not (currentTab == 1 and c.victims[dossierId]) then dossierId = nil end
-  local cols, rows = tab.cols, nil
+  main.list:ClearAllPoints()
+  main.list:SetPoint("TOPLEFT", 16, (currentTab == 3 and not dossierId) and -142 or -104)
+  main.list:SetPoint("TOPRIGHT", -16, (currentTab == 3 and not dossierId) and -142 or -104)
+  local visibleRows = currentTab == 3 and not dossierId and 11 or ROWS
+  main.list:SetHeight((visibleRows + 1) * ROW_HEIGHT + 4)
+  local cols, rows, huntersBuilding, huntersConfirmed = tab.cols, nil, false, 0
   if dossierId then
     cols, rows = DOSSIER_COLS, dossierLines(dossierId)
     main.back:Show(); main.bragVictim:Show(); main.hint:Hide()
   else
-    rows = tab.rows()
+    if currentTab == 3 and boardKind == "hunters" then
+      cols = HUNTER_COLS
+      rows, huntersBuilding, huntersConfirmed = hunterRows()
+    else
+      rows = tab.rows()
+    end
     main.back:Hide(); main.bragVictim:Hide(); main.hint:Show()
   end
   for i = 1, MAX_COLS do
@@ -685,9 +769,16 @@ function UI.Refresh()
   end
   layoutColumns(main.header.cells, cols)
 
-  offset = math.max(0, math.min(offset, math.max(0, #rows - ROWS)))
+  offset = math.max(0, math.min(offset, math.max(0, #rows - visibleRows)))
+  local pinned
+  if currentTab == 3 and boardKind == "hunters" then
+    for i, row in ipairs(rows) do
+      if row.me and (i <= offset or i > offset + visibleRows) then pinned = row break end
+    end
+  end
   for r = 1, ROWS do
-    local row, data = main.rows[r], rows[r + offset]
+    local row = main.rows[r]
+    local data = r <= visibleRows and ((pinned and r == visibleRows) and pinned or rows[r + offset]) or nil
     if data then
       layoutColumns(row.cells, cols)
       for i = 1, MAX_COLS do
@@ -700,21 +791,71 @@ function UI.Refresh()
       row:Hide()
     end
   end
-  main.empty:SetText(#rows == 0 and tab.empty or "")
-  if #rows > ROWS then
-    main.count:SetText(("%d-%d of %d  (mouse wheel to scroll)"):format(offset + 1, math.min(offset + ROWS, #rows), #rows))
+  main.empty:SetText(#rows == 0 and (huntersBuilding and "Building list..." or tab.empty) or "")
+  if #rows > visibleRows then
+    main.count:SetText(("%d-%d of %d  (mouse wheel to scroll)"):format(offset + 1, math.min(offset + visibleRows, #rows), #rows))
   else
     main.count:SetText("")
   end
 
+  local onBoard = not dossierId and currentTab == 3
+  for i, b in ipairs(main.boardButtons) do
+    if onBoard then
+      b:Show()
+      local selected = (i == 1 and boardKind == "guild") or (i == 2 and boardKind == "hunters")
+        or (i == 3 and boardKind == "hunters" and hunterPeriod == "lifetime")
+        or (i == 4 and boardKind == "hunters" and hunterPeriod == "week")
+      if selected then b:LockHighlight() else b:UnlockHighlight() end
+      if i >= 3 then b:SetShown(boardKind == "hunters") end
+    else b:Hide() end
+  end
+  if onBoard and boardKind == "hunters" then
+    main.boardHeader:SetText(("Rank among %d hunters confirmed by your client. Scores are self-reported."):format(huntersConfirmed))
+    main.boardHeader:Show()
+  else main.boardHeader:Hide() end
+
+  local showBoardNotice = false
   if dossierId then
     main.guildNote:SetText("")
   elseif currentTab == 3 then
-    local guild = ns.MyGuild()
-    main.guildNote:SetText(guild and ("<" .. guild .. "> members running Godslayer") or "Join a guild to see a leaderboard")
+    if boardKind == "guild" then
+      local guild = ns.MyGuild()
+      main.guildNote:SetText(guild and ("<" .. guild .. "> members running Godslayer") or "Join a guild to see a leaderboard")
+    else
+      local st = ns.Hunters.Status()
+      local footer
+      if not st.enabled then footer = "Hunters is off. /godslayer hunters on"
+      elseif st.reason then footer = st.reason
+      else
+        local exchange = "never"
+        if st.lastExchange then
+          local age = ago(st.lastExchange)
+          exchange = age == "now" and "now" or (age .. " ago")
+        end
+        if st.directory == "working" then
+          footer = ("%d candidates / %d confirmed / %d partners / sync %s"):format(
+            st.candidates, st.confirmed, st.partners, exchange)
+        elseif st.directory == "suspended" or st.directory == "unavailable" then
+          footer = ("%d confirmed. Directory unavailable; coverage is limited"):format(st.confirmed)
+        else
+          -- the first minutes after login: the directory is joining or its member list is on the way
+          footer = ("%d candidates / %d confirmed / looking for hunters"):format(st.candidates, st.confirmed)
+        end
+      end
+      if st.notice then
+        showBoardNotice = true
+        main.boardNotice:SetText(ns.Hunters.NOTICE)
+        footer = ""
+      end
+      main.guildNote:SetText(footer)
+    end
   else
     main.guildNote:SetText(#rows > 0 and TAB_NOTES[currentTab] or "")
   end
+  main.list:SetShown(not showBoardNotice)
+  main.boardNotice:SetShown(showBoardNotice)
+  main.dismissBoardNotice:SetShown(showBoardNotice)
+  if showBoardNotice then main.count:SetText("") end
   main.phrase:SetText(currentPhrase())
 end
 
@@ -850,7 +991,9 @@ local function killFeedback(name, class, guild, tier, pts, info, v)
   if opts.sound and SOUNDKIT and not info.announced then
     local loud = tier == "original" or info.rankUp
     local id = loud and SOUNDKIT.RAID_WARNING or (SOUNDKIT.UI_PVP_HONOR_PRESTIGE_RANK_UP or SOUNDKIT.RAID_WARNING)
-    if id then pcall(PlaySound, id) end -- this client's second argument is not the old channel name
+    if id then
+      if ns.Sound then pcall(ns.Sound.PlayKit, id) else pcall(PlaySound, id) end
+    end
   end
 end
 
@@ -861,6 +1004,9 @@ ns.OnScore = function(v, guild, tier, pts, info)
 end
 
 ns.OnChanged = function() UI.Refresh() end
+ns.OnHuntersChanged = function()
+  if main and main:IsShown() and currentTab == 3 and boardKind == "hunters" then UI.Refresh() end
+end
 
 -- ---------------------------------------------------------------------------
 -- Minimap button and addon compartment entry
@@ -1011,6 +1157,8 @@ local function printHelp()
   print("  /godslayer death     the last seconds of your life, hit by hit. death who for the tally")
   print("  /godslayer threat    who the guild keeps dying to. threat <name>, threat guilds")
   print("  /godslayer flag      where the flag is with the map shut. flag watch toggles the calls")
+  print("  /godslayer volume <0-100>   volume for Godslayer voice, effects, and chat wheel")
+  print("  /godslayer hunters [on|off|status]   first-hand cross-realm Hunters board")
   print("  /godslayer clip       mark this moment for your recorder")
   print("  /godslayer wheel      the chat wheel (or bind a key: Key Bindings, AddOns, Godslayer)   wheel list | wheel <number>")
   print("  /godslayer share      post a brag line to guild chat")
@@ -1103,6 +1251,17 @@ local function slash(input)
   elseif cmd == "flag" then
     if not ns.Flag then ns.Print("The flag part did not load. Quit the game fully and start it again.") return end
     ns.Flag.Command(rest)
+  elseif cmd == "volume" then
+    local value = tonumber(rest)
+    if rest == "" then
+      ns.Print(("Godslayer volume: %d. Below 100, Godslayer briefly sets the Dialog (or Ambience) volume while its own lines play, so an NPC line at that exact moment plays at Godslayer's level."):format(opts.volume or 100))
+    elseif not value or not ns.Sound or not ns.Sound.SetVolume(value) then
+      ns.Print("Use /godslayer volume <0-100>.")
+    else
+      ns.Print(("Godslayer volume set to %d."):format(opts.volume))
+    end
+  elseif cmd == "hunters" then
+    if ns.Hunters then ns.Hunters.Command(rest) else ns.Print("The Hunters board did not load.") end
   elseif cmd == "control" then
     if not ns.Control then ns.Print("The control part did not load. Quit the game fully and start it again.") return end
     ns.Control.Command(rest)
@@ -1171,6 +1330,7 @@ local function slash(input)
       ns.Print("<" .. rest .. "> is back to the default rules.")
     end
     ns.Recount()
+    if ns.Hunters then ns.Hunters.LocalChanged() end
     ns.Comm.MarkDirty()
     UI.Refresh()
   elseif cmd == "guilds" then
@@ -1218,4 +1378,5 @@ function UI.Init()
   if not ok then ns.Log("error", "minimap: " .. tostring(err)) end
   ok, err = pcall(hookTooltip)
   if not ok then ns.Log("error", "tooltip: " .. tostring(err)) end
+  if ns.Sound then pcall(ns.Sound.RegisterSettings) end
 end

@@ -14,7 +14,7 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "2.9.0"
+ns.VERSION = "3.0.0"
 
 local DEDUPE_SECONDS = 10        -- the signals above can all describe the same death
 local MATCH_WINDOW = 8           -- honorable-kill credit and a seen death must be this close
@@ -27,6 +27,11 @@ local ZONE_CAP = 12              -- zones remembered per victim; the rest go und
 local TEXT_MAX = 40              -- longest rank, race, title or zone name kept
 local RANK_CAP = 6               -- guild ranks remembered per victim; the rest go under OTHER_RANKS
 local DETAIL_CAP = 2500          -- victims that keep a kill-by-kill history; older feuds keep their totals
+-- Ten thousand ordinary one-off dossiers is about one hundred new opponents every day for one
+-- hundred days. The cap is maintained in batches; Olympus, regicide, repeat-victim and UI record
+-- holders are permanent and do not become eligible just to force an extraordinary book under it.
+local VICTIM_CAP, VICTIM_SLACK = 10000, 200
+local ARCHIVED_ID_CAP = 10000     -- bounded tombstones stop a returning evicted GUID becoming "unique" twice
 local HEALTH_GAP = 1             -- one unit is asked whether it is dead at most this often
 local IDLE_RETRY = 2             -- the idle sweep re-reads a plate with no guild yet this often
 local IDLE_SETTLED = 30          -- ... and one whose guild it already has, this often
@@ -36,6 +41,7 @@ local ELSEWHERE, OTHER_RANKS = "Elsewhere", "Other ranks"
 -- that needs an identity honest while the kill itself still advances the score and the hunt.
 local UNKNOWN_ID, UNKNOWN_NAME, UNKNOWN_GUILD = "unknown:hidden-victim", "Unknown victim", "Unknown"
 ns.HIST_CAP, ns.ZONE_CAP, ns.RANK_CAP, ns.DETAIL_CAP, ns.KNOWN_CAP = HIST_CAP, ZONE_CAP, RANK_CAP, DETAIL_CAP, KNOWN_CAP
+ns.VICTIM_CAP = VICTIM_CAP
 ns.ELSEWHERE, ns.OTHER_RANKS = ELSEWHERE, OTHER_RANKS
 ns.UNKNOWN_VICTIM_ID, ns.UNKNOWN_VICTIM_NAME, ns.UNKNOWN_VICTIM_GUILD = UNKNOWN_ID, UNKNOWN_NAME, UNKNOWN_GUILD
 
@@ -269,14 +275,115 @@ local function initDB()
   if o.chat == nil then o.chat = true end
   if o.tooltip == nil then o.tooltip = true end
   if o.minimap == nil then o.minimap = true end
+  local volume = tonumber(o.volume)
+  o.volume = volume and math.max(0, math.min(100, math.floor(volume + 0.5))) or 100
+  o.flag = type(o.flag) == "table" and o.flag or {}
+  if o.flag.calls ~= "important" and o.flag.calls ~= "all" and o.flag.calls ~= "off" then o.flag.calls = "important" end
+  if o.flag.voice == nil then o.flag.voice = true end
+  local repeatGap = tonumber(o.flag.repeatGap)
+  o.flag.repeatGap = repeatGap and math.max(10, math.min(120, math.floor(repeatGap + 0.5))) or 30
 end
 
 local function newChar()
   return { kills = 0, points = 0, uniques = 0, kb = 0, orig = 0, kings = 0, bestStreak = 0, victims = {}, guilds = {},
-           schema = 27 }
+           victimArchive = {}, schema = 27 }
 end
 
 local myName, myGUID, myFaction
+local victimCount = 0
+
+-- Full dossiers are bounded, but everything the lifetime and statistics surfaces add up is not.
+-- Once a one-off record ages out, its counts move into this fixed set of aggregate buckets.
+local function victimArchive(c)
+  c.victimArchive = type(c.victimArchive) == "table" and c.victimArchive or {}
+  local a = c.victimArchive
+  for _, key in ipairs({ "kills", "points", "uniques", "kb", "orig" }) do a[key] = tonumber(a[key]) or 0 end
+  for _, key in ipairs({ "guilds", "class", "zone", "rank", "hour", "ids" }) do
+    a[key] = type(a[key]) == "table" and a[key] or {}
+  end
+  a.zoned, a.timed, a.idCount = tonumber(a.zoned) or 0, tonumber(a.timed) or 0, tonumber(a.idCount) or 0
+  if a.idCount == 0 and next(a.ids) then for _ in pairs(a.ids) do a.idCount = a.idCount + 1 end end
+  return a
+end
+
+local function addCounts(into, from)
+  for key, n in pairs(from or {}) do
+    if type(n) == "number" then into[key] = (into[key] or 0) + n end
+  end
+end
+
+local function rememberArchivedId(a, id, v)
+  local old = a.ids[id]
+  if type(old) ~= "table" then
+    if old == nil then a.idCount = a.idCount + 1 end
+    old = {}
+    a.ids[id] = old
+  end
+  old.t = v.last or old.t or 0
+  if v.tier then old.counted = true end
+  if a.idCount <= ARCHIVED_ID_CAP + VICTIM_SLACK then return end
+  local list = {}
+  for archivedId, row in pairs(a.ids) do
+    list[#list + 1] = { archivedId, type(row) == "table" and (row.t or 0) or 0 }
+  end
+  table.sort(list, function(x, y) return x[2] < y[2] end)
+  for i = 1, #list - ARCHIVED_ID_CAP do a.ids[list[i][1]] = nil end
+  a.idCount = math.min(#list, ARCHIVED_ID_CAP)
+end
+
+local function archiveVictim(c, id, v)
+  local a = victimArchive(c)
+  if v.tier then
+    local firstArchive = not v.archived
+    a.kills, a.points = a.kills + (v.kills or 0), a.points + (v.points or 0)
+    a.kb, a.orig = a.kb + (v.kb or 0), a.orig + math.min(v.ok or 0, v.kills or 0)
+    if firstArchive then a.uniques = a.uniques + 1 end
+    if v.class then a.class[v.class] = (a.class[v.class] or 0) + (v.kills or 0) end
+    addCounts(a.zone, v.zones)
+    addCounts(a.rank, v.ranks)
+    addCounts(a.hour, v.hours)
+    for _, n in pairs(v.zones or {}) do if type(n) == "number" then a.zoned = a.zoned + n end end
+    for _, n in pairs(v.hours or {}) do if type(n) == "number" then a.timed = a.timed + n end end
+    local guild = v.guild or ""
+    local g = a.guilds[guild]
+    if type(g) ~= "table" then g = { kills = 0, points = 0, uniques = 0, tier = v.tier }; a.guilds[guild] = g end
+    g.kills, g.points = (g.kills or 0) + (v.kills or 0), (g.points or 0) + (v.points or 0)
+    if firstArchive then g.uniques = (g.uniques or 0) + 1 end
+  end
+  rememberArchivedId(a, id, v)
+end
+
+local function permanentVictims(c)
+  local keep, highest, upset, day, run = {}, nil, nil, nil, nil
+  for id, v in pairs(c.victims) do
+    if v.king or (v.kills or 0) > 1 or (v.ok or 0) > 0 or v.tier == "original" or v.tier == "network" then keep[id] = true end
+    if v.level and (not highest or v.level > highest[2]) then highest = { id, v.level } end
+    if v.up and (not upset or v.up > upset[2]) then upset = { id, v.up } end
+    if v.dayBest and (not day or v.dayBest > day[2]) then day = { id, v.dayBest } end
+    if v.bestRun and (not run or v.bestRun > run[2]) then run = { id, v.bestRun } end
+  end
+  if highest then keep[highest[1]] = true end
+  if upset then keep[upset[1]] = true end
+  if day then keep[day[1]] = true end
+  if run then keep[run[1]] = true end
+  return keep
+end
+
+local function pruneVictims(c, force)
+  if not force and victimCount <= VICTIM_CAP + VICTIM_SLACK then return end
+  if victimCount <= VICTIM_CAP then return end
+  local keep, candidates = permanentVictims(c), {}
+  for id, v in pairs(c.victims) do
+    if not keep[id] then candidates[#candidates + 1] = { id = id, last = v.last or 0 } end
+  end
+  table.sort(candidates, function(x, y) return x.last < y.last end)
+  local drop = math.min(victimCount - VICTIM_CAP, #candidates)
+  for i = 1, drop do
+    local id, v = candidates[i].id, c.victims[candidates[i].id]
+    if v then archiveVictim(c, id, v); c.victims[id] = nil end
+  end
+  victimCount = victimCount - drop
+end
 
 -- "First Last" on Forever, plain name elsewhere.
 local function fullName(unit)
@@ -303,6 +410,10 @@ local function initChar()
   -- life counts our own deaths: a kill belongs to the life it happened in, even when it
   -- is only scored later, once the victim's guild tag is seen
   ns.session = { kills = 0, points = 0, streak = 0, runs = {}, life = 1 }
+  victimArchive(c)
+  victimCount = 0
+  for _ in pairs(c.victims) do victimCount = victimCount + 1 end
+  pruneVictims(c, true)
   -- only so many victims keep their kill-by-kill history; the oldest feuds keep the totals
   local list = {}
   for _, v in pairs(c.victims) do
@@ -741,9 +852,12 @@ function Score(id, name, guild, tier, rec, class)
   -- a record with no tier sits in a guild that was ignored; its old kills come back with it
   local revived = v and not v.tier
   if not v then
-    v = { kills = 0, points = 0, kb = 0, first = now }
+    local archived = victimArchive(c).ids[id]
+    v = { kills = 0, points = 0, kb = 0, first = now,
+          archived = type(archived) == "table" and archived.counted or nil }
     c.victims[id] = v
-    c.uniques = c.uniques + 1
+    victimCount = victimCount + 1
+    if not v.archived then c.uniques = c.uniques + 1 end
   end
   -- ok = kills made while they wore the original tag; people change guilds
   v.kills, v.points = v.kills + 1, v.points + pts
@@ -770,6 +884,10 @@ function Score(id, name, guild, tier, rec, class)
   if king then c.kings = (c.kings or 0) + 1; v.king = true end
   local rankName, rankAfter = ns.RankFor(c.points)
 
+  -- Hunters owns its weekly counters and persistent wire ordering. This is deliberately after
+  -- every lifetime field has settled, so one sequence number describes one complete score.
+  if ns.Hunters then ns.Hunters.Score(pts, v) end
+
   ns.Log("score", v.name .. (guild ~= "" and (" <" .. guild .. ">") or "") .. " +" .. pts .. (rec.kb and " kb" or ""))
   local info = { king = king, streak = sameLife and s.streak or 1, rankUp = rankAfter > rankBefore and rankName or nil,
                  first = v.kills == 1, zone = rec.zone, sub = rec.sub, kb = rec.kb and true or false }
@@ -786,6 +904,7 @@ function Score(id, name, guild, tier, rec, class)
     end
   end
   if ns.OnScore then ns.OnScore(v, guild, tier, pts, info) end
+  pruneVictims(c, false)
 end
 
 local function prune()
@@ -839,6 +958,8 @@ upgradeScored = function(id, guild)
     -- same way the ignore command does, so a later recount cannot disagree with the running total.
     v.guild = guild
     ns.Recount()
+    if ns.Hunters then ns.Hunters.LocalChanged() end
+    if ns.Comm then ns.Comm.MarkDirty() end
     if ns.OnChanged then ns.OnChanged() end
     return
   end
@@ -860,6 +981,7 @@ upgradeScored = function(id, guild)
   if rec.life == ns.session.life then ns.session.points = ns.session.points + delta end
   local king = ns.IsKing(v.name, tier)
   if king then c.kings = (c.kings or 0) + 1; v.king = true end
+  if ns.Hunters then ns.Hunters.AdjustWeekly(delta, 0) end
   local rankName, rankAfter = ns.RankFor(c.points)
   if ns.Rival and ns.Rival.NoteUpgrade then ns.Rival.NoteUpgrade(guild, tier) end
   ns.Log("late", (v.name or id) .. " <" .. guild .. "> " .. (delta >= 0 and "+" or "") .. delta)
@@ -870,13 +992,14 @@ upgradeScored = function(id, guild)
   elseif rankAfter > rankBefore and ns.Hype and ns.Hype.Promoted then
     pcall(ns.Hype.Promoted, rankAfter, rankName)
   end
+  if ns.Comm then ns.Comm.MarkDirty() end
   if ns.OnChanged then ns.OnChanged() end
 end
 
 -- A player died and we get credit. kb = it was our own killing blow. calledAs = the name the
 -- announcer already called this kill under, when it was called before anyone knew whose it was.
 local claimCalled
-local deaths, credits = {}, {}
+local deaths, credits, matchedCredits = {}, {}, {}
 local matchCredits
 
 local function killRecord(name, kb)
@@ -904,6 +1027,7 @@ local function RegisterKill(id, name, kb, source, calledAs)
       if rec.scored then
         addKillingBlow(id)
         if rec.entry then rec.entry[4] = 1 end
+        if ns.Hunters then ns.Hunters.LocalChanged() end
         if ns.Comm then ns.Comm.MarkDirty() end
         if ns.OnChanged then ns.OnChanged() end
       end
@@ -974,6 +1098,9 @@ local function pruneHidden(now)
   for i = #hiddenKills, 1, -1 do
     if now - hiddenKills[i].t > MATCH_WINDOW + 2 then table.remove(hiddenKills, i) end
   end
+  for i = #matchedCredits, 1, -1 do
+    if now - matchedCredits[i].t > HIDDEN_MATCH_WINDOW then table.remove(matchedCredits, i) end
+  end
 end
 
 -- An enemy player died near us. Two events can report the same death.
@@ -1023,23 +1150,59 @@ end
 -- two signals separate is what lets hidden players count without turning a dungeon pull into a
 -- PvP streak.
 local function attachHidden(credit)
-  if credit.hidden then return credit.hidden end
-  local best, bestGap
+  local best, bestGap, candidates = credit.hidden, nil, 0
   for _, hidden in ipairs(hiddenKills) do
     local gap = math.abs(hidden.t - credit.t)
-    if not hidden.used and gap <= HIDDEN_MATCH_WINDOW and (not bestGap or gap < bestGap) then
-      best, bestGap = hidden, gap
+    if (hidden == best or not hidden.used) and gap <= HIDDEN_MATCH_WINDOW then
+      candidates = candidates + 1
+      if not best or not bestGap or gap < bestGap then best, bestGap = hidden, gap end
     end
   end
   if best then
     best.used, credit.hidden = true, best
+    -- Count this credit even after scoreUnknown has removed it from the live queue; then add every
+    -- other live or already-matched credit that could claim the same hidden event.
+    local possibleCredits = 1
+    for _, other in ipairs(credits) do
+      if other ~= credit and math.abs(other.t - best.t) <= HIDDEN_MATCH_WINDOW then
+        possibleCredits = possibleCredits + 1
+      end
+    end
+    for _, matched in ipairs(matchedCredits) do
+      if not matched.used and math.abs(matched.t - best.t) <= HIDDEN_MATCH_WINDOW then
+        possibleCredits = possibleCredits + 1
+      end
+    end
+    credit.hiddenAmbiguous = credit.hiddenAmbiguous or candidates ~= 1 or possibleCredits ~= 1
     return best
   end
 end
 
+-- A PvP credit can be consumed by UNIT_DIED before Forever delivers the attributable but
+-- identity-hidden PARTY_KILL. Keep that credit-to-victim edge for the shorter hidden window so
+-- the late signal can take the normal per-victim dedupe path and upgrade, never score again.
+local function upgradeLateHidden(hidden)
+  local found, matches, events, liveCredits = nil, 0, 0, 0
+  for _, matched in ipairs(matchedCredits) do
+    if not matched.used and math.abs(hidden.t - matched.t) <= HIDDEN_MATCH_WINDOW then
+      found, matches = matched, matches + 1
+    end
+  end
+  for _, other in ipairs(hiddenKills) do
+    if not other.used and math.abs(hidden.t - other.t) <= HIDDEN_MATCH_WINDOW then events = events + 1 end
+  end
+  for _, credit in ipairs(credits) do
+    if math.abs(hidden.t - credit.t) <= HIDDEN_MATCH_WINDOW then liveCredits = liveCredits + 1 end
+  end
+  if matches ~= 1 or events ~= 1 or liveCredits ~= 0 then return false end
+  found.used, hidden.used = true, true
+  if hidden.mine then RegisterKill(found.id, nameFromGUID(found.id), true, "PARTY_KILL") end
+  return true
+end
+
 local function callUnknown(credit)
   local hidden = attachHidden(credit)
-  local kb = hidden and hidden.mine or false
+  local kb = hidden and not credit.hiddenAmbiguous and hidden.mine or false
   local mode = GodslayerDB.opts.hype and GodslayerDB.opts.hype.mode
   local shouldHype = kb or mode ~= "blows"
   if not credit.called then
@@ -1101,13 +1264,23 @@ function matchCredits()
     local d = already or best
     if d then
       d.used = true
+      -- A hidden PARTY_KILL already waiting and an identified death are two plausible events for
+      -- this credit. The identity can still score, but the hidden source cannot prove whose blow it
+      -- was. A hidden signal that arrives after the match uses the retained one-to-one edge above.
+      if credit.hidden then credit.hiddenAmbiguous = true end
+      if not credit.hidden then matchedCredits[#matchedCredits + 1] = { id = d.id, t = credit.t } end
       table.remove(credits, c)
-      if not already then RegisterKill(d.id, nameFromGUID(d.id), credit.hidden and credit.hidden.mine or false, "HK", credit.called) end
+      if not already then
+        local kb = credit.hidden and not credit.hiddenAmbiguous and credit.hidden.mine or false
+        RegisterKill(d.id, nameFromGUID(d.id), kb, "HK", credit.called)
+      end
     else
       -- credit for a kill nobody saw die (too far, behind a wall, a crowd): it is still a kill, and
       -- the announcer says so now. If the death turns up in the next seconds it gets its name;
       -- only after the whole matching window expires is it banked under the unknown bucket.
-      if credit.hidden and now - ct >= ANON_AFTER then callUnknown(credit) end
+      -- Wait out the whole hidden-pairing window before calling it a blow: another hidden event or
+      -- credit can still make the source attribution ambiguous until then.
+      if credit.hidden and now - ct >= HIDDEN_MATCH_WINDOW then callUnknown(credit) end
       if credit.hidden and now - ct > MATCH_WINDOW then
         table.remove(credits, c)
         scoreUnknown(credit)
@@ -1218,7 +1391,9 @@ function handlers.PARTY_KILL(attackerGUID, targetGUID)
     -- PvP-credit event proves that a player died; creature kills expire without changing anything.
     local now = GetTime()
     pruneHidden(now) -- continuous PvE can emit this all day; keep only the matchable few seconds
-    hiddenKills[#hiddenKills + 1] = { t = now, mine = mine and true or false }
+    local hidden = { t = now, mine = mine and true or false }
+    hiddenKills[#hiddenKills + 1] = hidden
+    upgradeLateHidden(hidden)
     if targetSecret and not ns.hiddenLogged then ns.hiddenLogged = true ns.Log("party_kill", "victim hidden by the client (logged once per session)") end
     if #credits > 0 then matchCredits() end
     return
@@ -1373,6 +1548,7 @@ function handlers.NAME_PLATE_UNIT_REMOVED(unit)
 end
 
 function handlers.PLAYER_LOGIN()
+  if ns.Sound then ns.Sound.Login() end
   if ns.Rival then ns.Rival.OnLogin() end
   initChar()
   -- 2.7.0: every player kill scores now, and the old recount wiped open-ring records.
@@ -1394,6 +1570,7 @@ function handlers.PLAYER_LOGIN()
   if ns.Aura then ns.Aura.Init() end
   if ns.Ledger then ns.Ledger.Init() end
   if ns.Rank then ns.Rank.Init() end
+  if ns.Hunters then ns.Hunters.Init() end
   if ns.Recap then ns.Recap.Init() end
   if ns.Field then ns.Field.Init() end
   if ns.Flag then ns.Flag.Init() end
@@ -1419,10 +1596,12 @@ local function dispatchTables()
   local mark = (ns.Fight and 1 or 0) + (ns.Aura and 2 or 0) + (ns.Comm and 4 or 0) + (ns.Hype and 8 or 0)
              + (ns.Ledger and 16 or 0) + (ns.Rank and 32 or 0) + (ns.Recap and 64 or 0)
              + (ns.Field and 128 or 0) + (ns.Control and 256 or 0) + (ns.Death and 512 or 0)
-             + (ns.Threat and 1024 or 0) + (ns.Flag and 2048 or 0)
+             + (ns.Threat and 1024 or 0) + (ns.Flag and 2048 or 0) + (ns.Sound and 4096 or 0)
+             + (ns.Hunters and 8192 or 0)
   if dispatch and dispatchMark == mark then return dispatch end
   local parts = {}
   local function add(t) if type(t) == "table" then parts[#parts + 1] = t end end
+  add(ns.Sound and ns.Sound.handlers)
   add(ns.Fight and ns.Fight.handlers)
   add(ns.Aura and ns.Aura.handlers)
   add(ns.Ledger and ns.Ledger.handlers)
@@ -1435,6 +1614,7 @@ local function dispatchTables()
   add(ns.Threat and ns.Threat.handlers)
   add(handlers)
   add(ns.Comm and ns.Comm.handlers)
+  add(ns.Hunters and ns.Hunters.handlers)
   add(ns.Hype and ns.Hype.handlers)
   dispatch, dispatchMark = parts, mark
   return parts
@@ -1476,7 +1656,8 @@ for _, event in ipairs({
   "PLAYER_LOGIN", "PARTY_KILL", "UNIT_DIED", "UNIT_HEALTH", "PLAYER_PVP_KILLS_CHANGED",
   "CHAT_MSG_COMBAT_HONOR_GAIN", "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT",
   "PLAYER_FOCUS_CHANGED", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "CHAT_MSG_ADDON",
-  "PLAYER_GUILD_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_DEAD",
+  "PLAYER_GUILD_UPDATE", "GROUP_ROSTER_UPDATE", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "PLAYER_DEAD",
+  "PLAYER_LEAVING_WORLD", "LOADING_SCREEN_ENABLED", "PLAYER_LOGOUT",
   -- the ladder: rank is renown on faction 2800 on this build, so the renown event is the one
   -- that actually fires, and PLAYER_PVP_RANK_CHANGED is kept because the Camelot UI listens to it
   "MAJOR_FACTION_RENOWN_LEVEL_CHANGED", "PLAYER_PVP_RANK_CHANGED",
@@ -1491,6 +1672,9 @@ for _, event in ipairs({
   "PLAYER_UNGHOST", "PLAYER_ALIVE",
   -- a fight with a player starting and ending, before anyone dies
   "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_SOFT_ENEMY_CHANGED", "PLAYER_ENTER_COMBAT",
+  -- battleground flag truth comes from the dedicated system lines and the score widgets, never
+  -- from movement inferred out of the map pins.
+  "CHAT_MSG_BG_SYSTEM_ALLIANCE", "CHAT_MSG_BG_SYSTEM_HORDE", "CHAT_MSG_BG_SYSTEM_NEUTRAL", "UPDATE_UI_WIDGET",
 }) do
   pcall(frame.RegisterEvent, frame, event) -- an event this client lacks must not stop the rest
 end
@@ -1508,11 +1692,14 @@ if not (frame.RegisterUnitEvent and pcall(frame.RegisterUnitEvent, frame, "UNIT_
 function ns.ResetCharacter()
   local c = ns.char
   local class = c.class
+  local hunterGeneration = c.hunterGen
   for k in pairs(c) do c[k] = nil end
   for k, v in pairs(newChar()) do c[k] = v end
   c.class = class
+  victimCount = 0
   ns.session = { kills = 0, points = 0, streak = 0, runs = {}, life = 1 }
   pending, recent, upgradable = {}, {}, {}
+  if ns.Hunters then ns.Hunters.AfterReset(hunterGeneration) end
 end
 
 -- Rebuild totals after the guild rules change (add / ignore), and once on upgrade to 2.7.0.
@@ -1523,9 +1710,21 @@ end
 -- the 2.4.0 open ring banked and the old recount would have wiped.
 function ns.Recount()
   local c = ns.char
-  c.kills, c.points, c.uniques, c.kb, c.orig, c.guilds = 0, 0, 0, 0, 0, {}
+  local a = victimArchive(c)
+  local weekStart = tonumber(c.weekStart)
+  local weeklyKills, weeklyPoints = tonumber(c.wkKills) or 0, tonumber(c.wkPoints) or 0
+  c.kills, c.points, c.uniques, c.kb, c.orig = a.kills, a.points, a.uniques, a.kb, a.orig
+  c.guilds = {}
+  for guild, archived in pairs(a.guilds) do
+    if type(archived) == "table" then
+      c.guilds[guild] = { kills = tonumber(archived.kills) or 0, points = tonumber(archived.points) or 0,
+                          tier = archived.tier }
+    end
+  end
   -- regicides and the best streak are history, not totals, so they are left alone
   for id, v in pairs(c.victims) do
+    local oldTier = v.tier
+    local oldWeeklyValue = oldTier and ns.PointsFor(oldTier) or 0
     local tier
     if v.guild and v.guild ~= "" then
       tier = ns.Classify(v.guild)
@@ -1537,6 +1736,14 @@ function ns.Recount()
       tier = "any" -- a kill with no tag is an open-ring kill
     end
     v.tier = tier -- nil keeps the record but leaves it out of the totals and lists
+    local wk = type(v.wk) == "table" and v.wk or nil
+    local weekKills = wk and weekStart and tonumber(wk.start) == weekStart
+      and math.max(0, math.floor(tonumber(wk.kills) or 0)) or 0
+    if weekKills > 0 then
+      local newWeeklyValue = tier and ns.PointsFor(tier) or 0
+      weeklyKills = weeklyKills + weekKills * ((tier and 1 or 0) - (oldTier and 1 or 0))
+      weeklyPoints = weeklyPoints + weekKills * (newWeeklyValue - oldWeeklyValue)
+    end
     if tier then
       local ok = math.min(v.ok or 0, v.kills)
       if tier == "original" or tier == "network" then
@@ -1544,7 +1751,8 @@ function ns.Recount()
       else
         v.points = math.max(v.points or 0, ok * ns.ORIGINAL_POINTS + (v.kills - ok) * (ns.ANY_POINTS or 1))
       end
-      c.kills, c.points, c.uniques = c.kills + v.kills, c.points + v.points, c.uniques + 1
+      c.kills, c.points = c.kills + v.kills, c.points + v.points
+      if not v.archived then c.uniques = c.uniques + 1 end
       c.kb = c.kb + (v.kb or 0)
       c.orig = c.orig + ok
       local key = v.guild or ""
@@ -1552,6 +1760,11 @@ function ns.Recount()
       if not g then g = { kills = 0, points = 0, tier = tier }; c.guilds[key] = g end
       g.kills, g.points = g.kills + v.kills, g.points + v.points
     end
+  end
+  -- Per-victim week counts are exact even after the twelve-entry detail history rolls over. A
+  -- recount changes only this week's counted status/value and never promotes a partial week.
+  if weekStart then
+    c.wkKills, c.wkPoints = math.max(0, weeklyKills), math.max(0, weeklyPoints)
   end
 end
 
@@ -1593,7 +1806,13 @@ end
 -- Kills split by class, zone, guild rank and hour, plus a few records. Built from the
 -- victims every time, so it can never drift from the totals.
 function ns.Aggregates()
-  local a = { class = {}, zone = {}, rank = {}, hour = {}, kills = 0, zoned = 0, timed = 0 }
+  local archived = victimArchive(ns.char)
+  local a = { class = {}, zone = {}, rank = {}, hour = {}, kills = archived.kills,
+              zoned = archived.zoned, timed = archived.timed }
+  addCounts(a.class, archived.class)
+  addCounts(a.zone, archived.zone)
+  addCounts(a.rank, archived.rank)
+  addCounts(a.hour, archived.hour)
   for id, v in pairs(ns.char.victims) do
     if v.tier then
       a.kills = a.kills + v.kills
@@ -1614,9 +1833,10 @@ end
 -- most recently seen.
 function ns.HitList()
   local list, victims = {}, ns.char.victims
+  local archivedIds = victimArchive(ns.char).ids
   for id, k in pairs(GodslayerDB.known) do
     local v = victims[id]
-    if not (v and v.tier) and type(k.n) == "string" then
+    if not archivedIds[id] and not (v and v.tier) and type(k.n) == "string" then
       local tier = ns.Classify(k.g)
       if tier then
         list[#list + 1] = { id = id, name = k.n, guild = k.g, class = k.c, level = k.l, race = k.r, rank = k.k,

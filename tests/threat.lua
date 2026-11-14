@@ -23,7 +23,7 @@ M.addUnit("player", { name = "Vesh Torchman", guid = ME, guild = "The True Torch
                       class = "MAGE", race = "Scourge", sex = 2, faction = "Horde", isMe = true })
 local FILES = { "Data.lua", "Pvp.lua", "Core.lua", "Voice.lua", "Stage.lua", "Clip.lua", "Hype.lua",
                 "Fight.lua", "Aura.lua", "Ledger.lua", "Rank.lua", "Recap.lua", "Field.lua",
-                "Control.lua", "Death.lua", "Threat.lua", "Comm.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
+                "Control.lua", "Death.lua", "Threat.lua", "Comm.lua", "Hunters.lua", "Rival.lua", "Wheel.lua", "UI.lua" }
 local ns = M.load("Godslayer", FILES)
 M.fire("ADDON_LOADED", "Godslayer")
 M.fire("PLAYER_LOGIN")
@@ -155,7 +155,12 @@ eq(T.Of("Grimnight").mine, 1, "one of them yours")
 -- ---------------------------------------------------------------------------
 -- 8. Spread beats raw count: nine of us once each is worse than one of us nine times
 -- ---------------------------------------------------------------------------
-for i = 1, 9 do report("Emberjack", "Grudge", "ROGUE", "Olympus", "Alterac Valley") end
+-- These are nine real deaths rather than nine identical packet replays, so they are spaced past
+-- the inbound dedupe window. The focused replay/rate/cap regressions live in tests/run.lua.
+for i = 1, 9 do
+  report("Emberjack", "Grudge", "ROGUE", "Olympus", "Alterac Valley")
+  M.advance(31)
+end
 for _, who in ipairs({ "Tallow", "Wickline", "Rushbrand", "Emberjack" }) do
   report(who, "Everyone", "HUNTER", "Olympus", "Alterac Valley")
 end

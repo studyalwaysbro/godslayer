@@ -1,4 +1,4 @@
-# Godslayer PvP data, build 1.60.1.70862
+# Godslayer PvP data, build 1.60.1.70938
 
 164 spells read from the client.
 

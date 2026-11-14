@@ -317,6 +317,49 @@ function Stage.Banner(title, color, line, opts)
   end)
 end
 
+-- Flag calls keep one small banner per flag and rewrite it in place. A second report about the
+-- same flag updates that frame instead of stacking another notice, while the other flag retains
+-- its own current line.
+local flagBanners = {}
+local function buildFlagBanner(key)
+  local f = CreateFrame("Frame", "GodslayerFlagBanner" .. key, UIParent)
+  f:SetSize(540, 54)
+  f:SetPoint("TOP", UIParent, "TOP", 0, key == "Alliance" and -260 or -320)
+  f:SetFrameStrata("HIGH")
+  local font = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
+  f.title = f:CreateFontString(nil, "OVERLAY")
+  f.title:SetFont(font, 24, "OUTLINE")
+  f.title:SetPoint("TOP")
+  f.line = f:CreateFontString(nil, "OVERLAY")
+  f.line:SetFont(font, 13, "OUTLINE")
+  f.line:SetPoint("TOP", f.title, "BOTTOM", 0, -3)
+  f.turn = 0
+  f:Hide()
+  flagBanners[key] = f
+  return f
+end
+
+function Stage.FlagBanner(key, title, color, line, opts)
+  if key ~= "Alliance" and key ~= "Horde" then return end
+  local f = flagBanners[key] or buildFlagBanner(key)
+  f.turn = f.turn + 1
+  local mine = f.turn
+  f.title:SetText(title or "")
+  f.title:SetTextColor(color[1], color[2], color[3])
+  f.line:SetText(line or "")
+  f:SetAlpha(1)
+  f:Show()
+  C_Timer.After((opts and opts.hold or 3.4) + 1, function()
+    if f.turn ~= mine then return end
+    if type(UIFrameFadeOut) == "function" and pcall(UIFrameFadeOut, f, 0.8, 1, 0) then
+      C_Timer.After(0.85, function() if f.turn == mine then f:Hide() end end)
+    else
+      f:Hide()
+    end
+  end)
+end
+Stage.flagBanners = flagBanners
+
 -- The line under the words, corrected while it is still up: a kill that has just got its name.
 function Stage.Reline(find, with)
   if not (banner and banner:IsShown() and banner.line) then return false end
