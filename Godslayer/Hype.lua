@@ -259,7 +259,7 @@ Hype.ClipLength = clipLength
 local function sfx(name)
   if not name or not opts().sfx or not soundOn() or not (ns.SFX and ns.SFX[name]) then return false end
   local play = ns.Sound and ns.Sound.PlayFile or PlaySoundFile
-  return plain(try(play, SOUNDS .. "sfx\\" .. name .. ".ogg", opts().channel, ns.SFX[name])) and true or false
+  return plain(try(play, SOUNDS .. "sfx\\" .. name .. ".ogg", opts().channel, ns.SFX[name], "Effects")) and true or false
 end
 Hype.Sfx = sfx
 
@@ -299,9 +299,9 @@ local function playNow(clip, pack)
   local length = clipLength(clip, pack)
   local play = ns.Sound and ns.Sound.PlayFile or PlaySoundFile
   local dir = voiceDir()
-  if dir then own, handle = try(play, dir .. pack .. "\\" .. clip .. ".ogg", channel, length) end
-  if not plain(own) then own, handle = try(play, OWN .. "voice\\" .. pack .. "\\" .. clip .. ".ogg", channel, length) end
-  if not plain(own) then own, handle = try(play, SOUNDS .. pack .. "\\" .. clip .. ".ogg", channel, length) end
+  if dir then own, handle = try(play, dir .. pack .. "\\" .. clip .. ".ogg", channel, length, "Voice") end
+  if not plain(own) then own, handle = try(play, OWN .. "voice\\" .. pack .. "\\" .. clip .. ".ogg", channel, length, "Voice") end
+  if not plain(own) then own, handle = try(play, SOUNDS .. pack .. "\\" .. clip .. ".ogg", channel, length, "Voice") end
   return plain(handle)
 end
 
@@ -316,7 +316,8 @@ local function unduck()
   local was, low = ducked[1], ducked[2]
   ducked = nil
   local o = GodslayerDB and GodslayerDB.opts and GodslayerDB.opts.hype
-  if o then o.duckFrom = nil end
+  if o then o.duckFrom, o.duckTo = nil, nil end
+  if ns.Sound and ns.Sound.MusicDuck then ns.Sound.MusicDuck(false); return end
   local now = musicVolume()
   -- you moved the slider yourself while it was down: yours stands
   if now and math.abs(now - low) > 0.02 then return end
@@ -327,14 +328,24 @@ Hype.Unduck = unduck
 local function duck(seconds)
   if duckBroken or type(SetCVar) ~= "function" or not opts().duck then return end
   if not (track and track.music == "music") then return end
+  if ns.Sound and ns.Sound.MusicDuck then
+    if ns.Sound.MusicDuck(true) then
+      local state = ns.Sound.MusicState and ns.Sound.MusicState()
+      ducked = state and { state.original, state.ours } or ducked or { 0, 0 }
+    end
+    duckTurn = duckTurn + 1
+    local mine = duckTurn
+    C_Timer.After(seconds + 0.2, function() if mine == duckTurn then unduck() end end)
+    return
+  end
   if not ducked then
     local was = musicVolume()
     if not was or was < 0.08 then return end
     local low = math.floor(was * DUCK * 100 + 0.5) / 100
-    opts().duckFrom = was
+    opts().duckFrom, opts().duckTo = was, low
     if not pcall(SetCVar, "Sound_MusicVolume", low) or math.abs((musicVolume() or was) - low) > 0.02 then
       -- this client will not let an addon move the slider: never try again
-      duckBroken, opts().duckFrom = true, nil
+      duckBroken, opts().duckFrom, opts().duckTo = true, nil, nil
       return
     end
     ducked = { was, low }
@@ -471,7 +482,10 @@ local function startMusic()
   if plain(try(GetCVar, "Sound_EnableMusic")) ~= "0" and type(PlayMusic) == "function" then
     -- a client that says no plays it as a sound instead, below
     local ok, will = pcall(PlayMusic, path)
-    if ok and plain(will) ~= false then return "music", theme, path end
+    if ok and plain(will) ~= false then
+      if ns.Sound and ns.Sound.MusicStart then ns.Sound.MusicStart() end
+      return "music", theme, path
+    end
   end
   -- music is switched off in the options: play it as an ordinary sound instead
   local willPlay, handle = try(PlaySoundFile, path, "Master")
@@ -479,10 +493,13 @@ local function startMusic()
   return nil
 end
 
-local function stopMusic(how)
+local function stopMusic(how, keepController)
   if not how then return end
   unduck()
-  if how == "music" then try(StopMusic) else try(StopSound, how, FADE_MS) end
+  if how == "music" then
+    try(StopMusic)
+  else try(StopSound, how, FADE_MS) end
+  if not keepController and ns.Sound and ns.Sound.MusicStop then ns.Sound.MusicStop() end
 end
 
 -- The music is started once, by whichever comes first, the fight or the kill, and is held by both:
@@ -503,12 +520,15 @@ local function holdMusic()
   return track
 end
 
-local function dropMusic()
+local function dropMusic(keepController)
   opts().playing = nil
-  if not track then return end
+  if not track then
+    if not keepController and ns.Sound and ns.Sound.MusicStop then ns.Sound.MusicStop() end
+    return
+  end
   local t = track
   track = nil
-  stopMusic(t.music)
+  stopMusic(t.music, keepController)
 end
 
 -- A fight may start before the target's guild tag is readable. Once that existing fight first
@@ -523,8 +543,11 @@ local function switchToSignature()
   local keepDucked = ducked and volume and math.abs(volume - ducked[2]) <= 0.02
   local now = plain(try(GetTime))
   local duckFor = keepDucked and type(now) == "number" and math.max(0.2, busyUntil - now + OVERLAP) or nil
-  dropMusic()
+  dropMusic(true)
   holdMusic() -- fight.god is already true, so pickSong selects the signature
+  -- A refused PlayMusic handoff may have fallen back to a Master sound handle, or failed entirely.
+  -- Neither path owns the Music slider, so release the controller retained across the handoff.
+  if (not track or track.music ~= "music") and ns.Sound and ns.Sound.MusicStop then ns.Sound.MusicStop() end
   if duckFor and track then duck(duckFor) end
 end
 
@@ -1359,8 +1382,11 @@ end
 function Hype.Login()
   local o = opts()
   if o.duckFrom then
-    pcall(SetCVar, "Sound_MusicVolume", o.duckFrom)
-    o.duckFrom = nil
+    local original = tonumber(o.duckFrom)
+    local ours = tonumber(o.duckTo) or (original and math.floor(original * DUCK * 100 + 0.5) / 100)
+    local live = musicVolume()
+    if original and ours and live and math.abs(live - ours) <= 0.02 then pcall(SetCVar, "Sound_MusicVolume", original) end
+    o.duckFrom, o.duckTo = nil, nil
   end
   -- the interface was reloaded with our song playing: nothing holds it now, so the zone gets its music back
   if o.playing then
@@ -1375,18 +1401,28 @@ end
 local lastAlly, allyLog = -1000, {}
 local ALLY_SENDER_GAP, ALLY_SENDER_HOURLY = 20, 20
 function Hype.Ally(who, points)
-  if not GodslayerDB then return end
+  if not GodslayerDB then return false end
   local o = opts()
-  if not (o.on and o.guild) or type(who) ~= "string" or type(points) ~= "number" or points < 1 then return end
+  if not (o.on and o.guild) or type(who) ~= "string" or type(points) ~= "number" or points < 1 then return false end
   local now, log = GetTime(), allyLog[who]
   if not log then log = {} allyLog[who] = log end
   while log[1] and now - log[1] > 3600 do table.remove(log, 1) end
-  if #log >= ALLY_SENDER_HOURLY or (log[#log] and now - log[#log] < ALLY_SENDER_GAP) then return end
+  if #log >= ALLY_SENDER_HOURLY or (log[#log] and now - log[#log] < ALLY_SENDER_GAP) then return false end
   log[#log + 1] = now
   ns.Print(("|cffffd100%s|r just banked |cffffd100+%d|r."):format(who, points))
-  if hunt or Hype.Speaking() or now - lastAlly < ALLY_GAP then return end
+  if hunt or Hype.Speaking() or now - lastAlly < ALLY_GAP then return true end
   lastAlly = now
   speak({ { pick("ally"), 1 } })
+  return true
+end
+
+-- Slayers feed voice is opt-in at the feed layer. This reuses the existing ally line without
+-- producing the guild chat line a second time.
+function Hype.SlayerVoice()
+  local o = GodslayerDB and opts()
+  if not o or not (o.on and o.voice) or hunt or Hype.Speaking() then return false end
+  speak({ { pick("ally"), 1 } })
+  return true
 end
 
 -- A living Olympian has come into view. A horn, a banner with the name and guild, and a word
@@ -1536,13 +1572,7 @@ function Hype.Command(rest)
     print("  Music stepping back: " .. (duckBroken and "the game refused, so it is left alone" or (o.duck and "on" or "off")) .. ".")
     print("  Banner light: " .. ((ns.Stage and ns.Stage.Ready and ns.Stage.Ready()) and "working" or "plain words (the game refused the animations or the art)") .. ".")
   elseif word == "channel" then
-    local channels = { master = "Master", dialog = "Dialog", sfx = "SFX" }
-    if channels[value] then
-      o.channel = channels[value]
-      say("The announcer and its sounds now play on the " .. o.channel .. " channel, and follow that volume slider.")
-    else
-      say("Channel is " .. o.channel .. ". /godslayer hype channel master | dialog | sfx")
-    end
+    say("Routing is fixed per part: at 100, Voice and Effects play at full game volume on Master. Below 100, Voice borrows Dialog and Effects borrow Ambience. Songs follow Music. The old channel setting no longer applies.")
   elseif word == "test" and (value:match("^sig") or value:match("^streak")) then
     -- previews that touch nothing: a sound of your class, a guildmate's big moment
     local what = value:match("^%S+%s+(.+)$")
@@ -1676,8 +1706,8 @@ function Hype.Command(rest)
     print("  Rungs: " .. (function() local t = {} for _, r in ipairs(LADDER) do t[#t + 1] = r[1] .. " " .. r[2] end return table.concat(t, ", ") end)() .. ".")
     print(("  Moments %s (revenge, domination, giant slayer, outnumbered, comeback, class remarks), a word between rungs %s, DENIED on interrupts %s, duels %s."):format(
       onOff(o.moments), onOff(o.barks), onOff(o.deny), onOff(o.duels)))
-    print(("  Banner light %s, fuse %s, music steps back under the voice %s, screenshots of big moments %s, channel %s."):format(
-      onOff(o.fx), onOff(o.fuse), onOff(o.duck), onOff(o.photo), o.channel))
+    print(("  Banner light %s, fuse %s, music steps back under the voice %s, screenshots of big moments %s. Routing is fixed per part."):format(
+      onOff(o.fx), onOff(o.fuse), onOff(o.duck), onOff(o.photo)))
     print(("  Clip mark for a recorder %s. /godslayer clip marks one by hand."):format(onOff(o.clip)))
     print(("  Song starts with the fight %s, your class's sounds %s, finishers %s, guild big moments %s, groupmates' chat wheel %s."):format(
       onOff(o.engage), onOff(o.class), onOff(o.finishers), onOff(o.streaks), onOff(o.wheel)))

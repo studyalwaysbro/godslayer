@@ -120,7 +120,7 @@ SOUNDKIT = { RAID_WARNING = 8959 }
 function PlaySound(id) M.audio.kits[#M.audio.kits + 1] = { id = id, legacy = true } return true end
 -- sound files and music: M.audio.files names the files that exist on disk
 M.audio = { files = {}, lengths = {}, played = {}, stopped = {}, kits = {}, music = nil, musicStops = 0,
-  cvars = { Sound_EnableAllSound = "1", Sound_EnableMusic = "1", Sound_EnableDialog = "1",
+  cvars = { Sound_EnableAllSound = "1", Sound_EnableMusic = "1", Sound_EnableDialog = "1", Sound_EnableAmbience = "1",
     Sound_DialogVolume = "0.8", Sound_AmbienceVolume = "0.7", Sound_MusicVolume = "0.8" }, next = 0,
   cvarWrites = {} }
 function PlaySoundFile(path, channel)
@@ -129,7 +129,7 @@ function PlaySoundFile(path, channel)
   if not M.audio.files[path] then return false end
   M.audio.next = M.audio.next + 1
   local length = M.audio.lengths[path] or 1.5
-  M.audio.played[#M.audio.played + 1] = { path = path, handle = M.audio.next, at = M.now, length = length }
+  M.audio.played[#M.audio.played + 1] = { path = path, handle = M.audio.next, at = M.now, length = length, channel = channel }
   return true, M.audio.next
 end
 function StopSound(handle, fade) assert(type(handle) == "number") M.audio.stopped[handle] = fade or 0 end
@@ -877,6 +877,7 @@ function LeaveChannelByName(name)
 end
 function GetNumDisplayChannels() return M.channelJoined and 2 or 1 end
 function GetChannelDisplayInfo(index)
+  M.channelDisplayCalls = (M.channelDisplayCalls or 0) + 1
   if index == 1 then return "General", false, false, 1, 20, true, "CHANNEL_CATEGORY_WORLD", "CHANNEL_TYPE_SYSTEM" end
   if index == 2 and M.channelJoined and not M.channelSuspended then
     return "GodslayerHunters", false, false, 9, M.channelRosterCount or #M.channelRoster, true, "CHANNEL_CATEGORY_CUSTOM", "CHANNEL_TYPE_CUSTOM"

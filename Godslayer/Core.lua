@@ -14,7 +14,7 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "3.0.0"
+ns.VERSION = "3.1.0"
 
 local DEDUPE_SECONDS = 10        -- the signals above can all describe the same death
 local MATCH_WINDOW = 8           -- honorable-kill credit and a seen death must be this close
@@ -276,7 +276,20 @@ local function initDB()
   if o.tooltip == nil then o.tooltip = true end
   if o.minimap == nil then o.minimap = true end
   local volume = tonumber(o.volume)
-  o.volume = volume and math.max(0, math.min(100, math.floor(volume + 0.5))) or 100
+  volume = volume and math.max(0, math.min(100, math.floor(volume + 0.5))) or 100
+  -- 3.0's file volume was absolute below 100. Preserve that number for both file parts; Music is
+  -- the only part that composes with the player's own slider in 3.1.
+  if o.volumeVersion ~= 2 then
+    o.master, o.music, o.voice, o.effects = 100, 100, volume, volume
+    o.volumeVersion = 2
+  end
+  local function level(value, fallback)
+    value = tonumber(value)
+    return value and math.max(0, math.min(100, math.floor(value + 0.5))) or fallback
+  end
+  o.master, o.music = level(o.master, 100), level(o.music, 100)
+  o.voice, o.effects = level(o.voice, 100), level(o.effects, 100)
+  o.volume = o.master -- retained for old SavedVariables readers; /godslayer volume is Master now
   o.flag = type(o.flag) == "table" and o.flag or {}
   if o.flag.calls ~= "important" and o.flag.calls ~= "all" and o.flag.calls ~= "off" then o.flag.calls = "important" end
   if o.flag.voice == nil then o.flag.voice = true end
@@ -1657,6 +1670,7 @@ for _, event in ipairs({
   "CHAT_MSG_COMBAT_HONOR_GAIN", "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT",
   "PLAYER_FOCUS_CHANGED", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "CHAT_MSG_ADDON",
   "PLAYER_GUILD_UPDATE", "GROUP_ROSTER_UPDATE", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "PLAYER_DEAD",
+  "CHANNEL_ROSTER_UPDATE", "CHANNEL_UI_UPDATE", "CHANNEL_COUNT_UPDATE", "CHAT_MSG_CHANNEL_NOTICE",
   "PLAYER_LEAVING_WORLD", "LOADING_SCREEN_ENABLED", "PLAYER_LOGOUT",
   -- the ladder: rank is renown on faction 2800 on this build, so the renown event is the one
   -- that actually fires, and PLAYER_PVP_RANK_CHANGED is kept because the Camelot UI listens to it

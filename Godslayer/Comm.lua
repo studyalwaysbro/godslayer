@@ -301,9 +301,19 @@ function Comm.handlers.CHAT_MSG_ADDON(prefix, text, channel, sender)
     local gained = before and time() - (before.t or 0) < 6 * 3600 and points - (before.points or 0) or 0
     local newKills = before and kills - (before.kills or 0) or 0
     -- points with no kills behind them, or more than a handful at once, are a recount or a lie, not a kill
-    if gained >= 1 and newKills >= 1 and newKills <= 5 and gained <= newKills * ns.ORIGINAL_POINTS and ns.Hype then
-      local ok, err = pcall(ns.Hype.Ally, who, gained)
-      if not ok then ns.errors = (ns.errors or 0) + 1 ns.Log("error", "hype ally: " .. tostring(err)) end
+    if gained >= 1 and newKills >= 1 and newKills <= 5
+       and gained <= newKills * ns.ORIGINAL_POINTS and ns.Hype then
+      local duplicate = ns.Hunters and ns.Hunters.GuildDuplicate
+        and ns.Hunters.GuildDuplicate(who, kills)
+      if not duplicate then
+        local ok, presented = pcall(ns.Hype.Ally, who, gained)
+        if not ok then
+          ns.errors = (ns.errors or 0) + 1
+          ns.Log("error", "hype ally: " .. tostring(presented))
+        elseif presented and ns.Hunters and ns.Hunters.MarkPresented then
+          ns.Hunters.MarkPresented(who, kills, "guild")
+        end
+      end
     end
     local stored = {
       kills = kills, points = points, uniques = uniques, kb = kb, orig = orig,

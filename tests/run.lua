@@ -1548,6 +1548,27 @@ do
   eq(M.audio.musicStops, 1, "regression 6: signature switch uses the existing music stop path")
   math.random = realRandom
 
+  -- Drive the same handoff through Hype with a refused signature PlayMusic. The Master fallback is
+  -- a sound handle, so the Music controller retained for the handoff must be released immediately.
+  M.audio.files = { [own .. "kill.mp3"] = true, [own .. "kill2.mp3"] = true }
+  copy = freshRegression()
+  M.audio.cvars.Sound_MusicVolume = "0.8"
+  copy.Sound.SetVolume("master", 50); copy.Sound.SetVolume("music", 50)
+  math.random = function(n) return n and n or 0.5 end
+  copy.Hype.Engage({ name = "Fallback Fighter" })
+  eq(tonumber(M.audio.cvars.Sound_MusicVolume), 0.2,
+    "regression 6 setup: rotation PlayMusic owns the relative Music controller")
+  local realPlayMusic = PlayMusic
+  PlayMusic = function(path) if path == own .. "kill.mp3" then return false end return realPlayMusic(path) end
+  copy.Hype.Engage({ name = "Fallback Olympian", guild = "OLYMPUS", tier = "original" })
+  local fallback = M.audio.played[#M.audio.played]
+  check(fallback and fallback.path == own .. "kill.mp3" and fallback.channel == "Master",
+    "regression 6: refused signature handoff uses the Master sound fallback")
+  eq(tonumber(M.audio.cvars.Sound_MusicVolume), 0.8,
+    "regression 6: signature fallback releases and restores the Music controller")
+  eq(copy.Sound.MusicState(), nil, "regression 6: signature fallback leaves no Music controller")
+  PlayMusic, math.random = realPlayMusic, realRandom
+
   M.audio.files = { [own .. "kill.mp3"] = true, [own .. "kill2.mp3"] = true }
   copy = freshRegression()
   copy.Hype.Opts().music = false
@@ -1568,6 +1589,33 @@ do
   assert(loadfile("Godslayer/Data.lua"))("Godslayer", probe)
   assert(loadfile("Godslayer/Core.lua"))("Godslayer", probe)
   eq(toc:match("## Version: ([%d%.]+)"), probe.VERSION, "the toc and the code agree on the version")
+  check(toc:find("ranks Godslayer users of your faction and ruleset on the cross-realm Slayers board", 1, true)
+    and not toc:find("every Godslayer user", 1, true),
+    "the toc describes the faction-and-ruleset Slayers board without claiming every user")
+
+  local releaseFile = assert(io.open("docs/release-notes-3.1.0.md"))
+  local release = releaseFile:read("*a"); releaseFile:close()
+  check(release:find("Live kill news needs both players on 3.1. Players still on 3.0 see your new totals on the board, but", 1, true)
+    and release:find("If you score again before your last kills reached everyone, the next line counts them together", 1, true),
+    "release notes state the 3.1 live-news and 3.0 board boundary")
+  check(release:find("Kills inside battlegrounds and dungeons are shared after you leave", 1, true)
+    and release:find("A batch older than five minutes still updates the board without a chat line", 1, true),
+    "release notes state instance deferral and the five-minute quiet boundary")
+  check(release:find("At 100, Godslayer plays at full game volume as before", 1, true)
+    and release:find("songs follow your Music slider", 1, true),
+    "release notes state absolute file volume and relative Music")
+  check(release:find("Horde and Alliance cannot exchange addon messages, and Godslayer keeps each ruleset on its own board", 1, true),
+    "release notes state the faction and ruleset boundary accurately")
+  check(release:find("Not proven in game yet", 1, true) and not release:find("—", 1, true),
+    "release notes retain the honest live-game caveat in plain text")
+
+  local engineeringFile = assert(io.open("docs/engineering-3.1.0.md"))
+  local engineering = engineeringFile:read("*a"); engineeringFile:close()
+  check(engineering:find("Finalization captures the complete row once", 1, true)
+    and engineering:find("send scheduler reserves one of each three", 1, true)
+    and engineering:find("Voice and Effects once again use absolute levels", 1, true)
+    and engineering:find("## Rollback", 1, true),
+    "engineering record covers frozen news, response reservation, absolute audio, and rollback")
 end
 -- The clock, last. A fractional time() is a client this game does not have, and the damage it does
 -- is invisible: date() throws, try() eats it, and every kill quietly loses its day and its hour

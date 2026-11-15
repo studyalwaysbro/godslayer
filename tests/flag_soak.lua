@@ -26,7 +26,7 @@ for seed = FIRST, FIRST + RUNS - 1 do
   M.widget(1891, 1, "0")
   M.widget(1892, 1, "0")
   M.audio.files, M.audio.lengths, M.audio.played, M.audio.stopped, M.audio.kits = {}, {}, {}, {}, {}
-  M.audio.cvars = { Sound_EnableAllSound = "1", Sound_EnableMusic = "1", Sound_EnableDialog = "1",
+  M.audio.cvars = { Sound_EnableAllSound = "1", Sound_EnableMusic = "1", Sound_EnableDialog = "1", Sound_EnableAmbience = "1",
     Sound_DialogVolume = "0.8", Sound_AmbienceVolume = "0.7", Sound_MusicVolume = "0.8" }
   M.audio.cvarWrites, M.audio.next = {}, 0
   M.setSpoken(nil)

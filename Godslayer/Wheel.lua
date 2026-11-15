@@ -38,7 +38,7 @@ local function play(n)
   if plain(try(GetCVar, "Sound_EnableAllSound")) == "0" then return false end
   local length = ns.WHEEL.clips["wheel_" .. n]
   local playFile = ns.Sound and ns.Sound.PlayFile or PlaySoundFile
-  local ok, handle = try(playFile, SOUNDS .. "wheel_" .. n .. ".ogg", opts().channel or "Master", length)
+  local ok, handle = try(playFile, SOUNDS .. "wheel_" .. n .. ".ogg", opts().channel or "Master", length, "Voice")
   return plain(ok) and true or false, plain(handle)
 end
 

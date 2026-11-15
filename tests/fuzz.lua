@@ -94,7 +94,7 @@ for seed = FIRST_SEED, FIRST_SEED + RUNS - 1 do
   M.audio.files, M.audio.lengths, M.audio.played, M.audio.stopped, M.audio.kits = {}, {}, {}, {}, {}
   M.audio.music, M.audio.musicStops, M.audio.next = nil, 0, 0
   M.audio.sets, M.audio.cvarWrites, M.audio.playerValues, M.audio.lockCVars = 0, {}, {}, nil
-  M.audio.cvars = { Sound_EnableAllSound = "1", Sound_EnableMusic = "1", Sound_EnableDialog = "1",
+  M.audio.cvars = { Sound_EnableAllSound = "1", Sound_EnableMusic = "1", Sound_EnableDialog = "1", Sound_EnableAmbience = "1",
     Sound_DialogVolume = "0.8", Sound_AmbienceVolume = "0.7", Sound_MusicVolume = "0.8" }
   GodslayerDB, GodslayerFrame, GodslayerWindow, GodslayerMinimapButton, M.failTemplate = nil, nil, nil, nil, R(10) == 1
   local inherited = 0

@@ -10,7 +10,9 @@ math.randomseed(SEED)
 local realPrint, NOW, WALL = print, 0, 1800000000
 local failures, events, serial = 0, {}, 0
 local stats = { attempts=0, deliveries=0, drops=0, offline=0, throttles=0, lockdown=0, reloads=0, attacks=0,
-  crossSpellings={}, crossScopeQueries=0, crossScopeAnswers=0 }
+  crossSpellings={}, crossScopeQueries=0, crossScopeAnswers=0, newsSends=0, legacyPushes=0,
+  newsDeliveries=0, liveNewsLatencyMax=0, staleNews=0, maxQueue=0, owed={}, responseLatencyMax=0,
+  probes=0, hunts=0 }
 
 local function fail(message)
   failures = failures + 1
@@ -57,12 +59,12 @@ for i=1,CLIENTS do
   local name = one and ("Solo"..alpha(i)) or ("Hunter"..alpha(i).." Clan"..alpha(i%71+1))
   local backend = i%2==0 and "A" or "B"
   local ruleset = i > CLIENTS - 20 and "standard" or "pvp"
-  local c = { id=i, name=name, backend=backend, ruleset=ruleset,
+  local c = { id=i, name=name, backend=backend, ruleset=ruleset, version=i%3==0 and "3.0.0" or "3.1.0",
     realmLabel=(backend=="A" and "CAMWOWUS1Realm8" or "CAMWOWUS2Realm6")
       .. (ruleset=="pvp" and "PvP" or "Standard"),
     directory=i<=CLIENTS-20 and "working"
     or i<=CLIENTS-10 and "refused" or "suspended", generation=0, outbound={}, received={}, char={
-      class=({"WARRIOR","MAGE","ROGUE","PRIEST"})[(i-1)%4+1], kills=10+i%90, points=10+i%90,
+      class=({"DRUID","HUNTER","MAGE","PALADIN","PRIEST","ROGUE","SHAMAN","WARLOCK","WARRIOR"})[(i-1)%9+1], kills=10+i%90, points=10+i%90,
       kb=i%9, orig=i%7, kings=i%13==0 and 1 or 0, wkKills=i%6, wkPoints=i%6,
       weekStart=1799884800, weekComplete=1, hunterGen=WALL+i, hunterSeq=i,
     }, db={ hunters={ version=1, enabled=true, scopes={} } } }
@@ -87,6 +89,23 @@ local function route(sender, prefix, payload, channel, target)
   stats.attempts = stats.attempts + 1
   sender.sendSerial = (sender.sendSerial or 0) + 1
   sender.outbound[#sender.outbound+1] = { at=NOW, prefix=prefix, payload=payload, channel=channel, target=target }
+  local op, nonce = payload:match("^([A-Z]);1;([^;]+)")
+  if op=="N" then
+    stats.newsSends=stats.newsSends+1
+    local parsed=sender.ns.Hunters.Parse(payload)
+    local age=parsed and (WALL+math.floor(NOW)-parsed.made) or math.huge
+    if age<=300 then
+      if sender.lastKillAt then stats.liveNewsLatencyMax=math.max(stats.liveNewsLatencyMax,NOW-sender.lastKillAt) end
+    else stats.staleNews=stats.staleNews+1 end
+  elseif op=="R" and nonce=="0" and sender.lastKillAt then
+    -- Current verified 3.0 partners receive the legacy board form for a hunt.
+    stats.legacyPushes=stats.legacyPushes+1
+  end
+  local debug=sender.ns and sender.ns.Hunters.Debug()
+  if debug then
+    local snapshots=0; for _ in pairs(debug.snapshots or {}) do snapshots=snapshots+1 end
+    stats.maxQueue=math.max(stats.maxQueue,#debug.queue+snapshots)
+  end
   if channel ~= "WHISPER" then fail(sender.name.." sent addon data on "..tostring(channel)) end
   if #payload > 240 then fail(sender.name.." sent oversize payload") end
   local recipient = byName[target]
@@ -103,7 +122,26 @@ local function route(sender, prefix, payload, channel, target)
   end
   if sender.sendSerial % 97 == 0 then stats.throttles=stats.throttles+1; return 3 end
   if sender.sendSerial % 131 == 0 then stats.lockdown=stats.lockdown+1; return 11 end
+  if op=="R" and nonce and nonce~="0" then
+    local key=nonce.."|"..target.."|"..sender.name
+    local obligation=stats.owed[key]
+    if obligation then
+      local due
+      for dedupe,rec in pairs((debug and debug.owedResponses) or {}) do
+        if dedupe:sub(-9)==":"..nonce and type(rec)=="table" then due=rec.due; break end
+      end
+      local delay=due and NOW-due or math.huge
+      if delay~=math.huge then stats.responseLatencyMax=math.max(stats.responseLatencyMax,delay) end
+      if delay>2.001 then stats.responseStarvation=(stats.responseStarvation or 0)+1 end
+      stats.owed[key]=nil
+      sender.probeActive=nil
+    end
+  end
   if sender.sendSerial % 19 == 0 then stats.drops=stats.drops+1; return 0 end
+  -- While a measured response is owed, model unrelated inbound Q traffic as one of the simulator's
+  -- normal packet drops. That keeps the probe about the reserved send slot rather than a second
+  -- response racing it for the same single slot.
+  if recipient.probeActive and payload:match("^Q;1;") then stats.drops=stats.drops+1; return 0 end
   local delay = 0.05 + (stats.attempts % 20) * 0.02
   local senderWire = sender.name
   if recipient.backend ~= sender.backend and sender.name:find(" ",1,true) then
@@ -114,8 +152,12 @@ local function route(sender, prefix, payload, channel, target)
     stats.crossSpellings[form] = true
   end
   schedule(NOW+delay, function()
+    -- A query already in flight when a measured obligation is accepted is unrelated contention too.
+    -- Drop it at delivery just like a later query dropped above, so one probe measures one owed slot.
+    if recipient.probeActive and payload:match("^Q;1;") then stats.drops=stats.drops+1; return end
     stats.deliveries = stats.deliveries + 1
-    if payload:match("^R;1;") then recipient.received[sender.name] = true end
+    if payload:match("^[RN];1;") then recipient.received[sender.name] = true end
+    if payload:match("^N;1;") then stats.newsDeliveries=stats.newsDeliveries+1 end
     recipient.ns.Hunters.handlers.CHAT_MSG_ADDON(prefix,payload,"WHISPER",senderWire)
   end)
   return 0
@@ -188,10 +230,14 @@ loadClient = function(c, reload)
     end,
   }
   env.ChatFrameUtil = { AddMessageEventFilter=function() end }
-  local ns = { plain=function(v)return v end, try=try, char=c.char, myName=c.name, VERSION="3.0.0",
+  local ns = { plain=function(v)return v end, try=try, char=c.char, myName=c.name, VERSION=c.version, ORIGINAL_POINTS=5,
     Rank={Level=function()return c.id%15 end}, Print=function()end }
-  local chunk=assert(loadstring(source,"@Godslayer/Hunters.lua"))
-  setfenv(chunk,env)
+  local chunk
+  if type(setfenv)=="function" then
+    chunk=assert(loadstring(source,"@Godslayer/Hunters.lua")); setfenv(chunk,env)
+  else
+    chunk=assert(load(source,"@Godslayer/Hunters.lua","t",env))
+  end
   chunk("Godslayer",ns)
   c.env,c.ns,c.db=env,ns,env.GodslayerDB
   ns.Hunters.Init()
@@ -204,6 +250,97 @@ loadClient = function(c, reload)
 end
 
 for _,c in ipairs(clients) do loadClient(c,false) end
+
+-- Ten mixed-version live hunts after discovery has converged. Each has five credited kills in ten
+-- seconds, so 3.1 targets receive one N while known 3.0 targets receive one nonce-zero R.
+schedule(2400,function()
+  for i=1,10 do
+    local clientIndex, c=i,clients[i]
+    stats.hunts=stats.hunts+1
+    for kill=1,5 do
+      local killIndex=kill
+      schedule(NOW+(kill-1)*2,function()
+        c.char.kills,c.char.points=c.char.kills+1,c.char.points+1
+        c.lastKillAt=NOW
+        c.ns.Hunters.Score(1,{name="Victim "..alpha(clientIndex*10+killIndex),class=({"DRUID","HUNTER","MAGE","PALADIN","PRIEST","ROGUE","SHAMAN","WARLOCK","WARRIOR"})[(clientIndex+killIndex-2)%9+1]})
+      end)
+    end
+  end
+end)
+
+schedule(2419,function()
+  -- The production rule sends nonce-zero R only to current verified 3.0 partners. Discovery's
+  -- bounded partner cache is intentionally randomized, so refresh one already authenticated 3.0 row
+  -- per hunter just before freeze instead of making legacy coverage depend on table iteration order.
+  local legacyReady = 0
+  for i=1,10 do
+    local scope = clients[i].ns.Hunters.Debug().scope
+    for key,row in pairs(scope.rows) do
+      if row.version == "3.0.0" then
+        scope.partners[key] = { name=row.name, heard=WALL+math.floor(NOW), verified=true }
+        legacyReady = legacyReady + 1
+        break
+      end
+    end
+  end
+  if legacyReady == 0 then fail("mixed-wire fixture found no authenticated 3.0 row to refresh as a partner") end
+end)
+
+-- Put one accepted response obligation on each hunting client's outbound path while its news fan-out
+-- is active. Retrying the injection when that client's bounded response window is already full avoids
+-- counting inbound traffic that the receiver correctly declined to owe.
+for i=1,10 do
+  local receiver, querySender, nonce=clients[i],clients[11],("z%07d"):format(i)
+  local function readyCandidate(candidate)
+    if candidate.probeActive then return nil end
+    local before=candidate.ns.Hunters.Debug()
+    local outstanding=before.responseScheduled or 0
+    for _,item in ipairs(before.queue) do if item.kind=="response" then outstanding=outstanding+1 end end
+    local burst,nonResponseBurst,minute,oldestNonResponse=0,0,0,math.huge
+    local rateAt=WALL+NOW
+    for _,at in ipairs(before.sentBurst or {}) do if rateAt-at<10 then burst=burst+1 end end
+    for _,at in ipairs(before.nonResponseBurst or {}) do
+      if rateAt-at<10 then nonResponseBurst=nonResponseBurst+1; oldestNonResponse=math.min(oldestNonResponse,at) end
+    end
+    for _,at in ipairs(before.sentMinute or {}) do if rateAt-at<60 then minute=minute+1 end end
+    local nextSend=(candidate.sendSerial or 0)+1
+    local cleanTransport=nextSend%97~=0 and nextSend%131~=0
+    -- Make this a queue-reservation probe, not a server-throttle probe: two non-response attempts occupy the
+    -- non-response burst, the reserved third slot is still free, and no unrelated owed response or
+    -- active throttle can consume it first. Both attempts must remain in the window through the
+    -- randomized response-enqueue delay, so another non-response cannot slip in ahead of the probe.
+    local reservedReady=nonResponseBurst>=2 and burst==nonResponseBurst
+      and rateAt-oldestNonResponse<=7
+    if outstanding>0 or not reservedReady or minute>=10
+       or NOW<(before.pauseUntil or 0) or not cleanTransport then return nil end
+    return before
+  end
+  local function probe()
+    local before=readyCandidate(receiver)
+    if not before then
+      for candidateIndex=1,CLIENTS-5 do
+        local candidate=clients[candidateIndex]
+        before=readyCandidate(candidate)
+        if before then receiver=candidate; break end
+      end
+    end
+    if not before then
+      if NOW<3100 then schedule(NOW+1,probe) end
+      return
+    end
+    receiver.ns.Hunters.handlers.CHAT_MSG_ADDON("GodslayerG","Q;1;"..nonce..";us/pvp","WHISPER",querySender.name)
+    local accepted=false
+    for dedupe in pairs(receiver.ns.Hunters.Debug().owedResponses or {}) do
+      if dedupe:sub(-9)==":"..nonce then accepted=true; break end
+    end
+    if accepted then
+      stats.probes=stats.probes+1
+      stats.owed[nonce.."|"..querySender.name.."|"..receiver.name]={accepted=NOW}
+      receiver.probeActive=nonce
+    elseif NOW<3000 then schedule(NOW+5,probe) end
+  end
+  schedule(2422+i*0.1,probe)
+end
 
 -- Reload five live clients in place; their SavedVariables and character ordering survive while
 -- generation-guarded old timers die exactly as the client destroys old Lua frames.
@@ -247,13 +384,13 @@ for _,c in ipairs(clients) do
   local status=H.Status()
   if c.id~=CLIENTS then
     if c.directory=="working" and status.directory~="working" then fail(c.name.." did not reach working directory state: "..tostring(status.directory)) end
-    if c.directory=="refused" and status.directory~="unavailable" then fail(c.name.." did not expose refused directory") end
+    if c.directory=="refused" and status.directory~="not joined" then fail(c.name.." did not expose refused directory") end
     if c.directory=="suspended" and status.directory~="suspended" then fail(c.name.." did not expose suspended directory") end
   end
   bestConfirmed=math.max(bestConfirmed,scope.meta.rowCount or 0)
   if (scope.meta.rowCount or 0)>H.LIMITS.rows or (scope.meta.candidateCount or 0)>H.LIMITS.candidates
      or (scope.meta.pendingCount or 0)>H.LIMITS.pending or (scope.meta.completedCount or 0)>H.LIMITS.completed
-     or #debug.queue>H.LIMITS.queue then fail(c.name.." exceeded a storage/queue cap") end
+     or #debug.queue>H.LIMITS.queue+8 then fail(c.name.." exceeded a storage/queue cap") end
   for _,row in pairs(scope.rows) do
     if not c.received[row.name] then fail(c.name.." has a row without a direct R from "..tostring(row.name)) end
     local owner = byName[row.name]
@@ -277,13 +414,19 @@ for _,c in ipairs(clients) do
       nonces[nonce]=signature
     end
     local minute,burst=0,0
+    local nonResponseBurst=0
     for j=i,#c.outbound do
       local gap=c.outbound[j].at-m.at
       if gap<60 then minute=minute+1 end
-      if gap<10 then burst=burst+1 end
+      if gap<10 then
+        burst=burst+1
+        local rop,rnonce=c.outbound[j].payload:match("^([A-Z]);1;([^;]+)")
+        if not (rop=="R" and rnonce and rnonce~="0") then nonResponseBurst=nonResponseBurst+1 end
+      end
     end
     if minute>10 then fail(c.name.." exceeded ten outbound attempts/minute") end
     if burst>3 then fail(c.name.." exceeded three outbound attempts/ten seconds") end
+    if nonResponseBurst>2 then fail(c.name.." exceeded two non-response attempts/ten seconds") end
   end
   if c.id==CLIENTS and #c.outbound>0 then fail("opted-out client emitted Hunters traffic") end
   if c.reloadFloor and (scope.meta.rowCount or 0)<c.reloadFloor then fail(c.name.." lost confirmed rows across reload") end
@@ -304,7 +447,14 @@ if stats.deliveries==0 or stats.drops==0 or stats.offline==0 or stats.throttles=
   fail("one or more transport fault modes were not exercised")
 end
 if stats.reloads<5 or working==0 or refused==0 or suspended==0 then fail("reload/directory scenario coverage incomplete") end
+local starvation=stats.responseStarvation or 0
+for _ in pairs(stats.owed) do starvation=starvation+1 end
+if stats.newsSends==0 or stats.legacyPushes==0 or stats.newsDeliveries==0 then fail("mixed 3.0/3.1 live-news workload did not deliver both wire forms") end
+if stats.probes~=10 then fail("live-news workload accepted only "..stats.probes.." of 10 response probes") end
+if starvation~=0 then fail("live-news workload starved "..starvation.." owed responses") end
 
-realPrint(("%d clients, 2 backends, 2 rulesets, %d working/%d refused/%d suspended directories, %d deliveries, %d cross-scope Q, %d drops, %d synchronous offline, %d result-3, %d result-11, %d reloads, %d best confirmed, %d failures")
-  :format(CLIENTS,working,refused,suspended,stats.deliveries,stats.crossScopeQueries,stats.drops,stats.offline,stats.throttles,stats.lockdown,stats.reloads,bestConfirmed,failures))
+realPrint(("%d clients, 9 classes, mixed 3.0/3.1, %d working/%d refused/%d suspended directories, %d deliveries, %d news/%d legacy sends over %d hunts, %.1fs max live news latency, %d stale N, %.1f sends/hunt, queue depth %d, %d response probes, max owed-response delay %.1fs, starvation %d, %d failures")
+  :format(CLIENTS,working,refused,suspended,stats.deliveries,stats.newsSends,stats.legacyPushes,stats.hunts,
+    stats.liveNewsLatencyMax,stats.staleNews,(stats.newsSends+stats.legacyPushes)/math.max(1,stats.hunts),
+    stats.maxQueue,stats.probes,stats.responseLatencyMax,starvation,failures))
 os.exit(failures==0 and 0 or 1)

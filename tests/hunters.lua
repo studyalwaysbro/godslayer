@@ -72,7 +72,7 @@ return function(M, check, eq, ME)
   local ns = fresh()
   local H = ns.Hunters
   check(GodslayerDB.hunters.enabled == true, "hunters: sharing defaults on")
-  check(table.concat(M.printed, "\n"):find("name, class, kill counts, Olympus kills, and rung", 1, true),
+  check(table.concat(M.printed, "\n"):find("name, class, kill counts, Olympus kills, rung", 1, true),
     "hunters: first-run chat notice names every shared field")
   check(table.concat(M.printed, "\n"):find("cannot erase copies already received", 1, true),
     "hunters: first-run notice states remote retention honestly")
@@ -340,7 +340,8 @@ return function(M, check, eq, ME)
     GodslayerFrame.tabs[3].__scripts.OnClick()
     GodslayerFrame.boardButtons[2].__scripts.OnClick()
     M.advance(0)
-    check(GodslayerFrame.guildNote.__text:find("looking for hunters", 1, true),
+    check(GodslayerFrame.guildNote.__text:find("looking for Slayers", 1, true)
+      and not GodslayerFrame.guildNote.__text:find("unavailable", 1, true),
       "hunters review: footer says the directory is starting, not unavailable, right after login")
     noticeNS.UI.Toggle()
   end
@@ -520,7 +521,7 @@ return function(M, check, eq, ME)
   for i, at in ipairs(responseTimes) do
     local responses = 0
     for j = i, #responseTimes do if responseTimes[j] - at < 60 then responses = responses + 1 end end
-    check(responses <= 6, "hunters pacing: at most six query responses per minute")
+    check(responses <= 10, "hunters pacing: owed query responses use the hard ten-per-minute ceiling")
   end
   for i = 2, #sent do check(sent[i][4] - sent[i-1][4] >= 1.999, "hunters pacing: global minimum spacing is two seconds") end
   for i = 1, #sent do
@@ -541,7 +542,7 @@ return function(M, check, eq, ME)
   local offlineQ = waitForQuery("Offline Hunter", 1900)
   check(offlineQ ~= nil, "hunters result 12: offline candidate was attempted")
   local offline = scope.candidates[H.RowKey("Offline Hunter")]
-  check(offline and offline.fail >= 1, "hunters result 12: synchronous offline line applies target backoff")
+  check(offline and (offline.fail or 0) >= 1, "hunters result 12: synchronous offline line applies target backoff")
   M.syncOffline["Offline Hunter"] = nil
 
   H.NoteCandidate("Delayed Hunter", "test")
@@ -589,7 +590,9 @@ return function(M, check, eq, ME)
   M.addonResult = 11
   M.fire("CHAT_MSG_ADDON", "GodslayerG", "Q;1;lockdown;us/pvp", "WHISPER", "Lockdown Peer")
   M.advance(4)
-  for _, item in ipairs(H.Debug().queue) do check(item.p <= 2, "hunters result 11: only priority one/two work is retained") end
+  local retainedDiscovery = false
+  for _, item in ipairs(H.Debug().queue) do if item.kind == "Q" or item.kind == "D" then retainedDiscovery = true end end
+  check(retainedDiscovery, "hunters result 11: discovery work is retained without candidate failure")
   M.addonResult = 0
 
   -- Caps are exercised through the same insertion paths used by directory and direct replies.
@@ -707,7 +710,7 @@ return function(M, check, eq, ME)
   for _, setting in ipairs(category.settings or {}) do if setting.variable == "GODSLAYER_HUNTERS_SHARE" then share = setting end end
   check(share ~= nil, "hunters options: share checkbox registered")
   check(category.layout and category.layout.initializers[1]
-    and category.layout.initializers[1].text == "Hunters board: US, Horde, PvP",
+    and category.layout.initializers[1].text == "Slayers board: US, Horde, PvP",
     "hunters options: header names the scope plainly and leaves on/off to the checkbox")
   local hunterSource = assert(io.open("Godslayer/Hunters.lua")):read("*a")
   check(not hunterSource:find("\226\128\148", 1, true) and not hunterSource:find("\226\128\147", 1, true),
@@ -724,7 +727,7 @@ return function(M, check, eq, ME)
   check(GodslayerDB.hunters.enabled == true, "hunters slash: on restores sharing")
   check(M.channelJoined, "hunters regression S2: opt-in rejoins the directory channel")
   SlashCmdList.GODSLAYER("hunters status")
-  check(M.printed[#M.printed]:find("Hunters on", 1, true), "hunters slash: status reports live state")
+  check(M.printed[#M.printed]:find("Slayers on", 1, true), "hunters slash alias: status reports live state")
 
   -- Saved rows and local ordering survive reload, while session-bound pending nonces do not.
   local saved, generation, seq = GodslayerDB, ns.char.hunterGen, ns.char.hunterSeq
@@ -742,7 +745,7 @@ return function(M, check, eq, ME)
   M.channelRefused = true
   M.fire("PLAYER_ENTERING_WORLD")
   M.advance(130)
-  check(H.Status().directory == "unavailable", "hunters directory: refused channel is visibly unavailable")
+  check(H.Status().directory == "not joined", "hunters directory: refused channel is visibly not joined")
   check(M.joinCalls <= 2, "hunters directory: refusal follows the bounded join schedule")
 
   ns = fresh(); H = ns.Hunters
@@ -755,7 +758,7 @@ return function(M, check, eq, ME)
   M.channelJoined, M.channelRosterCount = true, 0
   M.fire("PLAYER_ENTERING_WORLD")
   M.advance(150)
-  check(#M.selectedDisplays <= 4 and H.Status().directory == "unavailable",
+  check(#M.selectedDisplays <= 4 and H.Status().directory == "waiting for roster",
     "hunters regression S4: empty directory fetch stops after the 3- and 8-second polls")
 
   ns = fresh(); H = ns.Hunters

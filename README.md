@@ -15,8 +15,9 @@ Made by **The True Torchmen**. For the Horde.
 - **Counts your kills.** Every unique player, which guild they wore, how many times, how many were your killing blow.
 - **Scores them.** One point for any player. Three for a member of the guild you name your rival. Five for a member of the original `OLYMPUS`, and one for any other guild in its network (Olympus Kitchen, OLYMPUS BETZ, OLYMPUS LXX), if the network is even on your server.
 - **Guild leaderboard.** Every guildmate running Godslayer shows up, ranked by points. No setup.
-- **The Hunters board.** Next to the guild board: every Godslayer user on your faction and ruleset, across realms, ranked by points, for all time or this week. A player only ranks once their own copy has sent you their score directly, so nobody can post a score for someone else. See [The Hunters board](#the-hunters-board) for exactly what it shares and how to turn it off.
-- **Its own volume.** `/godslayer volume 0-100`, or the slider in Options, AddOns, Godslayer.
+- **The Slayers board.** Next to the guild board: Godslayer users of every class and every guild on your faction and ruleset, across realms, ranked #1, #2, #3 and on by points, for all time or this week. A player only ranks once their own copy has sent you their score directly, so nobody can post a score for someone else. See [The Slayers board](#the-slayers-board) for exactly what it shares and how to turn it off.
+- **Live kill news.** When another Slayer scores, a line in your chat says who, how many, and where they now rank. Everyone, top 10 only, or off.
+- **Its own volume.** Master, Music, Voice and Effects, each 0 to 100: `/godslayer volume`, or the sliders in Options, AddOns, Godslayer.
 - **60+ brag lines.** One click posts your numbers to guild chat in a new way each time. Some of them now name your nemesis or your rival. There is also a button that posts one victim's whole record. The Olympus-flavoured lines keep themselves in reserve until you actually land an Olympus kill.
   > Zeus called. He wants his 14 guildies back. They're still running from the graveyard.
 - **Titles.** Start as an Unlit Torch. Work up through Heretic, Temple Robber, Thief of Fire and Pantheon Problem to Godslayer. There is one title above Godslayer. You will have to earn it to read it.
@@ -309,48 +310,76 @@ at the bottom of the report, because a silent drop is the bug you never find.
 The leaderboard also carries a **Rung** column now — everyone's place on the fourteen, which rides
 along on the same message the totals do.
 
-## The Hunters board
+## The Slayers board
 
-The guild board only knows your guild. The Hunters board is everyone else: every player running
-Godslayer on your faction and ruleset, whatever their guild or realm. Leaderboard tab, **Hunters**,
-then **Lifetime** or **This week**.
+The guild board only knows your guild. The Slayers board is everyone else: every player running
+Godslayer on your faction and ruleset, of every class, whatever their guild or realm. Leaderboard tab,
+**Slayers**, then **Lifetime** or **This week**. (Before 3.1 it was called the Hunters board, and
+`/godslayer hunters` still works.)
 
 **How a row gets on it.** Your copy asks other copies for their score, one whispered question at a
 time, and a row ranks only when it came straight from the player it belongs to. Nobody can hand you
 somebody else's score, and nothing is relayed. Scores are still self-reported: the board says so at
-the top, and it ranks you among the hunters *your client* has confirmed, because that is what it is.
+the top, and it ranks you among the Slayers *your client* has confirmed, because that is what it is.
 It starts empty after you update and fills over your first session as the copies find each other.
 
 **How copies find each other.** Godslayer joins a hidden chat channel, `GodslayerHunters`, and reads
 its member list. The channel is never added to a chat window and nothing is ever posted in it: on
 Forever an addon cannot send data on a custom channel, so every message is an addon whisper.
-Guildmates and group members on 3.0 are found too. All of it is paced (at most ten messages a
-minute, never in combat, never in an instance), and the game's "No player named ..." line for a
-whisper to someone who just logged off is hidden.
+Guildmates and group members are found too. All of it is paced (at most ten messages a minute,
+never in combat, never in an instance), and the game's "No player named ..." line for a whisper to
+someone who just logged off is hidden.
+
+**Live kill news.** When you score, your copy waits a few seconds for the fight to settle, then
+whispers the new total to other Slayers, so five quick kills become one line instead of five:
+"Zed (Mage) took down 3 players, +3. 47 kills, #3 on Slayers." A single kill names the victim and
+their class when the game provides them. If you score again before your last kills reached
+everyone, the next line counts them together. On a board of more than 20 players the messages are
+spread across turns, so not every kill reaches every client live; the board itself still catches up.
+Kills inside battlegrounds and dungeons are shared after you leave, because the game blocks addon
+whispers there, and a batch more than five minutes old updates the board without a chat line.
+Live news needs both players on 3.1; players still on 3.0 see your new totals on the board.
+
+`/godslayer slayers feed everyone`, `feed top10` or `feed off` picks which lines you see.
+`feed banner on` also shows each line as a banner, and `feed voice on` adds an announcer line when
+someone enters the top three. Both are off unless you turn them on.
 
 **This week** follows the game's weekly reset. A week you started tracking part way through is
 listed under "tracking began mid-week" instead of being ranked against full weeks, so your first
 week after updating ranks from the next reset.
 
 **What it shares, and with whom.** Your character name, class, kills, points, killing blows, Olympus
-kills, regicides, rung, this week's kills and points, and your Godslayer version, sent by hidden
-addon whisper to Godslayer users of your faction and ruleset who ask for them. Their copies keep your row for
-up to seven days. No guild, no level, no location.
+kills, regicides, rung, this week's kills and points, your Godslayer version, and your kills as they
+happen, including the victim's name and class when known. It is sent by hidden addon whisper to
+Godslayer users of your faction and ruleset. Their copies keep your row for up to seven days. No
+guild, no level, no location. Horde and Alliance cannot exchange addon messages, and Godslayer keeps
+each ruleset on its own board.
 
-**Turning it off.** `/godslayer hunters off`, or untick **Share on the Hunters board** in Options,
+**Turning it off.** `/godslayer slayers off`, or untick **Share on the Slayers board** in Options,
 AddOns, Godslayer. Your copy stops sending and answering at once and leaves the channel. It cannot
 erase rows other players' copies already hold; those expire on their own within seven days.
-`/godslayer hunters on` turns it back on, `/godslayer hunters status` says what it is doing.
+`/godslayer slayers on` turns it back on, `/godslayer slayers status` says what it is doing.
 
 ## Volume
 
-`/godslayer volume 0-100`, or the slider in Options, AddOns, Godslayer, sets how loud the
-announcer, its effects and the chat wheel are. The game gives addons no volume control for their
-own sound files, so below 100 Godslayer sets your Dialog volume (Ambience, if Dialog is off) to
-that level while one of its lines plays, and puts yours back when the last one ends. Move that
-slider yourself in the meantime and your setting wins. An NPC speaking at that moment plays at
-Godslayer's level. At 100 nothing is touched. Your kill song is game music and follows the music
-slider, as before.
+Godslayer has four levels, each 0 to 100, in Options, AddOns, Godslayer or by command:
+`/godslayer volume` prints them, `/godslayer volume 50` sets Master, and
+`/godslayer volume music|voice|effects 50` sets one part. Master scales the other three.
+
+- **Voice** is the announcer and the chat wheel.
+- **Effects** are the sounds under the voice and the window clicks.
+- **Music** is your hunt song.
+
+The game gives addons no volume control for their own sound files. At 100, Voice and Effects play
+at full game volume, exactly as before. Below 100, a voice line briefly borrows your Dialog slider
+(Ambience, if Dialog is off) and an effect borrows your Ambience slider (Dialog, if Ambience is off),
+set to Godslayer's level while it plays, and Godslayer puts yours back when the last one ends. Move
+that slider yourself in the meantime and your setting wins. An NPC speaking at that moment plays at
+Godslayer's level. Levels below 100 need the game's Dialog or Ambience sound turned on.
+
+Your kill song is game music, so it follows your own Music slider, scaled by Godslayer's Music and
+Master levels. If game Music is turned off, the song falls back to the Master channel, and Godslayer's
+Music level cannot reach that fallback.
 
 ## Where the flag is
 
@@ -464,7 +493,7 @@ Try it without killing anyone:
 | `/godslayer hype stop` | Ends the hunt and fades the music |
 | `/godslayer clip` | Marks this moment for your recorder |
 
-`/godslayer hype` shows the settings. `pack <name>` pins an announcer and `pack mix` goes back to a different one each hunt; `mix <name> off` leaves one out of the mix. On or off: `music`, `voice`, `guild`, `sfx` (every sound under the voice), `spot`, `multi` (double kill and up), `asides` (the remarks), `theme`, `moments`, `barks` (the short word between rungs), `deny`, `duels`, `fx` (banner light and motion; off gives plain words), `fuse`, `duck` (the music stepping back), `engage` (the song starting with the fight), `class` (your class's sounds), `finishers`, `streaks` (telling the guild your big moments and hearing theirs), `wheel` (hearing your group's chat wheel), `photo` (a screenshot of your biggest moments, off unless you ask), `clip` (a mark for a recorder when a hunt ends, off unless you ask; see Recording your hunts). `channel master`, `dialog` or `sfx` picks which volume slider the announcer follows. `window <seconds>` sets how long a hunt lasts, `blows` counts only your own killing blows, `all` counts every kill you get credit for. Pretend kills score nothing.
+`/godslayer hype` shows the settings. `pack <name>` pins an announcer and `pack mix` goes back to a different one each hunt; `mix <name> off` leaves one out of the mix. On or off: `music`, `voice`, `guild`, `sfx` (every sound under the voice), `spot`, `multi` (double kill and up), `asides` (the remarks), `theme`, `moments`, `barks` (the short word between rungs), `deny`, `duels`, `fx` (banner light and motion; off gives plain words), `fuse`, `duck` (the music stepping back), `engage` (the song starting with the fight), `class` (your class's sounds), `finishers`, `streaks` (telling the guild your big moments and hearing theirs), `wheel` (hearing your group's chat wheel), `photo` (a screenshot of your biggest moments, off unless you ask), `clip` (a mark for a recorder when a hunt ends, off unless you ask; see Recording your hunts). The old `channel` setting no longer applies: each part has its own fixed route (see [Volume](#volume)). `window <seconds>` sets how long a hunt lasts, `blows` counts only your own killing blows, `all` counts every kill you get credit for. Pretend kills score nothing.
 
 ## Recording your hunts
 
@@ -507,8 +536,8 @@ Every line is in `tools/voice_script.json`: six packs, five scripts, and the cha
 | `/godslayer death` | The last seconds of your life, hit by hit. `death who` for what keeps killing you |
 | `/godslayer threat` | Who the guild keeps dying to. `threat <name>` for one of them, `threat guilds` for whose they are |
 | `/godslayer flag` | Where the flag is with the map shut: yards, bearing, speed, distance to the cap. `flag calls important\|all\|off`, `flag voice on\|off`, `flag repeat <10-120>` |
-| `/godslayer hunters` | What the Hunters board is doing. `hunters off` stops sharing, `hunters on` starts it again |
-| `/godslayer volume <0-100>` | Godslayer's own volume |
+| `/godslayer slayers` | What the Slayers board is doing. `slayers off` stops sharing, `slayers on` starts it again, `slayers feed everyone\|top10\|off` picks the live kill lines (`hunters` still works) |
+| `/godslayer volume` | Godslayer's levels. `volume <0-100>` sets Master, `volume music\|voice\|effects <0-100>` sets one part |
 | `/godslayer share` | Post a brag line to guild chat |
 | `/godslayer top` | Post the top 3 to guild chat |
 | `/godslayer demo` | Preview the kill banner |

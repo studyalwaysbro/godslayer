@@ -419,9 +419,10 @@ H.End("stop")
 eq(A.cvars.Sound_MusicVolume, "0.8", "a hunt ending mid-call restores the music at once")
 -- the game was closed while it was down
 GodslayerDB.opts.hype.duckFrom = 0.7
+GodslayerDB.opts.hype.duckTo = 0.42
 A.cvars.Sound_MusicVolume = "0.3"
 H.Login()
-eq(A.cvars.Sound_MusicVolume, "0.7", "logging in after a crash mid-call puts the music back")
+eq(A.cvars.Sound_MusicVolume, "0.3", "duck crash recovery leaves a player-changed slider alone")
 -- a client that refuses
 A.cvars.Sound_MusicVolume = "0.8"
 say("hype duck off")
@@ -436,11 +437,10 @@ kill() M.advance(13)
 eq(A.music, S .. "music\\hunt2.ogg", "at five the theme moves to its second half")
 reset()
 -- channel
+local oldChannel = GodslayerDB.opts.hype.channel
 say("hype channel dialog")
-kill() M.advance(1)
-eq(A.channel, "Dialog", "the announcer can be moved to the dialog channel")
-say("hype channel master")
-say("hype channel nonsense") eq(GodslayerDB.opts.hype.channel, "Master", "an unknown channel changes nothing")
+eq(GodslayerDB.opts.hype.channel, oldChannel, "the obsolete channel command does not change routing")
+check(M.printed[#M.printed]:find("fixed per part", 1, true) ~= nil, "the obsolete channel command explains fixed routing")
 -- screenshots are opt-in
 reset()
 for _ = 1, 15 do kill() M.advance(13) end

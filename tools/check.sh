@@ -58,7 +58,7 @@ luatex --luaonly tools/build_secrecy_map.lua --check
 echo
 echo "== suites =="
 total=0
-for s in run v2 v22 aura rival pivot ledger rank recap field flag control death threat perf song hidden; do
+for s in run v2 v22 aura rival pivot ledger rank recap field flag control death threat perf song hidden hunters31; do
   out=$(GS_SEED="$SEED" GS_SUITE="tests/$s.lua" luatex --luaonly "$RUNNER" 2>&1 | tail -1)
   printf '%-10s %s\n' "$s" "$out"
   case "$out" in
@@ -69,6 +69,19 @@ for s in run v2 v22 aura rival pivot ledger rank recap field flag control death 
   total=$((total + n))
 done
 echo "total $total assertions"
+
+echo
+echo "== hunters simulation =="
+sim=$(GS_SEED="$SEED" /usr/bin/texlua tests/hunters_sim.lua 2>&1) || {
+  echo "$sim"
+  echo "FAILED: hunters simulation"
+  exit 1
+}
+echo "$sim"
+case "$sim" in
+  *"starvation 0, 0 failures") ;;
+  *) echo "FAILED: hunters simulation"; exit 1 ;;
+esac
 
 echo
 echo "== soak =="

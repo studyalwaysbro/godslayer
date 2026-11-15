@@ -429,7 +429,7 @@ local function boardRows()
 end
 
 local HUNTER_COLS = {
-  { "#", 24, "RIGHT" }, { "Hunter", 132, "LEFT" }, { "Rung", 36, "RIGHT" }, { "Title", 92, "LEFT" },
+  { "#", 24, "RIGHT" }, { "Player", 132, "LEFT" }, { "Rung", 36, "RIGHT" }, { "Title", 92, "LEFT" },
   { "Kills", 40, "RIGHT" }, { "KB", 32, "RIGHT" }, { "OLYMPUS", 60, "RIGHT" },
   { "Points", 46, "RIGHT" }, { "Confirmed", 62, "RIGHT" },
 }
@@ -463,7 +463,7 @@ local TABS = {
     cols = { { "#", 26, "RIGHT" }, { "Guild", 280, "LEFT" }, { "Members killed", 110, "RIGHT" },
              { "Kills", 70, "RIGHT" }, { "Points", 70, "RIGHT" } } },
   { label = "Leaderboard", rows = boardRows, empty = "",
-    cols = { { "#", 26, "RIGHT" }, { "Hunter", 160, "LEFT" }, { "Rung", 40, "RIGHT" }, { "Title", 120, "LEFT" },
+    cols = { { "#", 26, "RIGHT" }, { "Player", 160, "LEFT" }, { "Rung", 40, "RIGHT" }, { "Title", 120, "LEFT" },
              { "Kills", 40, "RIGHT" }, { "Unique", 46, "RIGHT" }, { "KB", 32, "RIGHT" }, { "OLYMPUS", 62, "RIGHT" },
              { "Points", 46, "RIGHT" } } },
   { label = "Hit List", rows = hitRows, empty = "Nobody worth hunting seen and still breathing. Turn on enemy nameplates.",
@@ -566,7 +566,7 @@ local function buildMain()
   f.boardButtons = {}
   local switches = {
     { "Guild", function() boardKind, offset = "guild", 0 end },
-    { "Hunters", function() boardKind, offset = "hunters", 0 end },
+    { "Slayers", function() boardKind, offset = "hunters", 0 end },
     { "Lifetime", function() hunterPeriod, offset = "lifetime", 0 end },
     { "This week", function() hunterPeriod, offset = "week", 0 end },
   }
@@ -810,7 +810,7 @@ function UI.Refresh()
     else b:Hide() end
   end
   if onBoard and boardKind == "hunters" then
-    main.boardHeader:SetText(("Rank among %d hunters confirmed by your client. Scores are self-reported."):format(huntersConfirmed))
+    main.boardHeader:SetText(("Rank among %d Slayers confirmed by your client. Scores are self-reported."):format(huntersConfirmed))
     main.boardHeader:Show()
   else main.boardHeader:Hide() end
 
@@ -824,7 +824,7 @@ function UI.Refresh()
     else
       local st = ns.Hunters.Status()
       local footer
-      if not st.enabled then footer = "Hunters is off. /godslayer hunters on"
+      if not st.enabled then footer = "Slayers is off. /godslayer slayers on"
       elseif st.reason then footer = st.reason
       else
         local exchange = "never"
@@ -835,11 +835,13 @@ function UI.Refresh()
         if st.directory == "working" then
           footer = ("%d candidates / %d confirmed / %d partners / sync %s"):format(
             st.candidates, st.confirmed, st.partners, exchange)
-        elseif st.directory == "suspended" or st.directory == "unavailable" then
+        elseif st.directory == "suspended" or st.directory == "unreadable" or st.directory == "not joined" then
           footer = ("%d confirmed. Directory unavailable; coverage is limited"):format(st.confirmed)
+        elseif st.directory == "only you" then
+          footer = ("%d confirmed. Directory is working; only you are listed right now"):format(st.confirmed)
         else
           -- the first minutes after login: the directory is joining or its member list is on the way
-          footer = ("%d candidates / %d confirmed / looking for hunters"):format(st.candidates, st.confirmed)
+          footer = ("%d candidates / %d confirmed / looking for Slayers"):format(st.candidates, st.confirmed)
         end
       end
       if st.notice then
@@ -1157,8 +1159,9 @@ local function printHelp()
   print("  /godslayer death     the last seconds of your life, hit by hit. death who for the tally")
   print("  /godslayer threat    who the guild keeps dying to. threat <name>, threat guilds")
   print("  /godslayer flag      where the flag is with the map shut. flag watch toggles the calls")
-  print("  /godslayer volume <0-100>   volume for Godslayer voice, effects, and chat wheel")
-  print("  /godslayer hunters [on|off|status]   first-hand cross-realm Hunters board")
+  print("  /godslayer volume [music|voice|effects] <0-100>   Master or per-part Godslayer volume")
+  print("  /godslayer slayers [on|off|status]   first-hand cross-realm Slayers board; hunters is an alias")
+  print("  /godslayer slayers feed off|top10|everyone   live kill chat; voice and banner are separate opt-ins")
   print("  /godslayer clip       mark this moment for your recorder")
   print("  /godslayer wheel      the chat wheel (or bind a key: Key Bindings, AddOns, Godslayer)   wheel list | wheel <number>")
   print("  /godslayer share      post a brag line to guild chat")
@@ -1252,16 +1255,22 @@ local function slash(input)
     if not ns.Flag then ns.Print("The flag part did not load. Quit the game fully and start it again.") return end
     ns.Flag.Command(rest)
   elseif cmd == "volume" then
+    local part, raw = rest:match("^(%S+)%s+(%S+)$")
     local value = tonumber(rest)
     if rest == "" then
-      ns.Print(("Godslayer volume: %d. Below 100, Godslayer briefly sets the Dialog (or Ambience) volume while its own lines play, so an NPC line at that exact moment plays at Godslayer's level."):format(opts.volume or 100))
-    elseif not value or not ns.Sound or not ns.Sound.SetVolume(value) then
-      ns.Print("Use /godslayer volume <0-100>.")
+      local master, music, voice, effects = ns.Sound and ns.Sound.Levels and ns.Sound.Levels()
+      local fallback = plain(try(GetCVar, "Sound_EnableMusic")) == "0"
+        and " Game Music is off, so hunt songs use the Master-channel fallback and the Music slider cannot reach that path." or ""
+      ns.Print(("Volume: Master %d, Music %d, Voice %d, Effects %d. At 100, Godslayer plays Voice and Effects at full game volume as before. Below 100, Voice briefly borrows Dialog and Effects borrow Ambience while a line plays; songs follow your Music slider. Levels below 100 need the game's Dialog or Ambience sound enabled.%s"):format(master or 100, music or 100, voice or 100, effects or 100, fallback))
+    elseif value and ns.Sound and ns.Sound.SetVolume(value) then
+      ns.Print(("Godslayer Master volume set to %d."):format(select(1, ns.Sound.Levels())))
+    elseif part and tonumber(raw) and ns.Sound and ns.Sound.SetVolume(part, tonumber(raw)) then
+      ns.Print(("Godslayer %s volume set to %d."):format(part, tonumber(raw)))
     else
-      ns.Print(("Godslayer volume set to %d."):format(opts.volume))
+      ns.Print("Use /godslayer volume <0-100> or /godslayer volume music|voice|effects <0-100>.")
     end
-  elseif cmd == "hunters" then
-    if ns.Hunters then ns.Hunters.Command(rest) else ns.Print("The Hunters board did not load.") end
+  elseif cmd == "slayers" or cmd == "hunters" then
+    if ns.Hunters then ns.Hunters.Command(rest) else ns.Print("The Slayers board did not load.") end
   elseif cmd == "control" then
     if not ns.Control then ns.Print("The control part did not load. Quit the game fully and start it again.") return end
     ns.Control.Command(rest)
